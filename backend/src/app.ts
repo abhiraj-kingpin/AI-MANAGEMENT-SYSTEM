@@ -1,0 +1,87 @@
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import express, { type Application } from 'express';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import { corsAllowedOrigins, env, isProduction } from './config/env';
+import { morganStream } from './config/logger';
+import { errorHandler } from './middlewares/error.middleware';
+import { notFoundHandler } from './middlewares/notFound.middleware';
+import { attendanceRouter } from './modules/attendance/attendance.routes';
+import { authRouter } from './modules/auth/auth.routes';
+import { employeeRouter } from './modules/employees/employee.routes';
+import { faceRouter } from './modules/face-recognition/face.routes';
+import { geofenceRouter } from './modules/geofence/geofence.routes';
+import { healthRouter } from './modules/health/health.routes';
+import { holidayRouter } from './modules/leaves/holiday.routes';
+import { leaveRouter } from './modules/leaves/leave.routes';
+import { leaveTypeRouter } from './modules/leaves/leaveType.routes';
+import { notificationRouter } from './modules/notifications/notification.routes';
+import { payrollRunRouter } from './modules/payroll/payrollRun.routes';
+import { payslipRouter } from './modules/payroll/payslip.routes';
+import { salaryRouter } from './modules/payroll/salary.routes';
+import { qrRouter } from './modules/qr/qr.routes';
+import { shiftRouter } from './modules/shifts/shift.routes';
+
+export function createApp(): Application {
+  const app = express();
+
+  // Security headers
+  app.use(helmet());
+
+  // CORS — only the admin dashboard / mobile app origins configured in .env are allowed
+  app.use(
+    cors({
+      origin: corsAllowedOrigins,
+      credentials: true,
+    }),
+  );
+
+  app.use(compression());
+  app.use(cookieParser());
+  app.use(express.json({ limit: '2mb' }));
+  app.use(express.urlencoded({ extended: true }));
+
+  // HTTP access log → routed through winston (see config/logger.ts)
+  app.use(morgan(isProduction ? 'combined' : 'dev', { stream: morganStream }));
+
+  // Global rate limit; stricter per-route limits (auth, attendance) are added in their own modules
+  app.use(
+    rateLimit({
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+      max: env.RATE_LIMIT_MAX,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: {
+        success: false,
+        error: { code: 'RATE_LIMITED', message: 'Too many requests, slow down.' },
+      },
+    }),
+  );
+
+  // Routes
+  app.use(`${env.API_PREFIX}/health`, healthRouter);
+  app.use(`${env.API_PREFIX}/auth`, authRouter);
+  app.use(`${env.API_PREFIX}/employees`, employeeRouter);
+  app.use(`${env.API_PREFIX}/attendance`, attendanceRouter);
+  app.use(`${env.API_PREFIX}/geofences`, geofenceRouter);
+  app.use(`${env.API_PREFIX}/qr`, qrRouter);
+  app.use(`${env.API_PREFIX}/face`, faceRouter);
+  app.use(`${env.API_PREFIX}/leaves`, leaveRouter);
+  app.use(`${env.API_PREFIX}/leave-types`, leaveTypeRouter);
+  app.use(`${env.API_PREFIX}/holidays`, holidayRouter);
+  app.use(`${env.API_PREFIX}/shifts`, shiftRouter);
+  app.use(`${env.API_PREFIX}/salaries`, salaryRouter);
+  app.use(`${env.API_PREFIX}/payroll`, payrollRunRouter);
+  app.use(`${env.API_PREFIX}/payslips`, payslipRouter);
+  app.use(`${env.API_PREFIX}/notifications`, notificationRouter);
+  // Future modules mount here: analytics, audit-logs — one line each, per
+  // docs/architecture/04-api-documentation.md
+
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
+  return app;
+}

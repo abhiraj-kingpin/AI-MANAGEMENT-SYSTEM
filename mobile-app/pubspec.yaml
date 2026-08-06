@@ -1,0 +1,46 @@
+name: ai_management_system
+description: "AI Management System — employee mobile app (GPS/QR/Face attendance, offline sync, leave, payroll)."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management (see docs/architecture/06-tech-stack-justification.md)
+  flutter_riverpod: ^2.5.1
+
+  # Networking
+  dio: ^5.5.0
+
+  # Routing
+  go_router: ^14.2.0
+
+  # Offline-first local storage — Hive for the attendance sync queue (Phase 13),
+  # flutter_secure_storage for JWT access/refresh tokens (Keychain/Keystore).
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^9.2.2
+  connectivity_plus: ^6.0.5
+
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.8
+
+  # Added in their respective phases (kept here as a reference, not yet used):
+  # geolocator            — Phase 6, GPS attendance / geofencing
+  # mobile_scanner        — Phase 7, QR attendance
+  # google_mlkit_face_detection, camera, tflite_flutter — Phase 8, face recognition
+  # firebase_messaging, firebase_core — Phase 12, push notifications
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

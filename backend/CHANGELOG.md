@@ -1,0 +1,126 @@
+# Changelog
+
+All notable backend development history, in build order. The [README](README.md) describes the system as it stands today; this file explains how it got there — including every deliberate simplification, every bug a test caught before it shipped, and the reasoning behind each.
+
+Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
+
+## [Phase 13] — Offline Mode (backend half)
+
+**Added** — `POST /attendance/sync`: bulk-applies offline-queued check-in/check-out punches, per [`docs/architecture/08-sequence-diagrams.md#5-offline-attendance-sync`](../docs/architecture/08-sequence-diagrams.md).
+
+- Refactored `attendance.service.ts#checkIn`/`checkOut` into time-parameterized internals (`performCheckIn`/`performCheckOut`) shared by both the live endpoints (`now = new Date()`) and sync (`now` = the punch's original `occurredAt`) — one implementation, not two copies that could drift. All 45 pre-existing `checkIn`/`checkOut` tests pass unchanged against the refactor, confirming behavior wasn't altered.
+- Idempotent via `clientGeneratedId` (a field and sparse-unique index the schema already had, reserved since Phase 2) — resubmitting the same punch twice returns `status: "duplicate"`, never double-applies it.
+- A punch that can't apply (already checked in, outside geofence, liveness failed, nothing to check out from, ...) never fails the whole batch or gets silently dropped — it comes back as `status: "conflict"` with the originating error code as `reason`, and is audit-logged for the anomaly-detection pass planned for Phase 15.
+- Punches are applied sequentially, in the order submitted — a check-out can depend on a check-in earlier in the same batch.
+- **Scope boundary, stated plainly**: this is the backend half of offline mode only. The mobile half — a Hive local queue, a connectivity listener, and retry/delete logic — is Flutter code that doesn't exist in this repository yet; this environment has no Flutter SDK to build or verify it. The API contract those pieces would call against is real and tested now.
+- **Documented limitation found while designing this**: the fixed schema stores one `clientGeneratedId` per `Attendance` document, not one per punch — a check-out punch's sync call overwrites the value a check-in punch's sync call set for the same day. Not a practical problem (the mobile client deletes a punch from its queue the moment it's acknowledged, so an already-acknowledged punch is never resent), but worth naming rather than assuming away.
+- **Verified**: 433 Jest tests (up from 421).
+
+## [Phase 12] — Notifications
+
+**Added** — `modules/notifications/`: an in-app notification feed (`GET /notifications/me`, `?unread=true`, mark-read / mark-all-read), HR/Admin broadcasts (`POST /notifications/broadcast`, company-wide or per-department), and FCM device-token registration (`POST /notifications/device-token`).
+
+- Real triggers wired into the modules that need them: a leave application notifies the applicant's manager; an approval/rejection notifies the applicant; a released payslip notifies the employee; a new shift assignment notifies the employee; an attendance-correction decision notifies the requester.
+- Push delivery itself (`push.service.ts#sendPushNotification`) is an honestly-labeled placeholder — no Firebase project or service-account credentials exist in this environment, so it logs what it would have sent rather than pretending to call Firebase. Every notification is still a real, persisted, individually-read-trackable document regardless of whether the push send is real.
+- Department-scoped broadcasts fan out to one document per active employee (so read state is trackable per person); a company-wide broadcast is a single `recipientId: null` document per the fixed schema, with a documented consequence: its `isRead` flag is shared, not per-recipient, since the schema has no per-user read-tracking for that case.
+- Added `User.deviceTokens: string[]` — not in the original schema doc, needed to back the device-token endpoint (same kind of documented gap-fill as attendance's `request-correction` in Phase 5).
+- **Real bug caught while building this phase**: `z.coerce.boolean()` on a query parameter is `Boolean(str)`, which is `true` for _any_ non-empty string — including the literal text `"false"`. Found on the new `unread` filter, and the same bug already existed on Phase 10's `includeInactive` shift filter; both fixed with an explicit `z.enum(['true','false']).transform(...)`.
+- **Verified**: 417 Jest tests (up from 385).
+
+## [Phase 11] — Payroll
+
+**Added** — `modules/payroll/`: base salary CRUD (`/salaries`), batch payslip generation (`POST /payroll/run`, poll via `GET /payroll/runs/:runId/status`), and payslip access (`/payslips`, `/payslips/me`, PDF download, release).
+
+- The payroll math is real, computed from `Attendance` data: overtime pay from summed overtime minutes at 1.5× an hourly rate derived from base salary; an attendance penalty (the schema's `latePenalty` field) covering late arrivals, half-days, and absences, each weighted by how much of a day they cost. Net pay is floored at 0.
+- A released payslip is never silently recomputed by a later run.
+- The batch trigger is an honestly-labeled placeholder for one piece only — the job queue. The API doc calls it a "queued job" (BullMQ + Redis in production); Redis is provisioned in `docker-compose.yml` but not wired into any application code yet, so this phase uses an in-memory run tracker instead. Every payslip it writes is still a real, durably-saved document; only the progress readout is lost on a restart.
+- PDF payslips are generated for real via PDFKit — verified in tests via the actual `%PDF` magic bytes.
+- **Verified**: 385 Jest tests (up from 329).
+
+## [Phase 10] — Shift Management
+
+**Added** — `modules/shifts/`: shift definitions (morning/night/rotational/flexible), single and bulk employee assignment, and `GET /shifts/me`.
+
+- Assignments are forward-only by design (`effectiveFrom` must be today or later) — there is always at most one open-ended assignment per employee, so reassigning just closes the previous one out the day before, with no arbitrary-interval reconciliation needed.
+- `attendance.service.ts` now resolves each employee's real assigned shift for late/present at check-in and overtime/half-day thresholds at check-out, correctly handling night shifts that cross midnight — falling back to the old hardcoded defaults only for an employee nobody's assigned a shift to yet, which is what let every pre-existing attendance test keep passing unchanged.
+- Half-day threshold now scales with the shift's real duration instead of a flat 4 hours.
+- **Verified**: 329 Jest tests (up from 284).
+
+## [Phase 9] — Leave Management
+
+**Added** — `modules/leaves/`: apply/cancel/approve/reject, running balances, leave types, and a holiday calendar.
+
+- `totalDays` is computed server-side from real business-day math (`shared/utils/businessDays.ts`), excluding weekends and holidays — never trusted from the client.
+- Balances are lazy: no `LeaveBalance` document is written until a request is actually approved or reversed; before that, the balance is computed virtually from the leave type's default quota.
+- Approving a leave stamps real `on_leave` Attendance records for each business day (via `$setOnInsert`, never overwriting a real check-in); check-in now rejects with `ON_APPROVED_LEAVE` on a day already stamped that way.
+- The manager-scoping query attendance already had inline was extracted to a shared `getManagedEmployeeIds` helper instead of being copy-pasted a third time.
+- **Flagged gap**: `LeaveType.carryForward`/`maxCarryForwardDays` are schema fields the balance math reads, but nothing automates the year-end carry-forward computation yet — that needs a scheduled job.
+- **Verified**: 284 Jest tests (up from 218).
+
+## [Phase 8] — Face Recognition
+
+**Added** — `modules/face-recognition/`: registration, per-employee embedding storage, cosine-similarity verification wired into check-in as `method: 'face'`.
+
+- **One seam is a labeled placeholder, confirmed with the user before building, not a silent one.** Converting a photo into an embedding vector needs a real face-recognition model (FaceNet/MobileFaceNet), which can't run in this backend-only environment (no GPU, no model bundling). `faceEmbedding.provider.ts` deterministically hashes image bytes into a unit vector instead — loudly documented as having no relationship to actual facial similarity, existing only so the pipeline around it is exercisable end-to-end. Swapping in a real model is a one-function change.
+- Everything around that seam is real: attendance-time verification never touches an image (the mobile app computes the embedding on-device per the architecture); the backend runs real cosine-similarity math against stored embeddings, thresholded at `FACE_MATCH_THRESHOLD`. Liveness must be explicitly `true`, not merely present.
+- `DELETE /face/:employeeId` is a genuine hard delete — the one place in this codebase that isn't soft-delete, since biometric data warrants real right-to-erasure.
+- **Real bug caught while building**: the first draft of "deactivate old embeddings on re-registration" used a time cutoff, which could misfire mid-batch on a slow request; fixed to exclude by explicit id instead.
+- **Verified**: 218 Jest tests (up from 180).
+
+## [Phase 7] — QR Attendance
+
+**Added** — `modules/qr/`: HR/Admin generate a time-boxed, HMAC-signed QR per branch; employees scan it via `POST /attendance/check-in` with `method: 'qr'`.
+
+- Two independent checks close two different attack paths: the JWT's own signature + `exp` (fast-fails a forged/tampered token before any DB call), and the DB record's `validTo` (catches a token revoked before its original `exp` — the JWT alone can't see that).
+- Uses its own signing secret (`QR_TOKEN_SECRET`), separate from session JWTs, since a QR code is a different trust boundary (displayed on a screen, potentially photographed).
+- **Real bug the tests caught**: the "already checked in today" guard originally ran _after_ method-specific work — harmless for GPS, but QR's `validateAndConsumeQrToken` mutates the QR record as a side effect, so a doomed request would have silently burned a single-use code. Fixed by reordering the guard first.
+- **Verified**: 180 Jest tests (up from 155).
+
+## [Phase 6] — GPS Attendance
+
+**Added** — `modules/geofence/`: office-location CRUD plus `findNearestGeofence()`, wired into check-in as `method: 'gps'`.
+
+- A single `$geoNear` aggregation against the `2dsphere` index does the distance math and sorts nearest-first server-side — not an app-level haversine loop.
+- `DELETE /geofences/:id` deactivates rather than hard-deletes, since historical attendance records reference a geofence by id.
+- `manual` check-in tightened back to HR/Admin-only now that GPS is a standard employee path.
+- **Verified**: 155 Jest tests (up from 137).
+
+## [Phase 5] — Attendance
+
+**Added** — `modules/attendance/`: self-service check-in/out + breaks, HR/Manager reporting, Excel/PDF export, and a two-track correction workflow (direct HR edit, and employee-request → manager/HR-approve).
+
+- Late/overtime/half-day math ran against one hardcoded default shift this phase (09:00, 8h day) — replaced with real per-employee shift lookups in Phase 10.
+- Only `method: 'manual'` was implemented; `gps`/`qr`/`face` were accepted by the Phase 2 schema but explicitly rejected with `METHOD_NOT_AVAILABLE` rather than silently no-op'ing.
+- Both correction paths are audit-logged through a new fire-and-forget `audit.service.ts` — a failed audit write logs loudly but never fails the request it's describing.
+- **Verified**: 137 Jest tests (up from 98).
+
+## [Phase 4] — Employee Management
+
+**Added** — `modules/employees/`: full CRUD, profile image + document upload (Multer memory storage → Cloudinary, no local disk).
+
+- RBAC split deliberately: whole-role gates (list/search/create/delete) live at the route via `requireRole`; per-resource scoping (a Manager sees only their team; an employee can self-edit only `phone`/`address`/`emergencyContact`) lives in the service layer.
+- `employeeCode` generation uses the standard MongoDB atomic-counter pattern, safe under concurrent creates.
+- Employee creation is two sequential writes (User, then Employee), not a transaction — a documented v1 trade-off, not a hidden one.
+- **Verified**: 98 Jest tests (up from 66).
+
+## [Phase 3] — Authentication
+
+**Added** — `modules/auth/`: register, login, JWT access + rotating refresh tokens, reuse-detection, logout, forgot/reset password, change password, `GET /me`.
+
+- **Real bug caught by tests**: two refresh tokens signed for the same user within the same second were byte-identical (JWT `iat`/`exp` have second granularity). Fixed by adding a random `jti` to every signed token.
+- The `User` schema tracks one active refresh-token hash per user (single session) — logging in on a new device ends the old session. Multi-device sessions would need a `sessions` sub-collection; a documented v2 item.
+- **Verified**: 66 Jest tests (up from 31).
+
+## [Phase 2] — Database Design
+
+**Added** — every collection from the architecture doc as a Mongoose model, with relationships, indexes (including the unique `{employeeId,date}` compound index and Geofence's `2dsphere` index), and schema-level cross-field validation.
+
+- **Verified**: 31 Jest tests exercising validators directly via Mongoose's in-process `validate()`/`validateSync()`.
+
+## [Phase 1] — Project Setup
+
+**Added** — Express + TypeScript scaffold, env validation (Zod), MongoDB connection, Winston/Morgan logging, centralized error handler, health checks, Helmet/CORS/rate-limiting, ESLint + Prettier, Docker + docker-compose (API/Mongo/Redis), Jest + Supertest.
+
+## [Phase 0] — Architecture
+
+Full system design: architecture, ER diagram, database schema, API contract, tech stack rationale, auth flow, sequence diagrams, deployment topology — see [docs/architecture/](../docs/architecture/). No code.
