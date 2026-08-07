@@ -59,6 +59,7 @@ Cross-module reuse goes through `src/shared/`, not through one module importing 
 | **Notifications**    | In-app feed, read/unread state, broadcasts, device-token registration                                                                                    |
 | **Analytics**        | Dashboard KPIs, monthly attendance-trend, cross-department comparison, CSV export — real aggregation over Employee/Attendance, team-scoped for Managers  |
 | **AI-Assisted Analytics** | Late-risk ranking, absenteeism trend + forecast, rule-based fraud/anomaly sweep — real statistics (rates, trend, z-scores, cosine similarity), explicitly not a trained ML model |
+| **Security**         | Account lockout after repeated failed logins, an append-only audit trail with a Super-Admin-only read API                                               |
 
 Two features have one real external-service seam each that can't be exercised in this environment (no GPU/ML runtime, no Firebase project) — everything else in those features is fully real. See [Known Simplifications](#known-simplifications--future-work).
 
@@ -149,7 +150,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 | Method | Path                    | Access                       | Notes                                                                         |
 | ------ | ----------------------- | ---------------------------- | ----------------------------------------------------------------------------- |
 | POST   | `/auth/register`        | Super Admin/HR               | HR cannot mint `hr`/`super_admin` accounts                                    |
-| POST   | `/auth/login`           | Public                       | Rate-limited 5/min/IP; refresh token as httpOnly cookie (web) + body (mobile) |
+| POST   | `/auth/login`           | Public                       | Rate-limited 5/min/IP; locks the account for 15 min after 5 wrong passwords; refresh token as httpOnly cookie (web) + body (mobile) |
 | POST   | `/auth/refresh`         | Public (valid refresh token) | Rotates the token; detects reuse of an already-rotated one                    |
 | POST   | `/auth/logout`          | Authenticated                | Clears the stored session hash + cookie                                       |
 | POST   | `/auth/forgot-password` | Public                       | Same response whether or not the email exists                                 |
@@ -269,6 +270,12 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 | GET    | `/analytics/ai/absenteeism-trend`   | Super Admin/HR/Manager  | Monthly unexplained-absence rate, trailing `months` (3–24, default 6), plus a one-month linear-regression forecast |
 | GET    | `/analytics/ai/anomalies`           | Super Admin/HR          | Rule-based sweep over `days` (1–90, default 30): implausible GPS travel, similar face embeddings across employees, overtime outliers |
 
+### Audit (`/audit-logs`)
+
+| Method | Path          | Access      | Notes                                                                                          |
+| ------ | ------------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| GET    | `/audit-logs` | Super Admin | `?entityType=&entityId=&actorId=&from=&to=&page=&limit=` — every filter optional, combined with AND |
+
 ## Build & Scripts
 
 | Command                           | Purpose                                   |
@@ -283,7 +290,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-482 Jest tests across every module, none requiring a live database:
+499 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).
@@ -304,10 +311,12 @@ Target topology (Render/Vercel/Atlas) and CI pipeline are documented in [`docs/a
 - **Tokens**: short-lived access JWT (15 min) + rotating refresh JWT (7 d); only the refresh token's SHA-256 hash is persisted; reuse of an already-rotated refresh token is detected and rejected.
 - **RBAC**: enforced at the route (`requireRole`) for whole-role gates and inside the service for per-resource scoping — a Manager's queries are always intersected with their own team server-side, never trusted from a client-supplied filter.
 - **Rate limiting**: global limiter on all routes, a stricter one on `/auth/login` and `/auth/forgot-password`.
+- **Account lockout** (Phase 16): 5 wrong passwords locks *that account* for 15 minutes, independent of which IP the attempts came from — the per-IP rate limiter and this per-account lock are complementary, not redundant. Stored on the `User` document itself (`failedLoginAttempts`/`lockedUntil`) rather than the originally-planned Redis counter, since no phase has ever wired Redis into any code (see [Known Simplifications](#known-simplifications--future-work)). A documented trade-off: unlike `forgotPassword`'s identical-response design, a locked account *does* reveal that the email exists — accepted because silently rejecting a correct password with no explanation is worse UX for negligible security gain against a targeted attacker.
+- **Audit trail**: `GET /audit-logs` (Super Admin only) exposes the append-only `AuditLog` collection that attendance corrections already write to (`recordAudit`, since Phase 5) — filterable by entity, actor, and date range.
 - **Transport hardening**: Helmet default headers, explicit CORS allowlist (`CORS_ALLOWED_ORIGINS`), `cookie-parser` with httpOnly refresh cookies.
 - **Trust boundaries respected, not assumed**: QR tokens are signed with a secret independent of the session JWT secrets (a QR code is physically displayed and can be photographed); face-attendance liveness must be explicitly `true`, never merely present, since the server cannot re-derive liveness itself from a single embedding.
 - **Biometric data**: face embeddings are the one entity in this codebase that is hard-deleted (not soft-deleted) on request, for genuine right-to-erasure.
-- **Known gap**: no account-lockout after repeated failed logins yet (the login rate limiter is the interim mitigation) — tracked for the security-hardening phase.
+- **Dependency audit** (`npm audit`): one moderate finding, upstream and currently unfixable without a regression — `exceljs@4.4.0` (already the latest release) pins a vulnerable `uuid@8.3.2` internally ([GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq), a missing buffer bounds check in uuid's v3/v5/v6 generation when a buffer is explicitly passed in). This app never calls `uuid` directly and doesn't control how `exceljs` uses it internally, so there's no reachable path from any request this API accepts — documented here rather than silently ignored, and worth re-checking whenever `exceljs` ships a new release.
 
 ## Performance Notes
 
@@ -339,7 +348,7 @@ Other known, documented gaps:
 - **No DB transactions**: employee creation (User + Employee) and a few other multi-document writes are sequential, not transactional — acceptable on a single-node MongoDB (not a replica set) for now, revisited once running against Atlas.
 - **Only one `clientGeneratedId` is retained per attendance record**: the schema (by design, from Phase 0) stores a single idempotency key per document, not one per punch. A check-out punch's sync call overwrites the field a check-in punch's sync call set. In practice this is safe — the mobile client deletes a punch from its local queue the moment it gets back `applied`/`duplicate`, so an older punch is never resubmitted after a newer one has already landed — but it's a narrow theoretical gap worth naming rather than silently assuming away.
 
-Remaining platform-level phases (a mobile offline-sync client, formal security hardening, performance tuning, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
+Remaining platform-level phases (a mobile offline-sync client, performance tuning, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
 
 ## License
 

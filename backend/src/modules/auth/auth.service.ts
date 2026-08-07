@@ -16,6 +16,41 @@ import { type IUser, User } from '../users/user.model';
 import type { AuthUserDTO, LoginResultDTO, SessionTokensDTO } from './auth.types';
 
 const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000;
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
+/** Throws 423 if `user` is currently locked out. A no-op for `null` (unknown email) — the same "don't tell an attacker more than a wrong password would" reasoning forgotPassword already documents. */
+function assertNotLocked(user: IUser | null): void {
+  if (user?.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+    const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
+    throw AppError.locked(
+      `Too many failed login attempts. Try again in ${minutesLeft} minute(s).`,
+      'ACCOUNT_LOCKED',
+    );
+  }
+}
+
+/**
+ * Increments the failed-attempt counter and locks the account once it
+ * crosses the threshold. Reached only after assertNotLocked has already
+ * confirmed any existing `lockedUntil` has expired — so a present-but-
+ * expired lock is treated as fully reset (counts from 1 again), not
+ * resumed from wherever it left off.
+ */
+async function registerFailedLogin(user: IUser): Promise<void> {
+  const hadExpiredLock = !!user.lockedUntil;
+  user.failedLoginAttempts = hadExpiredLock ? 1 : user.failedLoginAttempts + 1;
+  user.lockedUntil = null;
+
+  if (user.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+    user.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+    logger.warn(`Account locked after ${user.failedLoginAttempts} failed login attempts`, {
+      userId: user.id,
+    });
+  }
+
+  await user.save();
+}
 
 function toAuthUserDTO(user: IUser): AuthUserDTO {
   return {
@@ -74,18 +109,32 @@ export const authService = {
     return toAuthUserDTO(user);
   },
 
-  // Account lockout after repeated failed logins (docs/architecture/07-authentication-flow.md §7)
-  // is deferred to Phase 16 (Security), once Redis is wired in as the counter store — the global
-  // and per-route rate limiters (app.ts, auth.routes.ts) are the interim brute-force mitigation.
+  /**
+   * Rate limiting (auth.routes.ts's per-IP `bruteForceGuard`) throttles how
+   * fast anyone can try; this is the complementary per-account guard — 5
+   * wrong passwords locks *that account* for 15 minutes regardless of which
+   * IP the attempts came from, per docs/architecture/07-authentication-flow.md
+   * §7. Locking is a documented trade-off against user enumeration: an
+   * attacker who already knows a real email now learns it exists once it
+   * locks, which forgotPassword's identical-response design otherwise
+   * avoids — accepted because the alternative (silently rejecting a
+   * *correct* password during lockout with no explanation) is worse UX for
+   * a negligible security gain against a targeted attacker.
+   */
   async login(email: string, password: string): Promise<LoginResultDTO> {
     const user = await User.findOne({ email }).select('+passwordHash');
+    assertNotLocked(user);
+
     if (!user || !user.isActive || !(await user.comparePassword(password))) {
+      if (user) await registerFailedLogin(user);
       throw AppError.unauthorized('Email or password is incorrect.', 'INVALID_CREDENTIALS');
     }
 
     const employee = await findEmployeeSummary(user.id as string);
     const session = issueSession(user, employee?.id);
 
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
     user.lastLoginAt = new Date();
     await user.save();
 

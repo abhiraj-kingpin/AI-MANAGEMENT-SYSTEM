@@ -41,6 +41,11 @@ export class AppError extends Error {
     return new AppError(message, 409, code);
   }
 
+  /** 423 Locked — a resource that exists but is temporarily blocked, distinct from 401/403 which are about the caller's credentials/permissions. Used by auth.service.ts's login lockout (Phase 16). */
+  static locked(message: string, code = 'LOCKED') {
+    return new AppError(message, 423, code);
+  }
+
   static unprocessable(message: string, code = 'UNPROCESSABLE_ENTITY', details?: unknown) {
     return new AppError(message, 422, code, details);
   }

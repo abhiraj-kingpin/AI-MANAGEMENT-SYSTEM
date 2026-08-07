@@ -67,6 +67,7 @@ Every animation (mesh drift, scroll-reveal, count-up, magnetic hover, shine-swee
 - Access token lives in memory (`stores/authStore.ts`) — never written to `localStorage` (XSS mitigation, per [docs/architecture/07-authentication-flow.md](../docs/architecture/07-authentication-flow.md)).
 - Refresh token lives in an httpOnly cookie the browser manages; `shared/lib/axios.ts` calls `/auth/refresh` on any `401` and retries the original request once.
 - On page load, `features/auth/hooks/useAuthHydration.ts` silently attempts a refresh to restore the session from that cookie before `ProtectedRoute` decides whether to redirect to `/login`.
+- `LoginPage` surfaces the backend's actual error message rather than a hardcoded one — needed once the backend's Phase 16 account lockout could return a distinct "try again in N minutes" response that a generic "Invalid email or password" would have hidden.
 
 ## Status
 

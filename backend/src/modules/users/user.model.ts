@@ -16,6 +16,14 @@ export interface IUser extends Document {
   passwordResetExpiresAt: Date | null;
   lastLoginAt: Date | null;
   mustChangePassword: boolean;
+  // Account lockout (Phase 16) — see auth.service.ts. The original plan
+  // (docs/architecture/07-authentication-flow.md §7) named Redis as the
+  // failed-attempt counter store; no phase has ever wired Redis into any
+  // code (it sits unused in docker-compose, same documented gap as Phase
+  // 11's payroll job queue), so this uses plain User fields instead. Same
+  // security guarantee, no new infrastructure dependency.
+  failedLoginAttempts: number;
+  lockedUntil: Date | null;
   // Not in the original docs/architecture/03-database-schema.md#users —
   // added in Phase 12 to back POST /notifications/device-token (listed in
   // the API doc, but the schema doc predates it / has a gap, same kind of
@@ -52,6 +60,8 @@ const userSchema = new Schema<IUser, IUserModel>(
     passwordResetExpiresAt: { type: Date, select: false, default: null },
     lastLoginAt: { type: Date, default: null },
     mustChangePassword: { type: Boolean, default: false },
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockedUntil: { type: Date, default: null },
     deviceTokens: { type: [String], default: [] },
   },
   { timestamps: true },

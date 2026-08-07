@@ -46,6 +46,8 @@ interface FakeUserOverrides {
   passwordResetTokenHash?: string | null;
   passwordResetExpiresAt?: Date | null;
   mustChangePassword?: boolean;
+  failedLoginAttempts?: number;
+  lockedUntil?: Date | null;
 }
 
 function createFakeUser(overrides: FakeUserOverrides = {}) {
@@ -61,6 +63,8 @@ function createFakeUser(overrides: FakeUserOverrides = {}) {
     passwordResetExpiresAt: null as Date | null,
     mustChangePassword: false,
     lastLoginAt: null as Date | null,
+    failedLoginAttempts: 0,
+    lockedUntil: null as Date | null,
     comparePassword: jest.fn((candidate: string) =>
       Promise.resolve(candidate === 'correct-password'),
     ),
@@ -125,6 +129,75 @@ describe('authService.login', () => {
     await expect(authService.login('nobody@acme.com', 'x')).rejects.toMatchObject({
       code: 'INVALID_CREDENTIALS',
     });
+  });
+
+  it('increments the failed-attempt counter on a wrong password without locking under the threshold', async () => {
+    const fakeUser = createFakeUser({ failedLoginAttempts: 2 });
+    mockedUserFindOne.mockReturnValue(mockQuery(fakeUser));
+
+    await expect(authService.login('jane@acme.com', 'wrong-password')).rejects.toMatchObject({
+      code: 'INVALID_CREDENTIALS',
+    });
+
+    expect(fakeUser.failedLoginAttempts).toBe(3);
+    expect(fakeUser.lockedUntil).toBeNull();
+    expect(fakeUser.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks the account once failed attempts reach the threshold', async () => {
+    const fakeUser = createFakeUser({ failedLoginAttempts: 4 }); // one more tips it over
+    mockedUserFindOne.mockReturnValue(mockQuery(fakeUser));
+
+    await expect(authService.login('jane@acme.com', 'wrong-password')).rejects.toMatchObject({
+      code: 'INVALID_CREDENTIALS',
+    });
+
+    expect(fakeUser.failedLoginAttempts).toBe(5);
+    expect(fakeUser.lockedUntil).toBeInstanceOf(Date);
+    expect(fakeUser.lockedUntil!.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('rejects an already-locked account before ever checking the password — and does not consume another attempt', async () => {
+    const fakeUser = createFakeUser({
+      failedLoginAttempts: 5,
+      lockedUntil: new Date(Date.now() + 10 * 60_000),
+    });
+    mockedUserFindOne.mockReturnValue(mockQuery(fakeUser));
+
+    await expect(authService.login('jane@acme.com', 'correct-password')).rejects.toMatchObject({
+      code: 'ACCOUNT_LOCKED',
+      statusCode: 423,
+    });
+
+    expect(fakeUser.comparePassword).not.toHaveBeenCalled();
+    expect(fakeUser.failedLoginAttempts).toBe(5); // unchanged
+    expect(fakeUser.save).not.toHaveBeenCalled();
+  });
+
+  it('treats an expired lock as fully reset, not resumed, on the next failure', async () => {
+    const fakeUser = createFakeUser({
+      failedLoginAttempts: 5,
+      lockedUntil: new Date(Date.now() - 1000), // expired a second ago
+    });
+    mockedUserFindOne.mockReturnValue(mockQuery(fakeUser));
+
+    await expect(authService.login('jane@acme.com', 'wrong-password')).rejects.toMatchObject({
+      code: 'INVALID_CREDENTIALS',
+    });
+
+    expect(fakeUser.failedLoginAttempts).toBe(1); // restarted, not 6
+    expect(fakeUser.lockedUntil).toBeNull();
+  });
+
+  it('clears the failed-attempt counter on a successful login', async () => {
+    const fakeUser = createFakeUser({ failedLoginAttempts: 3 });
+    mockedUserFindOne.mockReturnValue(mockQuery(fakeUser));
+    mockedEmployeeFindOne.mockReturnValue(mockQuery(fakeEmployee));
+
+    await authService.login('jane@acme.com', 'correct-password');
+
+    expect(fakeUser.failedLoginAttempts).toBe(0);
+    expect(fakeUser.lockedUntil).toBeNull();
   });
 });
 

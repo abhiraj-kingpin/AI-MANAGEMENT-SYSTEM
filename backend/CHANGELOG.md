@@ -4,6 +4,18 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [Phase 16] — Security Hardening
+
+**Added** — Account lockout on `POST /auth/login`, and `GET /audit-logs` (Super Admin only) exposing the audit trail attendance corrections have written to since Phase 5.
+
+- **Account lockout**: 5 wrong passwords locks the account for 15 minutes, tracked on `User.failedLoginAttempts`/`User.lockedUntil` rather than the Redis counter `auth.service.ts`'s old comment named as the plan — no phase has ever wired Redis into any code (same documented gap as Phase 11's job queue), so this reuses the pattern already established there: same guarantee, no new infrastructure dependency. An already-expired lock is treated as fully reset on the next failure (starts counting from 1), not resumed from its pre-expiry count.
+- **Documented trade-off**: `forgotPassword` deliberately gives an identical response whether or not an email exists; account lockout can't offer that same guarantee — a locked response necessarily confirms the email is registered. Accepted because silently rejecting a *correct* password during lockout with no explanation is worse UX for negligible security benefit against an attacker who already has the target email.
+- New `AppError.locked()` (423) — distinct from 401/403, since this is "the account exists and the password may well be right, but access is temporarily blocked," not a credentials or permissions failure.
+- **Audit trail read API**: `audit.service.ts` already had `recordAudit` (write-only, fire-and-forget); added `listAuditLogs` plus a controller/routes layer to actually expose it, per the Phase 0 contract in [`docs/architecture/04-api-documentation.md`](../docs/architecture/04-api-documentation.md#audit-audit-logs--super-admin-only). Every filter (`entityType`, `entityId`, `actorId`, `from`/`to`) is optional and ANDs together.
+- **`npm audit` reviewed and documented**, not silently ignored: one moderate finding (`uuid@8.3.2`, pinned internally by `exceljs@4.4.0` — already the latest release — with no reachable path from anything this API accepts). See [README's Security Considerations](README.md#security-considerations) for the full reasoning.
+- Frontend: `admin-dashboard`'s `LoginPage` was hardcoding "Invalid email or password." for every login failure — harmless before this phase, actively misleading once a locked-out user could see it instead of a wrong-password message. Fixed to surface the backend's actual error message.
+- **Verified**: 499 Jest tests (up from 482 — 17 new: 5 lockout cases in `auth.service.test.ts`, 6 in `audit.service.test.ts`, 6 in `audit.routes.test.ts`).
+
 ## [Phase 15] — AI-Assisted Analytics
 
 **Added** — `modules/analytics/analytics.ai.*`: `GET /analytics/ai/late-risk`, `GET /analytics/ai/absenteeism-trend`, and `GET /analytics/ai/anomalies`, per the Phase 0 contract in [`docs/architecture/04-api-documentation.md`](../docs/architecture/04-api-documentation.md#analytics-analytics).

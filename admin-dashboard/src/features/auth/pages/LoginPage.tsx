@@ -1,8 +1,24 @@
+import axios from 'axios';
 import { type FormEvent, useState } from 'react';
 import { Atmosphere } from '@/app/layout/Atmosphere';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { useLogin } from '@/features/auth/hooks/useLogin';
+import type { ApiError } from '@/types/api';
+
+/**
+ * Surfaces the backend's real message instead of a hardcoded one — a wrong
+ * password ("Email or password is incorrect.") and an account lockout
+ * ("Too many failed login attempts. Try again in N minute(s).") are
+ * different situations the user needs different information to act on.
+ */
+function loginErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as ApiError | undefined;
+    if (data?.error?.message) return data.error.message;
+  }
+  return 'Something went wrong. Please try again.';
+}
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -65,7 +81,7 @@ export function LoginPage() {
 
           {error && (
             <p className="text-sm text-danger" role="alert">
-              Invalid email or password.
+              {loginErrorMessage(error)}
             </p>
           )}
 

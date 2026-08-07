@@ -11,6 +11,7 @@ import { errorHandler } from './middlewares/error.middleware';
 import { notFoundHandler } from './middlewares/notFound.middleware';
 import { analyticsRouter } from './modules/analytics/analytics.routes';
 import { attendanceRouter } from './modules/attendance/attendance.routes';
+import { auditRouter } from './modules/audit/audit.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { employeeRouter } from './modules/employees/employee.routes';
 import { faceRouter } from './modules/face-recognition/face.routes';
@@ -79,8 +80,7 @@ export function createApp(): Application {
   app.use(`${env.API_PREFIX}/payslips`, payslipRouter);
   app.use(`${env.API_PREFIX}/notifications`, notificationRouter);
   app.use(`${env.API_PREFIX}/analytics`, analyticsRouter);
-  // Future modules mount here: audit-logs — one line each, per
-  // docs/architecture/04-api-documentation.md
+  app.use(`${env.API_PREFIX}/audit-logs`, auditRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
