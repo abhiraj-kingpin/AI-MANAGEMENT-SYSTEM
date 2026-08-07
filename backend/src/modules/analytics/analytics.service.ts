@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { analyticsCache } from '../../shared/cache/memoryCache';
 import { AppError } from '../../shared/errors/AppError';
 import type { ActorContext } from '../../shared/types/actorContext';
 import { requireEmployeeId } from '../../shared/utils/actor';
@@ -78,43 +79,72 @@ function escapeCsvField(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-export const analyticsService = {
-  /** One day's headcount + attendance/late/leave rates for the caller's scope. Real aggregation over Attendance/Employee — nothing here is invented. */
-  async getDashboardKpis(actor: ActorContext, query: DashboardKpisQuery): Promise<DashboardKpisDTO> {
-    const day = startOfUtcDay(query.date ?? new Date());
-    const employeeIds = await resolveEmployeeIds(actor, query.departmentId);
-    const headcount = employeeIds.length;
+// Both cached reads below are polled repeatedly by a live admin dashboard
+// (every page load, every focus-refetch) but only need to be as fresh as
+// "within the last half-minute" — an accepted staleness window, not a
+// silent one: a mutating action (e.g. a check-in landing seconds ago) may
+// not be reflected until the cache entry naturally expires.
+const DASHBOARD_CACHE_TTL_MS = 30_000;
+const DEPARTMENT_COMPARISON_CACHE_TTL_MS = 30_000;
 
-    if (headcount === 0) {
+/** A Manager's result is their own team only, so their employeeId must be part of the key; Super Admin/HR share one identical org-wide result for the same day/department, so role alone is enough. */
+function dashboardCacheKey(
+  actor: ActorContext,
+  departmentId: string | undefined,
+  day: Date,
+): string {
+  const scope = actor.role === 'manager' ? `manager:${actor.employeeId}` : actor.role;
+  return `dashboard:${scope}:${departmentId ?? 'all'}:${day.toISOString()}`;
+}
+
+export const analyticsService = {
+  /** One day's headcount + attendance/late/leave rates for the caller's scope. Real aggregation over Attendance/Employee, cached for 30s — nothing here is invented. */
+  async getDashboardKpis(
+    actor: ActorContext,
+    query: DashboardKpisQuery,
+  ): Promise<DashboardKpisDTO> {
+    const day = startOfUtcDay(query.date ?? new Date());
+    const cacheKey = dashboardCacheKey(actor, query.departmentId, day);
+
+    return analyticsCache.getOrSet(cacheKey, DASHBOARD_CACHE_TTL_MS, async () => {
+      // RBAC (resolveEmployeeIds' FORBIDDEN throw for an `employee` actor)
+      // runs inside the cached compute, not before it — a rejected promise
+      // is never stored by getOrSet, so an unauthorized caller is re-checked
+      // and correctly re-rejected on every single call, cache or no cache.
+      const employeeIds = await resolveEmployeeIds(actor, query.departmentId);
+      const headcount = employeeIds.length;
+
+      if (headcount === 0) {
+        return {
+          date: day,
+          headcount: 0,
+          attendanceRate: 0,
+          lateRate: 0,
+          leaveRate: 0,
+          presentCount: 0,
+          lateCount: 0,
+          onLeaveCount: 0,
+        };
+      }
+
+      const records = await Attendance.find({
+        employeeId: { $in: employeeIds },
+        date: day,
+      }).select('status');
+
+      const { presentCount, lateCount, onLeaveCount } = tallyStatuses(records);
+
       return {
         date: day,
-        headcount: 0,
-        attendanceRate: 0,
-        lateRate: 0,
-        leaveRate: 0,
-        presentCount: 0,
-        lateCount: 0,
-        onLeaveCount: 0,
+        headcount,
+        attendanceRate: round2((presentCount / headcount) * 100),
+        lateRate: round2((lateCount / headcount) * 100),
+        leaveRate: round2((onLeaveCount / headcount) * 100),
+        presentCount,
+        lateCount,
+        onLeaveCount,
       };
-    }
-
-    const records = await Attendance.find({
-      employeeId: { $in: employeeIds },
-      date: day,
-    }).select('status');
-
-    const { presentCount, lateCount, onLeaveCount } = tallyStatuses(records);
-
-    return {
-      date: day,
-      headcount,
-      attendanceRate: round2((presentCount / headcount) * 100),
-      lateRate: round2((lateCount / headcount) * 100),
-      leaveRate: round2((onLeaveCount / headcount) * 100),
-      presentCount,
-      lateCount,
-      onLeaveCount,
-    };
+    });
   },
 
   /**
@@ -133,7 +163,9 @@ export const analyticsService = {
 
     const months = query.months;
     const now = new Date();
-    const rangeStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+    const rangeStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1),
+    );
     const rangeEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
 
     const objectIds = employeeIds.map((id) => new Types.ObjectId(id));
@@ -160,7 +192,9 @@ export const analyticsService = {
     const points: AttendanceTrendPointDTO[] = [];
     for (let i = months - 1; i >= 0; i -= 1) {
       const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-      const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0));
+      const monthEnd = new Date(
+        Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0),
+      );
       const month = `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, '0')}`;
 
       const workingDays = countBusinessDays(monthStart, monthEnd, holidayDates);
@@ -177,46 +211,50 @@ export const analyticsService = {
     return points;
   },
 
-  /** One day's headcount + rates per active department — an org-wide report (HR/Admin only, gated at the route), not team-scoped. */
+  /** One day's headcount + rates per active department — an org-wide report (HR/Admin only, gated at the route), not team-scoped. Cached for 30s: every department fans out to its own Employee+Attendance query, the most expensive read in this module. */
   async getDepartmentComparison(
     query: DepartmentComparisonQuery,
   ): Promise<DepartmentComparisonDTO[]> {
     const day = startOfUtcDay(query.date ?? new Date());
-    const departments = await Department.find({ isActive: true }).select('name');
+    const cacheKey = `department-comparison:${day.toISOString()}`;
 
-    return Promise.all(
-      departments.map(async (dept) => {
-        const employees = await Employee.find({
-          departmentId: dept._id,
-          isDeleted: false,
-        }).select('_id');
-        const headcount = employees.length;
+    return analyticsCache.getOrSet(cacheKey, DEPARTMENT_COMPARISON_CACHE_TTL_MS, async () => {
+      const departments = await Department.find({ isActive: true }).select('name');
 
-        if (headcount === 0) {
+      return Promise.all(
+        departments.map(async (dept) => {
+          const employees = await Employee.find({
+            departmentId: dept._id,
+            isDeleted: false,
+          }).select('_id');
+          const headcount = employees.length;
+
+          if (headcount === 0) {
+            return {
+              departmentId: String(dept._id),
+              departmentName: dept.name,
+              headcount: 0,
+              attendanceRate: 0,
+              lateRate: 0,
+            };
+          }
+
+          const records = await Attendance.find({
+            employeeId: { $in: employees.map((e) => e._id) },
+            date: day,
+          }).select('status');
+          const { presentCount, lateCount } = tallyStatuses(records);
+
           return {
             departmentId: String(dept._id),
             departmentName: dept.name,
-            headcount: 0,
-            attendanceRate: 0,
-            lateRate: 0,
+            headcount,
+            attendanceRate: round2((presentCount / headcount) * 100),
+            lateRate: round2((lateCount / headcount) * 100),
           };
-        }
-
-        const records = await Attendance.find({
-          employeeId: { $in: employees.map((e) => e._id) },
-          date: day,
-        }).select('status');
-        const { presentCount, lateCount } = tallyStatuses(records);
-
-        return {
-          departmentId: String(dept._id),
-          departmentName: dept.name,
-          headcount,
-          attendanceRate: round2((presentCount / headcount) * 100),
-          lateRate: round2((lateCount / headcount) * 100),
-        };
-      }),
-    );
+        }),
+      );
+    });
   },
 
   /** Raw per-record attendance export for a date range — an org-wide report (HR/Admin only, gated at the route). */
@@ -227,12 +265,20 @@ export const analyticsService = {
     const employees = await Employee.find(filter).select('employeeCode firstName lastName');
     const employeeById = new Map(employees.map((e) => [String(e._id), e]));
 
+    // Hard cap on report size for v1 — not a paginated/streamed export, same
+    // convention as attendance.service.ts's exportExcel/exportPdf. Found and
+    // fixed in Phase 17: this query had no limit at all until then, so a
+    // wide `from`/`to` range on a large org could have pulled the entire
+    // Attendance collection into memory in one request.
     const records = await Attendance.find({
       employeeId: { $in: employees.map((e) => e._id) },
       date: { $gte: startOfUtcDay(query.from), $lte: startOfUtcDay(query.to) },
-    }).sort({ date: 1, employeeId: 1 });
+    })
+      .sort({ date: 1, employeeId: 1 })
+      .limit(5000);
 
-    const header = 'Employee Code,Employee Name,Date,Status,Check In,Check Out,Working Minutes,Overtime Minutes';
+    const header =
+      'Employee Code,Employee Name,Date,Status,Check In,Check Out,Working Minutes,Overtime Minutes';
     const rows = records.map((record) => {
       const employee = employeeById.get(String(record.employeeId));
       const name = employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown';

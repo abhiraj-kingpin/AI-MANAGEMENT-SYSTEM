@@ -165,5 +165,15 @@ attendanceSchema.pre('validate', function enforceMethodEvidence(next) {
 attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
 attendanceSchema.index({ date: 1, status: 1 });
 attendanceSchema.index({ clientGeneratedId: 1 }, { unique: true, sparse: true });
+// Phase 15/17: back the AI-anomaly sweep's two full-table-scan-shaped
+// queries (analytics.ai.service.ts) — a GPS-method date-range scan for
+// location anomalies, and a date-range + overtime-floor scan for the
+// overtime-outlier check. Both are genuinely used read paths, not
+// speculative; the write-amplification cost (2 more index entries per
+// insert, on an otherwise very high-write collection) is accepted because
+// without them either query degenerates into a full collection scan as
+// Attendance grows.
+attendanceSchema.index({ method: 1, date: 1 });
+attendanceSchema.index({ date: 1, overtimeMinutes: 1 });
 
 export const Attendance = model<IAttendance>('Attendance', attendanceSchema);

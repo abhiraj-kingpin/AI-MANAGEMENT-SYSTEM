@@ -106,7 +106,9 @@ describe('listAuditLogs', () => {
   });
 
   it('maps a null before/after to null, not undefined, in the DTO', async () => {
-    mockedFind.mockReturnValue(mockQuery([fakeLog({ before: { status: 'present' }, after: { status: 'late' } })]));
+    mockedFind.mockReturnValue(
+      mockQuery([fakeLog({ before: { status: 'present' }, after: { status: 'late' } })]),
+    );
     mockedCount.mockResolvedValue(1);
 
     const result = await listAuditLogs({ page: 1, limit: 20 });

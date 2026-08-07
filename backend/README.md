@@ -45,21 +45,21 @@ Cross-module reuse goes through `src/shared/`, not through one module importing 
 
 ## Features
 
-| Domain               | What it does                                                                                                                                             |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Authentication**   | JWT access + rotating refresh tokens, reuse detection, RBAC (`super_admin`/`hr`/`manager`/`employee`), forgot/reset/change password                      |
-| **Employees**        | CRUD, profile photo + document upload (Cloudinary), search, department/status filtering, manager-scoped visibility                                       |
-| **Attendance**       | Check-in/out, breaks, working-hours/overtime/half-day computation, offline-punch sync, HR reporting with Excel/PDF export, two-track correction workflow |
-| **GPS Attendance**   | Geofenced check-in via indexed `$geoNear` distance queries                                                                                               |
-| **QR Attendance**    | Time-boxed, HMAC-signed, optionally single-use QR codes                                                                                                  |
-| **Face Recognition** | Registration, cosine-similarity verification, liveness-gated                                                                                             |
-| **Leave Management** | Apply/cancel/approve/reject, real business-day + holiday-aware balance accounting                                                                        |
-| **Shift Management** | Shift definitions, single/bulk assignment, drives attendance's late/overtime math                                                                        |
-| **Payroll**          | Salary structures, attendance-driven payslip computation, batch generation, PDF payslips                                                                 |
-| **Notifications**    | In-app feed, read/unread state, broadcasts, device-token registration                                                                                    |
-| **Analytics**        | Dashboard KPIs, monthly attendance-trend, cross-department comparison, CSV export — real aggregation over Employee/Attendance, team-scoped for Managers  |
+| Domain                    | What it does                                                                                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Authentication**        | JWT access + rotating refresh tokens, reuse detection, RBAC (`super_admin`/`hr`/`manager`/`employee`), forgot/reset/change password                                              |
+| **Employees**             | CRUD, profile photo + document upload (Cloudinary), search, department/status filtering, manager-scoped visibility                                                               |
+| **Attendance**            | Check-in/out, breaks, working-hours/overtime/half-day computation, offline-punch sync, HR reporting with Excel/PDF export, two-track correction workflow                         |
+| **GPS Attendance**        | Geofenced check-in via indexed `$geoNear` distance queries                                                                                                                       |
+| **QR Attendance**         | Time-boxed, HMAC-signed, optionally single-use QR codes                                                                                                                          |
+| **Face Recognition**      | Registration, cosine-similarity verification, liveness-gated                                                                                                                     |
+| **Leave Management**      | Apply/cancel/approve/reject, real business-day + holiday-aware balance accounting                                                                                                |
+| **Shift Management**      | Shift definitions, single/bulk assignment, drives attendance's late/overtime math                                                                                                |
+| **Payroll**               | Salary structures, attendance-driven payslip computation, batch generation, PDF payslips                                                                                         |
+| **Notifications**         | In-app feed, read/unread state, broadcasts, device-token registration                                                                                                            |
+| **Analytics**             | Dashboard KPIs, monthly attendance-trend, cross-department comparison, CSV export — real aggregation over Employee/Attendance, team-scoped for Managers                          |
 | **AI-Assisted Analytics** | Late-risk ranking, absenteeism trend + forecast, rule-based fraud/anomaly sweep — real statistics (rates, trend, z-scores, cosine similarity), explicitly not a trained ML model |
-| **Security**         | Account lockout after repeated failed logins, an append-only audit trail with a Super-Admin-only read API                                               |
+| **Security**              | Account lockout after repeated failed logins, an append-only audit trail with a Super-Admin-only read API                                                                        |
 
 Two features have one real external-service seam each that can't be exercised in this environment (no GPU/ML runtime, no Firebase project) — everything else in those features is fully real. See [Known Simplifications](#known-simplifications--future-work).
 
@@ -147,16 +147,16 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Authentication (`/auth`)
 
-| Method | Path                    | Access                       | Notes                                                                         |
-| ------ | ----------------------- | ---------------------------- | ----------------------------------------------------------------------------- |
-| POST   | `/auth/register`        | Super Admin/HR               | HR cannot mint `hr`/`super_admin` accounts                                    |
+| Method | Path                    | Access                       | Notes                                                                                                                               |
+| ------ | ----------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/auth/register`        | Super Admin/HR               | HR cannot mint `hr`/`super_admin` accounts                                                                                          |
 | POST   | `/auth/login`           | Public                       | Rate-limited 5/min/IP; locks the account for 15 min after 5 wrong passwords; refresh token as httpOnly cookie (web) + body (mobile) |
-| POST   | `/auth/refresh`         | Public (valid refresh token) | Rotates the token; detects reuse of an already-rotated one                    |
-| POST   | `/auth/logout`          | Authenticated                | Clears the stored session hash + cookie                                       |
-| POST   | `/auth/forgot-password` | Public                       | Same response whether or not the email exists                                 |
-| POST   | `/auth/reset-password`  | Public (valid reset token)   | Hashed, time-boxed token                                                      |
-| POST   | `/auth/change-password` | Authenticated                | Requires current-password confirmation                                        |
-| GET    | `/auth/me`              | Authenticated                | Current user + linked employee summary                                        |
+| POST   | `/auth/refresh`         | Public (valid refresh token) | Rotates the token; detects reuse of an already-rotated one                                                                          |
+| POST   | `/auth/logout`          | Authenticated                | Clears the stored session hash + cookie                                                                                             |
+| POST   | `/auth/forgot-password` | Public                       | Same response whether or not the email exists                                                                                       |
+| POST   | `/auth/reset-password`  | Public (valid reset token)   | Hashed, time-boxed token                                                                                                            |
+| POST   | `/auth/change-password` | Authenticated                | Requires current-password confirmation                                                                                              |
+| GET    | `/auth/me`              | Authenticated                | Current user + linked employee summary                                                                                              |
 
 ### Employees (`/employees`)
 
@@ -260,37 +260,38 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Analytics (`/analytics`)
 
-| Method | Path                                | Access                  | Notes                                                                                                              |
-| ------ | ------------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/analytics/dashboard`              | Super Admin/HR/Manager  | Headcount + attendance/late/leave rate for one day; team-scoped for Manager, optional `departmentId` for HR/Admin |
-| GET    | `/analytics/attendance-trend`       | Super Admin/HR/Manager  | Attendance/late rate per month, trailing `months` (1–24, default 6), against real business-day counts             |
-| GET    | `/analytics/department-comparison`  | Super Admin/HR          | Headcount + rates for every active department, one day                                                            |
-| GET    | `/analytics/export/csv`             | Super Admin/HR          | Raw per-record attendance CSV for a `from`/`to` date range, optional `departmentId` (PDF export is not yet built) |
-| GET    | `/analytics/ai/late-risk`           | Super Admin/HR/Manager  | Employees ranked by a real late-arrival-rate + trend score, trailing `days` (7–180, default 30); team-scoped for Manager |
-| GET    | `/analytics/ai/absenteeism-trend`   | Super Admin/HR/Manager  | Monthly unexplained-absence rate, trailing `months` (3–24, default 6), plus a one-month linear-regression forecast |
-| GET    | `/analytics/ai/anomalies`           | Super Admin/HR          | Rule-based sweep over `days` (1–90, default 30): implausible GPS travel, similar face embeddings across employees, overtime outliers |
+| Method | Path                               | Access                 | Notes                                                                                                                                |
+| ------ | ---------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/analytics/dashboard`             | Super Admin/HR/Manager | Headcount + attendance/late/leave rate for one day; team-scoped for Manager, optional `departmentId` for HR/Admin                    |
+| GET    | `/analytics/attendance-trend`      | Super Admin/HR/Manager | Attendance/late rate per month, trailing `months` (1–24, default 6), against real business-day counts                                |
+| GET    | `/analytics/department-comparison` | Super Admin/HR         | Headcount + rates for every active department, one day                                                                               |
+| GET    | `/analytics/export/csv`            | Super Admin/HR         | Raw per-record attendance CSV for a `from`/`to` date range, optional `departmentId` (PDF export is not yet built)                    |
+| GET    | `/analytics/ai/late-risk`          | Super Admin/HR/Manager | Employees ranked by a real late-arrival-rate + trend score, trailing `days` (7–180, default 30); team-scoped for Manager             |
+| GET    | `/analytics/ai/absenteeism-trend`  | Super Admin/HR/Manager | Monthly unexplained-absence rate, trailing `months` (3–24, default 6), plus a one-month linear-regression forecast                   |
+| GET    | `/analytics/ai/anomalies`          | Super Admin/HR         | Rule-based sweep over `days` (1–90, default 30): implausible GPS travel, similar face embeddings across employees, overtime outliers |
 
 ### Audit (`/audit-logs`)
 
-| Method | Path          | Access      | Notes                                                                                          |
-| ------ | ------------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| Method | Path          | Access      | Notes                                                                                               |
+| ------ | ------------- | ----------- | --------------------------------------------------------------------------------------------------- |
 | GET    | `/audit-logs` | Super Admin | `?entityType=&entityId=&actorId=&from=&to=&page=&limit=` — every filter optional, combined with AND |
 
 ## Build & Scripts
 
-| Command                           | Purpose                                   |
-| --------------------------------- | ----------------------------------------- |
-| `npm run dev`                     | Hot-reload dev server (`tsx watch`)       |
-| `npm run build`                   | Type-check and compile to `dist/`         |
-| `npm start`                       | Run the compiled build (`dist/server.js`) |
-| `npm run lint` / `lint:fix`       | ESLint                                    |
-| `npm run format` / `format:check` | Prettier                                  |
-| `npm run typecheck`               | `tsc --noEmit`                            |
-| `npm test` / `test:watch`         | Jest + Supertest                          |
+| Command                           | Purpose                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `npm run dev`                     | Hot-reload dev server (`tsx watch`)                                                               |
+| `npm run build`                   | Type-check and compile to `dist/`                                                                 |
+| `npm start`                       | Run the compiled build (`dist/server.js`)                                                         |
+| `npm run lint` / `lint:fix`       | ESLint                                                                                            |
+| `npm run format` / `format:check` | Prettier                                                                                          |
+| `npm run typecheck`               | `tsc --noEmit`                                                                                    |
+| `npm test` / `test:watch`         | Jest + Supertest                                                                                  |
+| `npm run perf:smoke`              | Sequential latency check against a running instance (see [Performance Notes](#performance-notes)) |
 
 ## Testing
 
-499 Jest tests across every module, none requiring a live database:
+512 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).
@@ -311,7 +312,7 @@ Target topology (Render/Vercel/Atlas) and CI pipeline are documented in [`docs/a
 - **Tokens**: short-lived access JWT (15 min) + rotating refresh JWT (7 d); only the refresh token's SHA-256 hash is persisted; reuse of an already-rotated refresh token is detected and rejected.
 - **RBAC**: enforced at the route (`requireRole`) for whole-role gates and inside the service for per-resource scoping — a Manager's queries are always intersected with their own team server-side, never trusted from a client-supplied filter.
 - **Rate limiting**: global limiter on all routes, a stricter one on `/auth/login` and `/auth/forgot-password`.
-- **Account lockout** (Phase 16): 5 wrong passwords locks *that account* for 15 minutes, independent of which IP the attempts came from — the per-IP rate limiter and this per-account lock are complementary, not redundant. Stored on the `User` document itself (`failedLoginAttempts`/`lockedUntil`) rather than the originally-planned Redis counter, since no phase has ever wired Redis into any code (see [Known Simplifications](#known-simplifications--future-work)). A documented trade-off: unlike `forgotPassword`'s identical-response design, a locked account *does* reveal that the email exists — accepted because silently rejecting a correct password with no explanation is worse UX for negligible security gain against a targeted attacker.
+- **Account lockout** (Phase 16): 5 wrong passwords locks _that account_ for 15 minutes, independent of which IP the attempts came from — the per-IP rate limiter and this per-account lock are complementary, not redundant. Stored on the `User` document itself (`failedLoginAttempts`/`lockedUntil`) rather than the originally-planned Redis counter, since no phase has ever wired Redis into any code (see [Known Simplifications](#known-simplifications--future-work)). A documented trade-off: unlike `forgotPassword`'s identical-response design, a locked account _does_ reveal that the email exists — accepted because silently rejecting a correct password with no explanation is worse UX for negligible security gain against a targeted attacker.
 - **Audit trail**: `GET /audit-logs` (Super Admin only) exposes the append-only `AuditLog` collection that attendance corrections already write to (`recordAudit`, since Phase 5) — filterable by entity, actor, and date range.
 - **Transport hardening**: Helmet default headers, explicit CORS allowlist (`CORS_ALLOWED_ORIGINS`), `cookie-parser` with httpOnly refresh cookies.
 - **Trust boundaries respected, not assumed**: QR tokens are signed with a secret independent of the session JWT secrets (a QR code is physically displayed and can be photographed); face-attendance liveness must be explicitly `true`, never merely present, since the server cannot re-derive liveness itself from a single embedding.
@@ -322,9 +323,11 @@ Target topology (Render/Vercel/Atlas) and CI pipeline are documented in [`docs/a
 
 - **Geospatial queries** use a single indexed `$geoNear` aggregation against Geofence's `2dsphere` index — not an application-level distance loop over every branch.
 - **`employeeCode` generation** uses the standard MongoDB atomic-counter pattern (`findByIdAndUpdate` + `$inc`), safe under concurrent creates without a count-then-use race.
-- **Pagination everywhere** a list can grow unbounded (employees, attendance, leaves, payslips, salaries); exports are hard-capped at 5,000 rows rather than streaming unbounded result sets.
-- **Compound/unique indexes** back the hot query paths — notably `{employeeId, date}` on Attendance and `{employeeId, month}` on Payslip — see [`docs/architecture/03-database-schema.md`](../docs/architecture/03-database-schema.md).
-- **Not yet done**: response caching, connection-pool tuning, and load testing are Phase 17 scope.
+- **Pagination everywhere** a list can grow unbounded (employees, attendance, leaves, payslips, salaries); exports are hard-capped at 5,000 rows rather than streaming unbounded result sets. `/analytics/export/csv` was missing this cap entirely until Phase 17 caught it — a wide `from`/`to` range on a large org could otherwise have pulled the whole `Attendance` collection into one request.
+- **Compound/unique indexes** back the hot query paths — notably `{employeeId, date}` on Attendance and `{employeeId, month}` on Payslip — see [`docs/architecture/03-database-schema.md`](../docs/architecture/03-database-schema.md). Phase 17 added two more, `{method, date}` and `{date, overtimeMinutes}`, once Phase 15's AI anomaly sweep introduced the first queries that actually need them.
+- **In-process response caching** (Phase 17): `analytics.service.ts`'s `getDashboardKpis` and `getDepartmentComparison` — the two reads a live dashboard polls most — are cached for 30s via `shared/cache/memoryCache.ts`, keyed by caller scope (a Manager's own team never shares a cache entry with another Manager's) so two different callers never see each other's data. A documented, accepted staleness window: a change landing seconds ago may not show up until the entry naturally expires. Same "real behavior, no new infrastructure" trade-off as Phase 11's job tracker and Phase 16's account lockout — the architecture doc's original plan named a shared Redis cache, but no phase has ever wired Redis into any code, so this is process-local (correct on one instance; behind a load balancer with more than one, each instance just caches independently, never incorrectly).
+- **Load-test tooling**: `npm run perf:smoke` (`scripts/perf-smoke.ts`) is a small, dependency-free, genuinely-runnable latency check against a running instance — not a throughput/concurrency benchmark (that needs a real tool like k6 or autocannon against a staging environment, which this repository doesn't run in CI).
+- **Not yet done**: connection-pool tuning and a real concurrent-load benchmark run are still open — `perf:smoke` measures sequential latency, not throughput under load.
 
 ## Known Simplifications & Future Work
 
@@ -348,7 +351,7 @@ Other known, documented gaps:
 - **No DB transactions**: employee creation (User + Employee) and a few other multi-document writes are sequential, not transactional — acceptable on a single-node MongoDB (not a replica set) for now, revisited once running against Atlas.
 - **Only one `clientGeneratedId` is retained per attendance record**: the schema (by design, from Phase 0) stores a single idempotency key per document, not one per punch. A check-out punch's sync call overwrites the field a check-in punch's sync call set. In practice this is safe — the mobile client deletes a punch from its local queue the moment it gets back `applied`/`duplicate`, so an older punch is never resubmitted after a newer one has already landed — but it's a narrow theoretical gap worth naming rather than silently assuming away.
 
-Remaining platform-level phases (a mobile offline-sync client, performance tuning, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
+Remaining platform-level phases (a mobile offline-sync client, expanded test coverage, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
 
 ## License
 

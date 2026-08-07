@@ -21,6 +21,7 @@ import { Attendance } from '../../../src/modules/attendance/attendance.model';
 import { Department } from '../../../src/modules/departments/department.model';
 import { Employee } from '../../../src/modules/employees/employee.model';
 import { getHolidayDatesInRange } from '../../../src/modules/leaves/holiday.service';
+import { analyticsCache } from '../../../src/shared/cache/memoryCache';
 import type { ActorContext } from '../../../src/shared/types/actorContext';
 
 const mockedEmployeeFind = Employee.find as unknown as jest.Mock;
@@ -45,6 +46,12 @@ function employeeRows(...ids: string[]) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockedGetHolidayDatesInRange.mockResolvedValue([]);
+  // getDashboardKpis/getDepartmentComparison are now cached (Phase 17) — a
+  // real, process-wide cache, not mocked, so it persists across `it` blocks
+  // unless explicitly cleared. Several tests below reuse the same actor and
+  // an empty query, which would otherwise collide on the same cache key and
+  // silently return an earlier test's mocked result.
+  analyticsCache.clear();
 });
 
 describe('analyticsService.getDashboardKpis', () => {
@@ -179,7 +186,13 @@ describe('analyticsService.getDepartmentComparison', () => {
     const result = await analyticsService.getDepartmentComparison({});
 
     expect(result).toEqual([
-      { departmentId: 'dept-1', departmentName: 'Ops', headcount: 0, attendanceRate: 0, lateRate: 0 },
+      {
+        departmentId: 'dept-1',
+        departmentName: 'Ops',
+        headcount: 0,
+        attendanceRate: 0,
+        lateRate: 0,
+      },
     ]);
     expect(mockedAttendanceFind).not.toHaveBeenCalled();
   });
@@ -208,7 +221,13 @@ describe('analyticsService.getDepartmentComparison', () => {
         attendanceRate: 100,
         lateRate: 50,
       },
-      { departmentId: 'dept-2', departmentName: 'Sales', headcount: 2, attendanceRate: 50, lateRate: 0 },
+      {
+        departmentId: 'dept-2',
+        departmentName: 'Sales',
+        headcount: 2,
+        attendanceRate: 50,
+        lateRate: 0,
+      },
     ]);
   });
 });
@@ -246,6 +265,19 @@ describe('analyticsService.exportAttendanceCsv', () => {
       'ENG-0001,Asha Rao,2026-08-01,present,2026-08-01T09:00:00.000Z,2026-08-01T18:00:00.000Z,480,0',
     );
     expect(mockedEmployeeFind).toHaveBeenCalledWith({ isDeleted: false, departmentId: 'dept-1' });
+  });
+
+  it('caps the export at 5000 rows (Phase 17 fix — this query previously had no limit at all)', async () => {
+    mockedEmployeeFind.mockReturnValue(mockQuery([]));
+    const query = mockQuery([]);
+    mockedAttendanceFind.mockReturnValue(query);
+
+    await analyticsService.exportAttendanceCsv({
+      from: new Date('2026-08-01'),
+      to: new Date('2026-08-31'),
+    });
+
+    expect(query.limit).toHaveBeenCalledWith(5000);
   });
 
   it('quotes an employee name containing a comma', async () => {
@@ -296,5 +328,57 @@ describe('analyticsService.exportAttendanceCsv', () => {
     });
 
     expect(csv.split('\n')[1]).toContain('Unknown,Unknown,');
+  });
+});
+
+describe('analyticsService caching (Phase 17)', () => {
+  it('serves a repeated getDashboardKpis call from cache without re-querying', async () => {
+    mockedEmployeeFind.mockReturnValue(mockQuery(employeeRows('e1')));
+    mockedAttendanceFind.mockReturnValue(mockQuery([{ status: 'present' }]));
+
+    const first = await analyticsService.getDashboardKpis(hr, {});
+    const second = await analyticsService.getDashboardKpis(hr, {});
+
+    expect(second).toEqual(first);
+    expect(mockedEmployeeFind).toHaveBeenCalledTimes(1);
+    expect(mockedAttendanceFind).toHaveBeenCalledTimes(1);
+  });
+
+  it('never shares a cache entry between two different managers', async () => {
+    const managerA: ActorContext = { id: 'user-a', role: 'manager', employeeId: 'mgr-a' };
+    const managerB: ActorContext = { id: 'user-b', role: 'manager', employeeId: 'mgr-b' };
+    mockedEmployeeFind
+      .mockReturnValueOnce(mockQuery(employeeRows('a1'))) // manager A's team
+      .mockReturnValueOnce(mockQuery(employeeRows('b1', 'b2'))); // manager B's team
+    mockedAttendanceFind.mockReturnValue(mockQuery([]));
+
+    const resultA = await analyticsService.getDashboardKpis(managerA, {});
+    const resultB = await analyticsService.getDashboardKpis(managerB, {});
+
+    expect(resultA.headcount).toBe(1);
+    expect(resultB.headcount).toBe(2);
+    expect(mockedEmployeeFind).toHaveBeenCalledTimes(2); // both actually queried, no cross-manager reuse
+  });
+
+  it('never caches a rejected (FORBIDDEN) call — every call to an unauthorized role re-throws', async () => {
+    await expect(analyticsService.getDashboardKpis(employeeActor, {})).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(analyticsService.getDashboardKpis(employeeActor, {})).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockedEmployeeFind).not.toHaveBeenCalled();
+  });
+
+  it('serves a repeated getDepartmentComparison call from cache without re-querying', async () => {
+    mockedDepartmentFind.mockReturnValue(mockQuery([{ _id: 'dept-1', name: 'Ops' }]));
+    mockedEmployeeFind.mockReturnValue(mockQuery(employeeRows('e1')));
+    mockedAttendanceFind.mockReturnValue(mockQuery([{ status: 'present' }]));
+
+    const first = await analyticsService.getDepartmentComparison({});
+    const second = await analyticsService.getDepartmentComparison({});
+
+    expect(second).toEqual(first);
+    expect(mockedDepartmentFind).toHaveBeenCalledTimes(1);
   });
 });

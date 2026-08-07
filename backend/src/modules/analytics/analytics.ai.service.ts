@@ -327,7 +327,9 @@ export const aiAnalyticsService = {
 
     const history = [];
     if (headcount > 0) {
-      const rangeStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+      const rangeStart = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1),
+      );
       const rangeEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
       const objectIds = employeeIds.map((id) => new Types.ObjectId(id));
 

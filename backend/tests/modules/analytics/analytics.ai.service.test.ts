@@ -121,18 +121,16 @@ describe('aiAnalyticsService.getLateRiskEmployees', () => {
   it('caps the result at `limit`', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-08-15T00:00:00Z'));
     const ids = [idOf('1'), idOf('2'), idOf('3')];
-    mockedEmployeeFind
-      .mockReturnValueOnce(mockQuery(employeeRows(...ids)))
-      .mockReturnValueOnce(
-        mockQuery(
-          ids.map((id, i) => ({
-            _id: id,
-            employeeCode: `ENG-000${i}`,
-            firstName: `Emp${i}`,
-            lastName: 'Test',
-          })),
-        ),
-      );
+    mockedEmployeeFind.mockReturnValueOnce(mockQuery(employeeRows(...ids))).mockReturnValueOnce(
+      mockQuery(
+        ids.map((id, i) => ({
+          _id: id,
+          employeeCode: `ENG-000${i}`,
+          firstName: `Emp${i}`,
+          lastName: 'Test',
+        })),
+      ),
+    );
     mockedAttendanceAggregate.mockResolvedValue([]);
 
     const result = await aiAnalyticsService.getLateRiskEmployees(hr, { days: 30, limit: 2 });
@@ -346,7 +344,11 @@ describe('aiAnalyticsService.getAnomalies', () => {
     const result = await aiAnalyticsService.getAnomalies({ days: 30 });
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ type: 'overtime_outlier', severity: 'high', employeeId: outlier });
+    expect(result[0]).toMatchObject({
+      type: 'overtime_outlier',
+      severity: 'high',
+      employeeId: outlier,
+    });
   });
 
   it('never flags an overtime outlier from fewer than 4 employees with overtime', async () => {
