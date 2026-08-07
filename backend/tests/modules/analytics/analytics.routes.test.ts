@@ -22,6 +22,9 @@ describe('analytics routes — validation and access control wiring', () => {
       '/api/v1/analytics/attendance-trend',
       '/api/v1/analytics/department-comparison',
       '/api/v1/analytics/export/csv',
+      '/api/v1/analytics/ai/late-risk',
+      '/api/v1/analytics/ai/absenteeism-trend',
+      '/api/v1/analytics/ai/anomalies',
     ];
     for (const route of routes) {
       const res = await request(app).get(route);
@@ -95,6 +98,65 @@ describe('analytics routes — validation and access control wiring', () => {
   it('rejects a CSV export where `from` is after `to`', async () => {
     const res = await request(app)
       .get('/api/v1/analytics/export/csv?from=2026-08-31&to=2026-08-01')
+      .set('Authorization', `Bearer ${tokenFor('super_admin')}`);
+    expect(res.status).toBe(422);
+  });
+
+  it('rejects a plain employee from the late-risk view', async () => {
+    const res = await request(app)
+      .get('/api/v1/analytics/ai/late-risk')
+      .set('Authorization', `Bearer ${tokenFor('employee', 'aaaaaaaaaaaaaaaaaaaaaaaa')}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects a plain employee from the absenteeism trend', async () => {
+    const res = await request(app)
+      .get('/api/v1/analytics/ai/absenteeism-trend')
+      .set('Authorization', `Bearer ${tokenFor('employee', 'aaaaaaaaaaaaaaaaaaaaaaaa')}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects a manager from the anomaly sweep (HR/Admin only)', async () => {
+    const res = await request(app)
+      .get('/api/v1/analytics/ai/anomalies')
+      .set('Authorization', `Bearer ${tokenFor('manager', 'aaaaaaaaaaaaaaaaaaaaaaaa')}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects an out-of-range `days` value on the late-risk view', async () => {
+    const tooFew = await request(app)
+      .get('/api/v1/analytics/ai/late-risk?days=1')
+      .set('Authorization', `Bearer ${tokenFor('hr')}`);
+    expect(tooFew.status).toBe(422);
+
+    const tooMany = await request(app)
+      .get('/api/v1/analytics/ai/late-risk?days=999')
+      .set('Authorization', `Bearer ${tokenFor('hr')}`);
+    expect(tooMany.status).toBe(422);
+  });
+
+  it('rejects an out-of-range `limit` on the late-risk view', async () => {
+    const res = await request(app)
+      .get('/api/v1/analytics/ai/late-risk?limit=0')
+      .set('Authorization', `Bearer ${tokenFor('hr')}`);
+    expect(res.status).toBe(422);
+  });
+
+  it('rejects an out-of-range `months` value on the absenteeism trend', async () => {
+    const tooFew = await request(app)
+      .get('/api/v1/analytics/ai/absenteeism-trend?months=1')
+      .set('Authorization', `Bearer ${tokenFor('hr')}`);
+    expect(tooFew.status).toBe(422);
+
+    const tooMany = await request(app)
+      .get('/api/v1/analytics/ai/absenteeism-trend?months=25')
+      .set('Authorization', `Bearer ${tokenFor('hr')}`);
+    expect(tooMany.status).toBe(422);
+  });
+
+  it('rejects an out-of-range `days` value on the anomaly sweep', async () => {
+    const res = await request(app)
+      .get('/api/v1/analytics/ai/anomalies?days=91')
       .set('Authorization', `Bearer ${tokenFor('super_admin')}`);
     expect(res.status).toBe(422);
   });

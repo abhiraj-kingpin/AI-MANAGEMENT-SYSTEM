@@ -2,6 +2,12 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { requireRole } from '../../middlewares/rbac.middleware';
 import { validate } from '../../middlewares/validate.middleware';
+import * as aiController from './analytics.ai.controller';
+import {
+  absenteeismTrendQuerySchema,
+  anomaliesQuerySchema,
+  lateRiskQuerySchema,
+} from './analytics.ai.validators';
 import * as analyticsController from './analytics.controller';
 import {
   attendanceTrendQuerySchema,
@@ -40,6 +46,24 @@ router.get(
   requireRole('super_admin', 'hr'),
   validate(exportAttendanceCsvQuerySchema),
   analyticsController.exportAttendanceCsv,
+);
+
+// Phase 15 — AI-assisted analytics. Real statistical/rule-based scoring,
+// explicitly labeled as such (see analytics.ai.service.ts), not a trained
+// model. late-risk/absenteeism-trend are team-scoped like the endpoints
+// above; anomalies is an HR/Admin-only investigative sweep with no "my
+// team" reading, so it's gated at the route like department-comparison.
+router.get('/ai/late-risk', validate(lateRiskQuerySchema), aiController.getLateRisk);
+router.get(
+  '/ai/absenteeism-trend',
+  validate(absenteeismTrendQuerySchema),
+  aiController.getAbsenteeismTrend,
+);
+router.get(
+  '/ai/anomalies',
+  requireRole('super_admin', 'hr'),
+  validate(anomaliesQuerySchema),
+  aiController.getAnomalies,
 );
 
 export { router as analyticsRouter };

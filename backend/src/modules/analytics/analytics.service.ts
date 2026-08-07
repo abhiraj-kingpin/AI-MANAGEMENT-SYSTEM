@@ -33,8 +33,13 @@ const PRESENT_STATUSES = new Set(['present', 'late', 'half_day']);
  * branching lives here, not in the route) used by leave.service.ts#list and
  * employee.service.ts#listEmployees. An `employee` never gets an org- or
  * team-level view; a `manager` is scoped to their own direct reports.
+ * Exported for reuse by analytics.ai.service.ts (Phase 15), which scopes its
+ * late-risk and absenteeism-trend views the same way.
  */
-async function resolveEmployeeIds(actor: ActorContext, departmentId?: string): Promise<string[]> {
+export async function resolveEmployeeIds(
+  actor: ActorContext,
+  departmentId?: string,
+): Promise<string[]> {
   if (actor.role === 'employee') {
     throw AppError.forbidden('You do not have permission to view analytics.', 'FORBIDDEN');
   }

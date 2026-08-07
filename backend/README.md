@@ -58,6 +58,7 @@ Cross-module reuse goes through `src/shared/`, not through one module importing 
 | **Payroll**          | Salary structures, attendance-driven payslip computation, batch generation, PDF payslips                                                                 |
 | **Notifications**    | In-app feed, read/unread state, broadcasts, device-token registration                                                                                    |
 | **Analytics**        | Dashboard KPIs, monthly attendance-trend, cross-department comparison, CSV export — real aggregation over Employee/Attendance, team-scoped for Managers  |
+| **AI-Assisted Analytics** | Late-risk ranking, absenteeism trend + forecast, rule-based fraud/anomaly sweep — real statistics (rates, trend, z-scores, cosine similarity), explicitly not a trained ML model |
 
 Two features have one real external-service seam each that can't be exercised in this environment (no GPU/ML runtime, no Firebase project) — everything else in those features is fully real. See [Known Simplifications](#known-simplifications--future-work).
 
@@ -264,6 +265,9 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 | GET    | `/analytics/attendance-trend`       | Super Admin/HR/Manager  | Attendance/late rate per month, trailing `months` (1–24, default 6), against real business-day counts             |
 | GET    | `/analytics/department-comparison`  | Super Admin/HR          | Headcount + rates for every active department, one day                                                            |
 | GET    | `/analytics/export/csv`             | Super Admin/HR          | Raw per-record attendance CSV for a `from`/`to` date range, optional `departmentId` (PDF export is not yet built) |
+| GET    | `/analytics/ai/late-risk`           | Super Admin/HR/Manager  | Employees ranked by a real late-arrival-rate + trend score, trailing `days` (7–180, default 30); team-scoped for Manager |
+| GET    | `/analytics/ai/absenteeism-trend`   | Super Admin/HR/Manager  | Monthly unexplained-absence rate, trailing `months` (3–24, default 6), plus a one-month linear-regression forecast |
+| GET    | `/analytics/ai/anomalies`           | Super Admin/HR          | Rule-based sweep over `days` (1–90, default 30): implausible GPS travel, similar face embeddings across employees, overtime outliers |
 
 ## Build & Scripts
 
@@ -279,7 +283,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-458 Jest tests across every module, none requiring a live database:
+482 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).
@@ -324,6 +328,8 @@ Two external-service integrations are intentionally-labeled placeholders — the
 | Payroll batch job queue       | `payroll/payrollRun.service.ts`              | The payroll computation itself, run status tallying, per-employee failure isolation                                        | Job durability across a process restart — an in-memory map stands in for BullMQ/Redis, which is provisioned in `docker-compose.yml` but not wired into any code yet |
 | Password-reset email delivery | `notifications/email.service.ts`             | Token generation, hashing, expiry                                                                                          | The actual SMTP send — logs the reset link when no `SMTP_HOST` is configured                                                                                        |
 
+**"AI-Assisted Analytics" (Phase 15) is real math, honestly named — not a stub, but also not a trained model.** `/analytics/ai/late-risk`, `/analytics/ai/absenteeism-trend`, and `/analytics/ai/anomalies` are transparent, reconstructible statistics: late-risk is a rate plus a first-half-vs-second-half trend nudge; the absenteeism forecast is a stated least-squares line (`method: "linear-regression"` is in the response itself, not marketing copy); anomaly detection is three independent rule-based checks (haversine-distance implied travel speed, leave-one-out z-scores on overtime totals, pairwise cosine similarity on face embeddings). No neural network, no training data, and the response never claims otherwise. The one caveat worth repeating: `duplicate_face` inherits Phase 8's documented placeholder — the embeddings it compares are hashed image bytes, not real facial features, so a flagged pair means "similar-looking source photos," not confirmed shared identity; every `duplicate_face` anomaly says so in its own `detail` field.
+
 **Offline sync is a different kind of gap — not a stub, a missing counterpart.** `POST /attendance/sync` (see [API Reference](#api-reference)) is the real, fully-tested backend half of the flow in [`docs/architecture/08-sequence-diagrams.md#5-offline-attendance-sync`](../docs/architecture/08-sequence-diagrams.md): idempotent via `clientGeneratedId`, re-runs the same GPS/QR/face/shift checks a live check-in would against the punch's original `occurredAt`, and never silently drops a conflicting punch (surfaced as `status: "conflict"` with the reason code, and audit-logged). What doesn't exist in this repository is the _mobile_ half — the Hive local queue, connectivity listener, and retry logic are Flutter code, and this environment has no Flutter SDK to build or verify it against. The API contract is ready for it; the client isn't built yet.
 
 Other known, documented gaps:
@@ -333,7 +339,7 @@ Other known, documented gaps:
 - **No DB transactions**: employee creation (User + Employee) and a few other multi-document writes are sequential, not transactional — acceptable on a single-node MongoDB (not a replica set) for now, revisited once running against Atlas.
 - **Only one `clientGeneratedId` is retained per attendance record**: the schema (by design, from Phase 0) stores a single idempotency key per document, not one per punch. A check-out punch's sync call overwrites the field a check-in punch's sync call set. In practice this is safe — the mobile client deletes a punch from its local queue the moment it gets back `applied`/`duplicate`, so an older punch is never resubmitted after a newer one has already landed — but it's a narrow theoretical gap worth naming rather than silently assuming away.
 
-Remaining platform-level phases (a mobile offline-sync client, AI-assisted insights, formal security hardening, performance tuning, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
+Remaining platform-level phases (a mobile offline-sync client, formal security hardening, performance tuning, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
 
 ## License
 
