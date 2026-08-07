@@ -10,19 +10,12 @@ import { getManagedEmployeeIds } from '../../shared/utils/teamScope';
 import { Attendance } from '../attendance/attendance.model';
 import { Employee } from '../employees/employee.model';
 import { notify } from '../notifications/notification.service';
-import { Holiday } from './holiday.model';
+import { getHolidayDatesInRange } from './holiday.service';
 import { Leave, type LeaveStatus } from './leave.model';
 import { LeaveBalance } from './leaveBalance.model';
 import { LeaveType } from './leaveType.model';
 import { type LeaveBalanceDTO, type LeaveDTO, toLeaveDTO } from './leave.types';
 import type { ApplyLeaveInput, ListLeavesQuery } from './leave.validators';
-
-async function getHolidayDatesInRange(start: Date, end: Date): Promise<Date[]> {
-  const holidays = await Holiday.find({
-    date: { $gte: startOfUtcDay(start), $lte: startOfUtcDay(end) },
-  }).select('date');
-  return holidays.map((h) => h.date);
-}
 
 /**
  * Read-only view of a balance — auto-"allocates" the leave type's default

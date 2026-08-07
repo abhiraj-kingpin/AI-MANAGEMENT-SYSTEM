@@ -4,6 +4,17 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [Phase 14] — Reports & Analytics Dashboard
+
+**Added** — `modules/analytics/`: `GET /analytics/dashboard` (headcount + attendance/late/leave rate for one day), `GET /analytics/attendance-trend` (attendance/late rate per month, trailing 1–24 months), `GET /analytics/department-comparison` (per-department comparison, HR/Admin only), and `GET /analytics/export/csv` (raw per-record attendance export, HR/Admin only) — paths match the Phase 0 contract in [`docs/architecture/04-api-documentation.md`](../docs/architecture/04-api-documentation.md#analytics-analytics), with `attendance-trend`'s window controlled by a `months` count (1–24) rather than the originally-sketched `period` enum, and `export/csv` scoped to attendance records specifically (a PDF export and other view-specific exports from that same doc row remain unbuilt).
+
+- Every number is computed from real `Employee`/`Attendance` data — no synthetic or placeholder figures anywhere in this phase, continuing the project-wide rule that a pending feature says so explicitly instead of showing invented numbers (see the admin dashboard's Phase-14-pending stat cards it now replaces).
+- Dashboard KPIs and the attendance trend are team-scoped for a Manager (their own direct reports only, via the same `resolveEmployeeIds`-style role branching `leave.service.ts#list` and `employee.service.ts#listEmployees` already use) and org-wide (optionally one department) for Super Admin/HR — the route only requires authentication; the role branching lives in the service, per this codebase's established route-vs-service RBAC split.
+- The department comparison and CSV export are org-wide reports with no "my team" reading, so they're gated at the route (`requireRole('super_admin', 'hr')`) instead, matching how `payslip.routes.ts#list` is already gated.
+- The attendance-trend rate's denominator is real expected working days (`shared/utils/businessDays.ts`, weekdays minus holidays) × headcount for that month — not calendar days — computed via a single `$dateToString`/`$cond`/`$sum` aggregation per request rather than one query per month.
+- **DRY refactor done first**: extracted the `round2()` helper duplicated in `payslip.service.ts` to `shared/utils/math.ts`, and the holiday-date-range lookup duplicated inside `leave.service.ts` to a new exported `holiday.service.ts#getHolidayDatesInRange` — both now used by this phase's math too. All 103 pre-existing `leaves`/`payroll` tests pass unchanged against the refactor.
+- **Verified**: 458 Jest tests (up from 433 — 25 new, split across `analytics.service.test.ts` (real aggregation math, hand-computed) and `analytics.routes.test.ts` (RBAC/validation)).
+
 ## [Phase 13] — Offline Mode (backend half)
 
 **Added** — `POST /attendance/sync`: bulk-applies offline-queued check-in/check-out punches, per [`docs/architecture/08-sequence-diagrams.md#5-offline-attendance-sync`](../docs/architecture/08-sequence-diagrams.md).

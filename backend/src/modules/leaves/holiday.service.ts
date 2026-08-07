@@ -1,6 +1,15 @@
+import { startOfUtcDay } from '../../shared/utils/dateTime';
 import { Holiday } from './holiday.model';
 import { type HolidayDTO, toHolidayDTO } from './holiday.types';
 import type { CreateHolidayInput } from './holiday.validators';
+
+/** Every holiday date between `start` and `end` (inclusive) — the one place that query lives, reused by leave balance math and analytics' expected-working-days calculation alike. */
+export async function getHolidayDatesInRange(start: Date, end: Date): Promise<Date[]> {
+  const holidays = await Holiday.find({
+    date: { $gte: startOfUtcDay(start), $lte: startOfUtcDay(end) },
+  }).select('date');
+  return holidays.map((h) => h.date);
+}
 
 export const holidayService = {
   async list(year?: number): Promise<HolidayDTO[]> {

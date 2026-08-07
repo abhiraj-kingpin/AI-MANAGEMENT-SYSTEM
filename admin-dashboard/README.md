@@ -32,9 +32,9 @@ Requires the [backend](../backend/) running (default `http://localhost:5000`).
 ```
 src/
 ├── app/            # router (+ ProtectedRoute guard), providers (TanStack Query), layout shell, Atmosphere background
-├── features/        # one folder per domain: auth/ + dashboard/ + employees/ (headcount only) scaffolded now,
-│                     #   full employees/attendance/leaves/shifts/payroll/geofence/qr/
-│                     #   notifications/analytics screens arrive phase by phase
+├── features/        # one folder per domain: auth/ + dashboard/ + employees/ (headcount) + analytics/ (dashboard KPIs)
+│                     #   scaffolded now; full employees/attendance/leaves/shifts/payroll/geofence/qr/
+│                     #   notifications screens, plus analytics trend charts, arrive phase by phase
 ├── shared/
 │   ├── hooks/        # useReveal, useCountUp, useMagneticHover, usePrefersReducedMotion
 │   ├── ui/            # Button, Card, Chip, Reveal, StatCard — the design system's component layer
@@ -58,7 +58,7 @@ A single dark "control room" theme — pure black, a drifting blue mesh glow, gl
 | `--radius-pill` / `--radius-card`                        | `100px` / `20px`           | `rounded-pill`, `rounded-card`                                                          |
 | `--font-sans` / `--font-mono`                            | Manrope / JetBrains Mono   | default body font / `font-mono` for data, labels, timestamps                            |
 
-Component layer (`shared/ui/`): `Button` (primary = gradient pill with a shine-sweep hover + magnetic cursor-follow; ghost = glass pill), `Card` (translucent, blurred, soft-lit border), `Chip` (status pills), `Reveal` (scroll-triggered fade-up, staggerable via an `index` prop), `StatCard` (count-up number + sparkline, with an honest "not available yet" state for metrics that have no backing endpoint — see `DashboardPage`, which never fabricates a number: headcount is real and live-fetched; the other three KPIs are visibly marked "Phase 14" instead of showing invented data).
+Component layer (`shared/ui/`): `Button` (primary = gradient pill with a shine-sweep hover + magnetic cursor-follow; ghost = glass pill), `Card` (translucent, blurred, soft-lit border), `Chip` (status pills), `Reveal` (scroll-triggered fade-up, staggerable via an `index` prop), `StatCard` (count-up number + sparkline, with an honest "not available yet" state for metrics that have no backing endpoint — see `DashboardPage`, which never fabricates a number: all four KPIs — headcount, attendance rate, late arrivals, on leave — are now real and live-fetched from `GET /employees`/`GET /analytics/dashboard`; a role that can't view them (a plain employee) sees "HR/Admin only" rather than a guessed number).
 
 Every animation (mesh drift, scroll-reveal, count-up, magnetic hover, shine-sweep) checks `prefers-reduced-motion` via `shared/hooks/usePrefersReducedMotion.ts` and either skips or jumps straight to the end state.
 
@@ -70,4 +70,4 @@ Every animation (mesh drift, scroll-reveal, count-up, magnetic hover, shine-swee
 
 ## Status
 
-Phase 1 scaffolding (routing, auth session plumbing) plus a real design system applied to the two screens that exist today: `LoginPage` and the `AppShell`/`DashboardPage` (sidebar nav shows every planned module, with the unbuilt ones visibly dimmed and marked "Soon" rather than linking nowhere). Feature screens for employees, attendance, leave, shifts, payroll, and notifications — the backend has full APIs for all of them already — land on this same design system in their own passes. `lint`/`typecheck`/`format:check`/`build` all pass.
+Phase 1 scaffolding (routing, auth session plumbing) plus a real design system applied to the two screens that exist today: `LoginPage` and the `AppShell`/`DashboardPage` (sidebar nav shows every planned module, with the unbuilt ones visibly dimmed and marked "Soon" rather than linking nowhere). `DashboardPage`'s four KPI cards are fully live now (headcount, attendance rate, late arrivals, on leave, from `GET /employees` and `GET /analytics/dashboard`); the trend-chart and department-comparison panel underneath is still a placeholder pointing at the two backend endpoints (`/analytics/attendance-trend`, `/analytics/department-comparison`) that already exist for it. Feature screens for employees, attendance, leave, shifts, payroll, and notifications — the backend has full APIs for all of them already — land on this same design system in their own passes. `lint`/`typecheck`/`format:check`/`build` all pass.

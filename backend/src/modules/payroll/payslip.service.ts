@@ -4,6 +4,7 @@ import { AppError } from '../../shared/errors/AppError';
 import type { ActorContext } from '../../shared/types/actorContext';
 import type { PaginatedResult } from '../../shared/types/pagination';
 import { requireEmployeeId } from '../../shared/utils/actor';
+import { round2 } from '../../shared/utils/math';
 import { Attendance } from '../attendance/attendance.model';
 import { Employee } from '../employees/employee.model';
 import { notify } from '../notifications/notification.service';
@@ -20,10 +21,6 @@ const OVERTIME_MULTIPLIER = 1.5;
 const LATE_PENALTY_FRACTION_OF_DAY = 0.1; // arrived late but still worked a full day
 const HALF_DAY_DEDUCTION_FRACTION = 0.5;
 const ABSENT_DEDUCTION_FRACTION = 1.0;
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 /** "YYYY-MM" -> the first and last UTC calendar day of that month (both at 00:00 — Attendance.date is always truncated to UTC midnight, so `$lte: end` needs no time-of-day component). */
 function monthDateRange(month: string): { start: Date; end: Date } {

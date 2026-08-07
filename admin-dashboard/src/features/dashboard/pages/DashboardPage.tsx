@@ -1,6 +1,7 @@
 import { Card } from '@/shared/ui/Card';
 import { Reveal } from '@/shared/ui/Reveal';
 import { StatCard } from '@/shared/ui/StatCard';
+import { useDashboardKpis } from '@/features/analytics/hooks/useDashboardKpis';
 import { useHeadcount } from '@/features/employees/hooks/useHeadcount';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -18,9 +19,22 @@ function greeting(): string {
   return 'Good evening';
 }
 
+// Every StatCard here reports a single day's snapshot, not a real
+// change-over-time trend — there's no prior-period comparison wired in yet.
+// The up-arrow/"today" pairing is a "this is live data" indicator, exactly
+// like Headcount's pre-existing 'up'/'live' pairing, not a claim that the
+// number is trending in any direction.
+const SNAPSHOT_TREND = { direction: 'up' as const, label: 'today' };
+
 export function DashboardPage() {
   const employee = useAuthStore((s) => s.employee);
+  const role = useAuthStore((s) => s.user?.role);
+  const canViewAnalytics = role === 'super_admin' || role === 'hr' || role === 'manager';
+
   const { data: headcount } = useHeadcount();
+  const { data: kpis } = useDashboardKpis();
+
+  const pendingNote = canViewAnalytics ? 'Loading…' : 'HR/Admin only';
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,11 +65,55 @@ export function DashboardPage() {
                   sparkColor: 'accent',
                 }
           }
-          pendingNote={employee ? 'Loading…' : 'HR/Admin only'}
+          pendingNote={pendingNote}
         />
-        <StatCard label="Attendance Today" index={2} pendingNote="Phase 14" />
-        <StatCard label="Late Arrivals" index={3} pendingNote="Phase 14" />
-        <StatCard label="On Leave" index={4} pendingNote="Phase 14" />
+        <StatCard
+          label="Attendance Today"
+          index={2}
+          data={
+            kpis === undefined
+              ? undefined
+              : {
+                  value: kpis.attendanceRate,
+                  decimals: 1,
+                  unit: '%',
+                  trend: SNAPSHOT_TREND,
+                  spark: Array(6).fill(kpis.attendanceRate) as number[],
+                  sparkColor: 'success',
+                }
+          }
+          pendingNote={pendingNote}
+        />
+        <StatCard
+          label="Late Arrivals"
+          index={3}
+          data={
+            kpis === undefined
+              ? undefined
+              : {
+                  value: kpis.lateCount,
+                  trend: SNAPSHOT_TREND,
+                  spark: Array(6).fill(kpis.lateCount) as number[],
+                  sparkColor: 'warning',
+                }
+          }
+          pendingNote={pendingNote}
+        />
+        <StatCard
+          label="On Leave"
+          index={4}
+          data={
+            kpis === undefined
+              ? undefined
+              : {
+                  value: kpis.onLeaveCount,
+                  trend: SNAPSHOT_TREND,
+                  spark: Array(6).fill(kpis.onLeaveCount) as number[],
+                  sparkColor: 'dim',
+                }
+          }
+          pendingNote={pendingNote}
+        />
       </div>
 
       <Reveal index={5}>
@@ -63,14 +121,14 @@ export function DashboardPage() {
           <span className="text-2xl" aria-hidden="true">
             ◈
           </span>
-          <h2 className="text-base font-bold">Analytics dashboard is coming in Phase 14</h2>
+          <h2 className="text-base font-bold">Trend charts &amp; department comparison are next</h2>
           <p className="max-w-md text-sm text-text-dim">
-            Attendance rate, late trends, and leave utilization will appear here once the reporting
-            API ships — see{' '}
-            <span className="font-mono text-[12.5px]">
-              docs/architecture/04-api-documentation.md#analytics-analytics
-            </span>
-            .
+            The KPIs above are real, live numbers from{' '}
+            <span className="font-mono text-[12.5px]">GET /analytics/dashboard</span>. Monthly
+            attendance trends and a per-department comparison are already live on the API (
+            <span className="font-mono text-[12.5px]">/analytics/attendance-trend</span>,{' '}
+            <span className="font-mono text-[12.5px]">/analytics/department-comparison</span>) —
+            charting them here is next.
           </p>
         </Card>
       </Reveal>

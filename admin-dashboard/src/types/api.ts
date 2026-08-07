@@ -34,6 +34,18 @@ export interface EmployeeSummary {
   lastName: string;
 }
 
+/** `GET /analytics/dashboard` — see backend/README.md#analytics-analytics. `date` arrives as an ISO string over JSON, not a `Date`. */
+export interface DashboardKpis {
+  date: string;
+  headcount: number;
+  attendanceRate: number;
+  lateRate: number;
+  leaveRate: number;
+  presentCount: number;
+  lateCount: number;
+  onLeaveCount: number;
+}
+
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;

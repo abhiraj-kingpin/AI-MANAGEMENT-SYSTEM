@@ -57,6 +57,7 @@ Cross-module reuse goes through `src/shared/`, not through one module importing 
 | **Shift Management** | Shift definitions, single/bulk assignment, drives attendance's late/overtime math                                                                        |
 | **Payroll**          | Salary structures, attendance-driven payslip computation, batch generation, PDF payslips                                                                 |
 | **Notifications**    | In-app feed, read/unread state, broadcasts, device-token registration                                                                                    |
+| **Analytics**        | Dashboard KPIs, monthly attendance-trend, cross-department comparison, CSV export — real aggregation over Employee/Attendance, team-scoped for Managers  |
 
 Two features have one real external-service seam each that can't be exercised in this environment (no GPU/ML runtime, no Firebase project) — everything else in those features is fully real. See [Known Simplifications](#known-simplifications--future-work).
 
@@ -255,6 +256,15 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 | POST   | `/notifications/broadcast`             | Super Admin/HR | Company-wide or per-department |
 | POST   | `/notifications/device-token`          | Self           | Registers an FCM token         |
 
+### Analytics (`/analytics`)
+
+| Method | Path                                | Access                  | Notes                                                                                                              |
+| ------ | ------------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/analytics/dashboard`              | Super Admin/HR/Manager  | Headcount + attendance/late/leave rate for one day; team-scoped for Manager, optional `departmentId` for HR/Admin |
+| GET    | `/analytics/attendance-trend`       | Super Admin/HR/Manager  | Attendance/late rate per month, trailing `months` (1–24, default 6), against real business-day counts             |
+| GET    | `/analytics/department-comparison`  | Super Admin/HR          | Headcount + rates for every active department, one day                                                            |
+| GET    | `/analytics/export/csv`             | Super Admin/HR          | Raw per-record attendance CSV for a `from`/`to` date range, optional `departmentId` (PDF export is not yet built) |
+
 ## Build & Scripts
 
 | Command                           | Purpose                                   |
@@ -269,7 +279,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-433 Jest tests across every module, none requiring a live database:
+458 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).
@@ -323,7 +333,7 @@ Other known, documented gaps:
 - **No DB transactions**: employee creation (User + Employee) and a few other multi-document writes are sequential, not transactional — acceptable on a single-node MongoDB (not a replica set) for now, revisited once running against Atlas.
 - **Only one `clientGeneratedId` is retained per attendance record**: the schema (by design, from Phase 0) stores a single idempotency key per document, not one per punch. A check-out punch's sync call overwrites the field a check-in punch's sync call set. In practice this is safe — the mobile client deletes a punch from its local queue the moment it gets back `applied`/`duplicate`, so an older punch is never resubmitted after a newer one has already landed — but it's a narrow theoretical gap worth naming rather than silently assuming away.
 
-Remaining platform-level phases (a mobile offline-sync client, analytics/reporting dashboards, AI-assisted insights, formal security hardening, performance tuning, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
+Remaining platform-level phases (a mobile offline-sync client, AI-assisted insights, formal security hardening, performance tuning, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
 
 ## License
 
