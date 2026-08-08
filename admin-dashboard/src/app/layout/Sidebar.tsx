@@ -44,14 +44,15 @@ const liveItems: NavItem[] = [
   // Payslips" section), while salaries and the HR payslip queue inside the
   // same page are gated to Super Admin/HR (see PayrollPage's `canManage`).
   { to: '/payroll', label: 'Payroll', icon: '◈', end: false },
+  // GET /notifications/me is every role's own feed; only the Broadcast
+  // button inside the page is gated to Super Admin/HR.
+  { to: '/notifications', label: 'Notifications', icon: '◎', end: false },
 ];
 
-// Not wired up yet — the backend has full APIs for all of these (see
+// Not wired up yet — the backend has full APIs for both of these (see
 // backend/README.md#api-reference), but no admin-dashboard screen exists
 // for them yet. Shown, not hidden, so the nav reflects where the product is
 // going — but dimmed and inert rather than pretending they work.
-const comingSoonItems = [{ label: 'Notifications', icon: '◎' }];
-
 const comingSoonConfig = [
   { label: 'Geofences', icon: '◍' },
   { label: 'QR Codes', icon: '▣' },
@@ -89,10 +90,6 @@ export function Sidebar() {
             <span className="w-[18px] text-center text-[15px]">{item.icon}</span>
             {item.label}
           </NavLink>
-        ))}
-
-        {comingSoonItems.map((item) => (
-          <ComingSoonNavItem key={item.label} {...item} />
         ))}
 
         <div className="mt-2.5 mb-1 px-3 font-mono text-[10.5px] tracking-[0.12em] text-text-faint uppercase">

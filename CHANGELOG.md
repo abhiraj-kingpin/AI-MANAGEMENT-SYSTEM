@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Admin Dashboard — Notifications Feature
+
+An inbox every role sees (unread filter, mark-read/mark-all-read) plus a Topbar bell badge polling the unread count every 30s, since there's no push/websocket channel to invalidate it on arrival. Super Admin/HR additionally get a "Send Broadcast" action, org-wide or scoped to one department.
+
 ## Admin Dashboard — Payroll Feature
 
 Same shape as Leave and Shifts: a "My Payslips" section (list + PDF download) every role sees, above a Super Admin/HR-only area for salary structures and the payslip queue (filter, release, download) plus a "Run Payroll" action that starts a batch job and polls its status until it finishes. The PDF download is the one binary response in the whole API, fetched as a blob rather than JSON. Building this screen surfaced the real backend gap fixed in `v1.1.3` below.

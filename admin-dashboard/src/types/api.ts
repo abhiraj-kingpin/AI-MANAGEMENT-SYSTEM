@@ -312,6 +312,34 @@ export interface RunPayrollInput {
   departmentId?: string;
 }
 
+export type NotificationType =
+  'attendance' | 'leave' | 'salary' | 'shift' | 'holiday' | 'birthday' | 'announcement';
+
+/** `GET /notifications/me` — see backend/README.md#notifications-notifications. `recipientId: null` means a broadcast to everyone/a department, not a targeted notification. */
+export interface Notification {
+  id: string;
+  recipientId: string | null;
+  title: string;
+  body: string;
+  type: NotificationType;
+  isRead: boolean;
+  data?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ListMyNotificationsQuery {
+  unread?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface BroadcastInput {
+  title: string;
+  body: string;
+  type?: NotificationType;
+  departmentId?: string;
+}
+
 export type ShiftType = 'morning' | 'night' | 'rotational' | 'flexible';
 
 /** `GET /shifts` — see backend/README.md#shifts-shifts. */
