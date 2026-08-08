@@ -30,6 +30,14 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Phase 6 — GPS attendance/geofencing (see core/services/location_service.dart).
+  # Pinned below 14.0.0 deliberately: geolocator 14.x resolves
+  # geolocator_android 5.x, whose Dart code calls `Color.toARGB32()` — a
+  # dart:ui API that doesn't exist yet on this project's pinned Flutter
+  # 3.24.0 (ci-mobile.yml), only on newer SDKs. 13.x's geolocator_android
+  # 4.6.2 has no such call. Both 4.6.2 and 5.x separately need the Gradle
+  # compatibility shim in android/build.gradle for their
+  # `flutter.compileSdkVersion` reference — see that file's comment. Both
+  # issues found via real local `flutter build apk` failures, not guessed.
   geolocator: ^13.0.1
 
   # Added in their respective phases (kept here as a reference, not yet used):

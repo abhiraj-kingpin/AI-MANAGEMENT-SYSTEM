@@ -5,6 +5,30 @@ allprojects {
     }
 }
 
+// Compatibility shim, real bug found via a local `flutter build apk`
+// reproduction of a CI failure GitHub's log API wouldn't let us read
+// directly: geolocator_android's own build.gradle still reads
+// `flutter.compileSdkVersion`/`flutter.minSdkVersion` directly — a pattern
+// from Flutter's older apply-script Gradle mechanism, which used to inject
+// an `ext.flutter` property onto every subproject automatically. This
+// project's settings.gradle uses the newer declarative plugin loading
+// (`dev.flutter.flutter-gradle-plugin` applied only inside :app's own
+// build.gradle), which no longer does that injection for library
+// subprojects, so geolocator_android's build.gradle failed with "Could not
+// get unknown property 'flutter'". Values match what every other plugin
+// here already hardcodes directly (see e.g. flutter_secure_storage's own
+// android/build.gradle: `compileSdk 34`).
+subprojects { subproject ->
+    // Excludes :app — it applies the real `dev.flutter.flutter-gradle-plugin`
+    // itself, which creates its own genuine `flutter` extension; pre-setting
+    // an `ext.flutter` property on :app before that plugin applies breaks
+    // its own initialization ("Must provide Flutter source directory"),
+    // confirmed by hitting that exact failure while testing this shim.
+    if (subproject.name != "app") {
+        subproject.ext.flutter = [compileSdkVersion: 34, minSdkVersion: 21, targetSdkVersion: 34]
+    }
+}
+
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
