@@ -82,11 +82,11 @@ graph LR
     HEALTHCHECK -->|fail| ROLLBACK["Auto-rollback to last healthy image"]
 ```
 
-Workflows (`.github/workflows/`):
-- `ci-backend.yml` — lint, typecheck, `jest`, build Docker image on every PR touching `backend/`.
-- `ci-admin.yml` — lint, typecheck, `vitest`/component tests, `vite build` on every PR touching `admin-dashboard/`.
-- `ci-mobile.yml` — `flutter analyze`, `flutter test`, `flutter build apk --release` on every PR touching `mobile-app/`.
-- `deploy.yml` — on push to `main`: triggers Render deploy hook + Vercel production deploy; uploads the signed APK as a GitHub Release asset.
+Workflows (`.github/workflows/`) — implemented in Phase 19, with two honest deviations from this original sketch, both explained in the workflow files themselves:
+- `ci-backend.yml` — lint, `format:check`, typecheck, `jest`, `tsc` build, and a Docker image build (build-only, no push) on every push/PR touching `backend/`. Matches the original plan exactly.
+- `ci-admin.yml` — lint, `format:check`, typecheck, `vite build` on every push/PR touching `admin-dashboard/`. **Deviation**: no test step — `admin-dashboard` has no test suite yet (see its README's Status section), so there's no `vitest`/component-test command to run.
+- `ci-mobile.yml` — `flutter analyze`, `flutter test` on every push/PR touching `mobile-app/`. **Deviation**: no `flutter build apk` step — this repository has never had the one-time `flutter create .` scaffolding run against it, so the `android`/`ios` platform folders a real build needs don't exist yet; analyze/test don't need them and are real checks on their own.
+- `deploy.yml` — on push to `main`: would trigger a Render deploy hook + Vercel deploy hook. Inert by default (gated on a `DEPLOY_ENABLED` repository variable) since no Render/Vercel project has been created from this environment — activating it is a one-time manual step for whoever has account access, documented in the workflow file's header comment. The signed-APK-as-GitHub-Release step from the original sketch is deferred until `ci-mobile.yml`'s build step exists.
 
 ## 4. Infrastructure Details
 

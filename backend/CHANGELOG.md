@@ -4,6 +4,16 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [Phase 19] — Deployment Pipeline
+
+**Added** — `.github/workflows/ci-backend.yml`, `ci-admin.yml`, `ci-mobile.yml`, and `deploy.yml`, per the Phase 0 plan in [`docs/architecture/09-deployment-architecture.md`](../docs/architecture/09-deployment-architecture.md#3-cicd-pipeline).
+
+- `ci-backend.yml` matches the original plan exactly: lint, `format:check`, typecheck, the full Jest suite, `tsc` build, and a Docker image build (build-only, no registry push) — every step genuinely runs and passes, no live database or secrets needed (Jest's own `NODE_ENV=test` default already points `config/env.ts` at the committed `.env.test`).
+- Two honest, documented deviations from the original sketch rather than a workflow that claims more than it checks: `ci-admin.yml` has no test step (`admin-dashboard` has no test suite yet — see its README), and `ci-mobile.yml` runs `flutter analyze`/`flutter test` but not `flutter build apk` (this repo has never had the one-time `flutter create .` scaffold run, so the `android`/`ios` folders a real build needs don't exist yet).
+- **Stated plainly, not glossed over**: `ci-mobile.yml` is this codebase's first-ever machine verification of the hand-written Dart in `mobile-app/lib/` — every prior phase's mobile work was authored and reviewed without a local Flutter SDK available. Its first real run on GitHub's Flutter-equipped runners is expected to surface real issues, not pass cleanly by luck.
+- `deploy.yml` is real, working YAML, but deliberately inert until a human activates it: no Render or Vercel account exists to create a deploy hook against from this environment. Gated on a `DEPLOY_ENABLED` repository variable (unset by default) rather than failing on missing secrets or silently pretending to deploy.
+- **Verified**: all four workflow files parse as valid YAML; `ci-backend.yml`'s steps were run individually and pass (536 tests, clean lint/typecheck/build) — the workflow file itself hasn't executed on GitHub Actions yet, since that only happens once this commit is pushed.
+
 ## [Phase 18] — Expanded Test Coverage
 
 **Added** — `tests/shared/regex.test.ts`, `tests/shared/counter.test.ts`, `tests/modules/notifications/email.service.test.ts`, and `tests/middlewares/error.middleware.test.ts` + `.production.test.ts`.

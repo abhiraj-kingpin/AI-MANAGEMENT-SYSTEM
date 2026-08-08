@@ -308,7 +308,9 @@ npm test -- --coverage   # writes an HTML+text report to coverage/
 
 ## Deployment
 
-Target topology (Render/Vercel/Atlas) and CI pipeline are documented in [`docs/architecture/09-deployment-architecture.md`](../docs/architecture/09-deployment-architecture.md). A `Dockerfile` and `docker-compose.yml` are provided for local/API+DB parity; container image publishing and the production pipeline are Phase 19 work (see [Known Simplifications](#known-simplifications--future-work)).
+Target topology (Render/Vercel/Atlas) is documented in [`docs/architecture/09-deployment-architecture.md`](../docs/architecture/09-deployment-architecture.md). A `Dockerfile` and `docker-compose.yml` are provided for local/API+DB parity.
+
+**CI** (Phase 19): [`.github/workflows/ci-backend.yml`](../.github/workflows/ci-backend.yml) runs lint/`format:check`/typecheck/`test`/build plus a Docker image build on every push or PR touching this directory — real checks, no live database (see [Testing](#testing)). **Deploy** (`.github/workflows/deploy.yml`) is written but inert by default: this environment has no Render account to create a real deploy hook against, so the workflow no-ops until a human sets the `DEPLOY_ENABLED` repo variable and the hook-URL secret — see that file's header comment for the exact steps. See the [repository root's CI/CD section](../README.md#cicd) for all four workflows together.
 
 ## Security Considerations
 

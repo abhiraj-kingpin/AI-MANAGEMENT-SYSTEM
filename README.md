@@ -11,6 +11,7 @@ An enterprise workforce management platform: GPS/QR/face attendance, leave, shif
 - [Technology Stack](#technology-stack)
 - [Getting Started](#getting-started)
 - [Security & Performance](#security--performance)
+- [CI/CD](#cicd)
 - [Future Work](#future-work)
 - [License](#license)
 
@@ -65,7 +66,7 @@ At a glance: the backend is a layered modular monolith (one module per business 
 | 16  | Security hardening                                                                                   | Done ([backend](backend/README.md#security-considerations))                                                                               |
 | 17  | Performance                                                                                          | Done ([backend](backend/README.md#performance-notes))                                                                                     |
 | 18  | Expanded test coverage                                                                               | Done ([backend](backend/README.md#testing))                                                                                               |
-| 19  | Deployment pipeline                                                                                  | Planned                                                                                                                                   |
+| 19  | Deployment pipeline                                                                                  | Done ([CI/CD](#cicd)) — actual Render/Vercel hosting still needs a human to create those accounts                                          |
 | 20  | Documentation & release                                                                              | Planned                                                                                                                                   |
 
 Phase-by-phase build history — what shipped, what bugs a test caught, what was deliberately simplified and why — is in [CHANGELOG.md](CHANGELOG.md) (backend detail in [backend/CHANGELOG.md](backend/CHANGELOG.md)). Enterprise-extra features (visitor management, asset management, expense claims, multi-tenant, etc.) are tracked separately and layered on once the core 20 phases are stable.
@@ -91,11 +92,22 @@ Each project is independently runnable — see its README for exact steps:
 
 ## Security & Performance
 
-Backend-specific detail (auth model, RBAC enforcement, rate limiting, indexing strategy) is in [backend/README.md#security-considerations](backend/README.md#security-considerations) and [backend/README.md#performance-notes](backend/README.md#performance-notes). Formal security-hardening and performance passes are scoped as Phases 16-17 of the roadmap above.
+Backend-specific detail (auth model, RBAC enforcement, account lockout, rate limiting, indexing strategy, in-process caching) is in [backend/README.md#security-considerations](backend/README.md#security-considerations) and [backend/README.md#performance-notes](backend/README.md#performance-notes) — Phases 16 and 17, both complete.
+
+## CI/CD
+
+`.github/workflows/` (Phase 19):
+
+| Workflow          | Runs on                              | What it actually checks                                                                                  |
+| ------------------ | ------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `ci-backend.yml`  | Push/PR touching `backend/`          | lint, `format:check`, typecheck, the full Jest suite, `tsc` build, and a Docker image build — all real, no live database needed |
+| `ci-admin.yml`    | Push/PR touching `admin-dashboard/`  | lint, `format:check`, typecheck, Vite build — no test step, since none exists yet (see [Component Status](#component-status)) |
+| `ci-mobile.yml`   | Push/PR touching `mobile-app/`       | `flutter analyze` + `flutter test` — this repository's first-ever machine verification of the hand-written Dart in `lib/`, expected to need real fixes on its first run, not a guaranteed pass |
+| `deploy.yml`      | Push to `main`                       | Inert by default (gated on a `DEPLOY_ENABLED` repo variable) — the deploy-hook wiring for Render/Vercel projects that don't exist yet from this environment; a human with account access activates it, see the workflow file's header comment |
 
 ## Future Work
 
-The mobile half of offline sync (a Hive local queue, connectivity listener, and retry logic against the now-real `POST /attendance/sync` API) is still unbuilt — this environment has no Flutter SDK to build or verify it. The remaining roadmap (Phases 14-20) covers analytics dashboards, AI-assisted insights, formal security hardening, performance tuning, expanded testing, a deployment pipeline, and consolidated documentation. Backend-specific known simplifications (placeholder external-service integrations, deferred automation) are itemized in [backend/README.md#known-simplifications--future-work](backend/README.md#known-simplifications--future-work).
+The mobile half of offline sync (a Hive local queue, connectivity listener, and retry logic against the now-real `POST /attendance/sync` API) is still unbuilt — this environment has no Flutter SDK to build or verify it. Phase 20 (consolidated documentation) is the last numbered backend phase; beyond it, both client applications still need their feature UI designed and built (see [Component Status](#component-status)) — the backend's API surface for employees, attendance, leave, shifts, payroll, notifications, and analytics is ready and waiting for both. Backend-specific known simplifications (placeholder external-service integrations, deferred automation) are itemized in [backend/README.md#known-simplifications--future-work](backend/README.md#known-simplifications--future-work).
 
 Both client applications (admin dashboard and mobile app) also still need their feature UI designed and built out — see [Component Status](#component-status). The backend's API surface for employees, attendance, leave, shifts, payroll, and notifications is ready and waiting for both.
 
