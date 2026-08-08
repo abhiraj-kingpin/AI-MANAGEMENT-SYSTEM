@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Admin Dashboard — Geofences & QR Codes Features
+
+The last two Super-Admin/HR-only configuration screens: Geofences (office-location CRUD — branch name, lat/lng, radius) and QR Codes (per-location generate/revoke, rendering the real scannable image the backend already produces). Neither has a self-service half — an employee checks in *against* these via the mobile app, they never manage one — so both nav items are hidden from every other role rather than showing a page with nothing in it. With these two, every module from the original roadmap is a real screen; only the analytics trend-chart/department-comparison panel remains.
+
 ## Admin Dashboard — Notifications Feature
 
 An inbox every role sees (unread filter, mark-read/mark-all-read) plus a Topbar bell badge polling the unread count every 30s, since there's no push/websocket channel to invalidate it on arrival. Super Admin/HR additionally get a "Send Broadcast" action, org-wide or scoped to one department.

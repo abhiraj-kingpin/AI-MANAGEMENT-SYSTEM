@@ -49,20 +49,34 @@ const liveItems: NavItem[] = [
   { to: '/notifications', label: 'Notifications', icon: '◎', end: false },
 ];
 
-// Not wired up yet — the backend has full APIs for both of these (see
-// backend/README.md#api-reference), but no admin-dashboard screen exists
-// for them yet. Shown, not hidden, so the nav reflects where the product is
-// going — but dimmed and inert rather than pretending they work.
-const comingSoonConfig = [
-  { label: 'Geofences', icon: '◍' },
-  { label: 'QR Codes', icon: '▣' },
+// Setup/configuration screens, kept visually separate from the day-to-day
+// modules above. Both are Super Admin/HR only, full stop — unlike
+// Leave/Shifts/Payroll/Notifications there's no self-service half here (an
+// employee checks in *against* a geofence/QR code, they never manage one),
+// so the nav item itself is hidden rather than showing a page that's just
+// the role-gated section with nothing above it.
+const configItems: NavItem[] = [
+  {
+    to: '/geofences',
+    label: 'Geofences',
+    icon: '◍',
+    end: false,
+    roles: ['super_admin', 'hr'],
+  },
+  {
+    to: '/qr-codes',
+    label: 'QR Codes',
+    icon: '▣',
+    end: false,
+    roles: ['super_admin', 'hr'],
+  },
 ];
 
 export function Sidebar() {
   const role = useAuthStore((s) => s.user?.role);
-  const visibleLiveItems = liveItems.filter(
-    (item) => !item.roles || (role && item.roles.includes(role)),
-  );
+  const isVisible = (item: NavItem) => !item.roles || (role && item.roles.includes(role));
+  const visibleLiveItems = liveItems.filter(isVisible);
+  const visibleConfigItems = configItems.filter(isVisible);
 
   return (
     <aside className="hidden w-[248px] shrink-0 flex-col gap-6 border-r border-border bg-white/[0.015] p-4 sm:flex">
@@ -75,45 +89,39 @@ export function Sidebar() {
 
       <nav className="flex flex-col gap-0.5">
         {visibleLiveItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `relative flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-semibold transition-colors ${
-                isActive
-                  ? 'bg-gradient-to-r from-accent/20 to-accent/5 text-white before:absolute before:-left-4 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-accent before:to-accent-light before:shadow-[0_0_12px_1px_rgba(111,143,255,0.7)]'
-                  : 'text-text-dim hover:bg-white/[0.04] hover:text-text'
-              }`
-            }
-          >
-            <span className="w-[18px] text-center text-[15px]">{item.icon}</span>
-            {item.label}
-          </NavLink>
+          <SidebarLink key={item.to} item={item} />
         ))}
 
-        <div className="mt-2.5 mb-1 px-3 font-mono text-[10.5px] tracking-[0.12em] text-text-faint uppercase">
-          Configuration
-        </div>
-        {comingSoonConfig.map((item) => (
-          <ComingSoonNavItem key={item.label} {...item} />
-        ))}
+        {visibleConfigItems.length > 0 && (
+          <>
+            <div className="mt-2.5 mb-1 px-3 font-mono text-[10.5px] tracking-[0.12em] text-text-faint uppercase">
+              Configuration
+            </div>
+            {visibleConfigItems.map((item) => (
+              <SidebarLink key={item.to} item={item} />
+            ))}
+          </>
+        )}
       </nav>
     </aside>
   );
 }
 
-function ComingSoonNavItem({ label, icon }: { label: string; icon: string }) {
+function SidebarLink({ item }: { item: NavItem }) {
   return (
-    <div
-      className="flex cursor-not-allowed items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-semibold text-text-dim/40"
-      title={`${label} — not built yet`}
+    <NavLink
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) =>
+        `relative flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-semibold transition-colors ${
+          isActive
+            ? 'bg-gradient-to-r from-accent/20 to-accent/5 text-white before:absolute before:-left-4 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-accent before:to-accent-light before:shadow-[0_0_12px_1px_rgba(111,143,255,0.7)]'
+            : 'text-text-dim hover:bg-white/[0.04] hover:text-text'
+        }`
+      }
     >
-      <span className="w-[18px] text-center text-[15px]">{icon}</span>
-      <span className="flex-1">{label}</span>
-      <span className="rounded-pill bg-white/5 px-1.5 py-0.5 font-mono text-[9.5px] tracking-wide text-text-dim/70 uppercase">
-        Soon
-      </span>
-    </div>
+      <span className="w-[18px] text-center text-[15px]">{item.icon}</span>
+      {item.label}
+    </NavLink>
   );
 }

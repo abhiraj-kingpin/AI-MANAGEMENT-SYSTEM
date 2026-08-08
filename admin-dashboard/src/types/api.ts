@@ -340,6 +340,50 @@ export interface BroadcastInput {
   departmentId?: string;
 }
 
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+}
+
+/** `GET/POST/PATCH/DELETE /geofences` — see backend/README.md#gps--geofence-geofences. Super Admin/HR only; there's no self-service view (employees check in *against* these, they don't manage them). */
+export interface Geofence {
+  id: string;
+  branchName: string;
+  center: GeoPoint;
+  radiusMeters: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateGeofenceInput {
+  branchName: string;
+  center: GeoPoint;
+  radiusMeters?: number;
+}
+
+export type UpdateGeofenceInput = Partial<CreateGeofenceInput & { isActive: boolean }>;
+
+/** `POST /qr/generate`, `GET /qr/active` — see backend/README.md#gps--geofence-geofences. Only ever returned with `token`/`qrImageDataUrl` attached (there's no list endpoint that would need to omit them). */
+export interface QrCode {
+  id: string;
+  geofenceId: string;
+  validFrom: string;
+  validTo: string;
+  isUsed: boolean;
+  singleUse: boolean;
+  generatedBy: string;
+  createdAt: string;
+  token: string;
+  qrImageDataUrl: string;
+}
+
+export interface GenerateQrInput {
+  geofenceId: string;
+  validForMinutes?: number;
+  singleUse?: boolean;
+}
+
 export type ShiftType = 'morning' | 'night' | 'rotational' | 'flexible';
 
 /** `GET /shifts` — see backend/README.md#shifts-shifts. */

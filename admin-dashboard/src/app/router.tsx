@@ -7,9 +7,11 @@ import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { EmployeeDetailPage } from '@/features/employees/pages/EmployeeDetailPage';
 import { EmployeeFormPage } from '@/features/employees/pages/EmployeeFormPage';
 import { EmployeesListPage } from '@/features/employees/pages/EmployeesListPage';
+import { GeofencesPage } from '@/features/geofences/pages/GeofencesPage';
 import { LeavePage } from '@/features/leaves/pages/LeavePage';
 import { NotificationsPage } from '@/features/notifications/pages/NotificationsPage';
 import { PayrollPage } from '@/features/payroll/pages/PayrollPage';
+import { QrCodesPage } from '@/features/qr/pages/QrCodesPage';
 import { ShiftsPage } from '@/features/shifts/pages/ShiftsPage';
 
 export const router = createBrowserRouter([
@@ -30,8 +32,8 @@ export const router = createBrowserRouter([
           { path: 'shifts', element: <ShiftsPage /> },
           { path: 'payroll', element: <PayrollPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
-          // Geofence and QR routes are added phase by phase — see
-          // docs/architecture/05-folder-structure.md for the target layout.
+          { path: 'geofences', element: <GeofencesPage /> },
+          { path: 'qr-codes', element: <QrCodesPage /> },
         ],
       },
     ],
