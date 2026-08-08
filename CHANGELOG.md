@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Admin Dashboard — Analytics Charts (Feature-Complete)
+
+`DashboardPage`'s last placeholder: a 6-month attendance-trend line chart (`GET /analytics/attendance-trend`, Super Admin/HR/Manager) and a department-comparison ranking (`GET /analytics/department-comparison`, Super Admin/HR only). Both hand-rolled in SVG/CSS rather than a charting library, matching the no-dependency approach the sparkline component already used. With this, the admin dashboard is feature-complete against the original 20-phase roadmap.
+
 ## Admin Dashboard — Geofences & QR Codes Features
 
 The last two Super-Admin/HR-only configuration screens: Geofences (office-location CRUD — branch name, lat/lng, radius) and QR Codes (per-location generate/revoke, rendering the real scannable image the backend already produces). Neither has a self-service half — an employee checks in *against* these via the mobile app, they never manage one — so both nav items are hidden from every other role rather than showing a page with nothing in it. With these two, every module from the original roadmap is a real screen; only the analytics trend-chart/department-comparison panel remains.

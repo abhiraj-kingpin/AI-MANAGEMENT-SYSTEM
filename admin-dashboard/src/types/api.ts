@@ -446,6 +446,22 @@ export interface DashboardKpis {
   onLeaveCount: number;
 }
 
+/** `GET /analytics/attendance-trend` — see backend/README.md#analytics-analytics. Team-scoped for a Manager, org-wide for Super Admin/HR. */
+export interface AttendanceTrendPoint {
+  month: string; // "YYYY-MM"
+  attendanceRate: number;
+  lateRate: number;
+}
+
+/** `GET /analytics/department-comparison` — Super Admin/HR only, no "my team" reading. */
+export interface DepartmentComparison {
+  departmentId: string;
+  departmentName: string;
+  headcount: number;
+  attendanceRate: number;
+  lateRate: number;
+}
+
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;

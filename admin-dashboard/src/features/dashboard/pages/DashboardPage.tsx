@@ -1,7 +1,11 @@
 import { Card } from '@/shared/ui/Card';
 import { Reveal } from '@/shared/ui/Reveal';
 import { StatCard } from '@/shared/ui/StatCard';
+import { AttendanceTrendChart } from '@/features/analytics/components/AttendanceTrendChart';
+import { DepartmentComparisonTable } from '@/features/analytics/components/DepartmentComparisonTable';
+import { useAttendanceTrend } from '@/features/analytics/hooks/useAttendanceTrend';
 import { useDashboardKpis } from '@/features/analytics/hooks/useDashboardKpis';
+import { useDepartmentComparison } from '@/features/analytics/hooks/useDepartmentComparison';
 import { useHeadcount } from '@/features/employees/hooks/useHeadcount';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -31,8 +35,12 @@ export function DashboardPage() {
   const role = useAuthStore((s) => s.user?.role);
   const canViewAnalytics = role === 'super_admin' || role === 'hr' || role === 'manager';
 
+  const canViewComparison = role === 'super_admin' || role === 'hr';
+
   const { data: headcount } = useHeadcount();
   const { data: kpis } = useDashboardKpis();
+  const { data: trend, isLoading: trendLoading } = useAttendanceTrend();
+  const { data: comparison, isLoading: comparisonLoading } = useDepartmentComparison();
 
   const pendingNote = canViewAnalytics ? 'Loading…' : 'HR/Admin only';
 
@@ -116,22 +124,46 @@ export function DashboardPage() {
         />
       </div>
 
-      <Reveal index={5}>
-        <Card className="flex flex-col items-center gap-2 px-8 py-14 text-center">
-          <span className="text-2xl" aria-hidden="true">
-            ◈
-          </span>
-          <h2 className="text-base font-bold">Trend charts &amp; department comparison are next</h2>
-          <p className="max-w-md text-sm text-text-dim">
-            The KPIs above are real, live numbers from{' '}
-            <span className="font-mono text-[12.5px]">GET /analytics/dashboard</span>. Monthly
-            attendance trends and a per-department comparison are already live on the API (
-            <span className="font-mono text-[12.5px]">/analytics/attendance-trend</span>,{' '}
-            <span className="font-mono text-[12.5px]">/analytics/department-comparison</span>) —
-            charting them here is next.
-          </p>
-        </Card>
-      </Reveal>
+      {canViewAnalytics ? (
+        <Reveal index={5}>
+          <Card className="px-6 py-5">
+            <h2 className="mb-1 text-[15px] font-bold">Attendance Trend</h2>
+            <p className="mb-4 text-[12.5px] text-text-dim">Last 6 months, monthly rates</p>
+            {trendLoading && !trend ? (
+              <p className="py-10 text-center text-sm text-text-dim">Loading…</p>
+            ) : (
+              <AttendanceTrendChart points={trend ?? []} />
+            )}
+          </Card>
+        </Reveal>
+      ) : (
+        <Reveal index={5}>
+          <Card className="flex flex-col items-center gap-2 px-8 py-14 text-center">
+            <span className="text-2xl" aria-hidden="true">
+              ◈
+            </span>
+            <p className="text-sm text-text-dim">
+              Attendance trends and department comparisons are visible to HR/Admin/Manager roles.
+            </p>
+          </Card>
+        </Reveal>
+      )}
+
+      {canViewComparison && (
+        <Reveal index={6}>
+          <Card className="px-6 py-5">
+            <h2 className="mb-1 text-[15px] font-bold">Department Comparison</h2>
+            <p className="mb-4 text-[12.5px] text-text-dim">
+              Today's attendance rate by department, ranked
+            </p>
+            {comparisonLoading && !comparison ? (
+              <p className="py-10 text-center text-sm text-text-dim">Loading…</p>
+            ) : (
+              <DepartmentComparisonTable rows={comparison ?? []} />
+            )}
+          </Card>
+        </Reveal>
+      )}
     </div>
   );
 }
