@@ -16,7 +16,7 @@ defaults:
     working-directory: mobile-app
 
 jobs:
-  analyze-and-test:
+  analyze-test-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,15 +30,16 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
-      # `flutter build apk` is deliberately not run here: this repository
-      # has never had the one-time `flutter create .` scaffolding step run
-      # against it (see mobile-app/README.md) — the android/ and ios/
-      # platform folders a real build needs don't exist yet. `analyze` and
-      # `test` don't need those folders, so they're real, useful checks on
-      # their own; a build step would just fail for a reason unrelated to
-      # code quality until that one-time step happens.
-      #
-      # Worth stating plainly: this workflow is this codebase's first-ever
-      # machine verification of the hand-written Dart in lib/ — it was
-      # authored and reviewed without a local Flutter SDK available. Expect
-      # its first real run to surface issues, not to pass cleanly by luck.
+      # A debug (unsigned) build, not `--release` — no signing keystore is
+      # configured anywhere in this repo. GitHub's own ubuntu-latest runner
+      # image ships a pre-installed, license-accepted Android SDK
+      # specifically for this, unlike a fresh local machine (see
+      # mobile-app/README.md's Status section for exactly that gap, hit and
+      # documented while verifying this workflow locally) — so this step
+      # can do something local verification couldn't.
+      - run: flutter build apk --debug
+
+      # Phase 20 update: `android/`/`ios/` now exist (flutter create . was
+      # run once real Flutter tooling became available) and this codebase's
+      # first-ever machine verification found exactly one lint nit, already
+      # fixed. This workflow is expected to be green, not a coin flip.

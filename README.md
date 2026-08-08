@@ -41,7 +41,7 @@ At a glance: the backend is a layered modular monolith (one module per business 
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | [`backend/`](backend/)                 | 18 of 20 roadmap phases complete — authentication through expanded test coverage. See [backend/README.md](backend/README.md) for the full feature list and API reference. | 536 Jest tests passing (87% statement coverage), `lint`/`typecheck`/`build` clean, no live database required                                             |
 | [`admin-dashboard/`](admin-dashboard/) | Project scaffold + authenticated shell (login → dashboard, token refresh). Feature screens land alongside their backend phase.                                       | `lint`/`typecheck`/`format:check`/`build` clean                                                                                 |
-| [`mobile-app/`](mobile-app/)           | Clean-Architecture scaffold + full auth vertical slice (login/logout/session-restore). Hand-written, not yet machine-verified — this environment has no Flutter SDK. | `flutter analyze`/`test` not yet run; see [mobile-app/README.md](mobile-app/README.md) for the one-time `flutter create .` step |
+| [`mobile-app/`](mobile-app/)           | Clean-Architecture scaffold + full auth vertical slice (login/logout/session-restore). Hand-written without a Flutter SDK, machine-verified in Phase 20 once one became available. | `flutter analyze`: 0 issues; `flutter test`: 4/4 passing; `android`/`ios` scaffolded — see [mobile-app/README.md#status](mobile-app/README.md#status) |
 
 ## Roadmap
 
@@ -60,7 +60,7 @@ At a glance: the backend is a layered modular monolith (one module per business 
 | 10  | Shift management                                                                                     | Done                                                                                                                                      |
 | 11  | Payroll                                                                                              | Done                                                                                                                                      |
 | 12  | Notifications                                                                                        | Done                                                                                                                                      |
-| 13  | Offline mode — queue, auto-sync, conflict resolution                                                 | Partial — backend done ([`POST /attendance/sync`](backend/README.md#attendance-attendance)); mobile Hive queue not built (no Flutter SDK in this environment) |
+| 13  | Offline mode — queue, auto-sync, conflict resolution                                                 | Partial — backend done ([`POST /attendance/sync`](backend/README.md#attendance-attendance)); mobile Hive queue not built yet |
 | 14  | Reports & analytics dashboard                                                                        | Done ([backend](backend/README.md#analytics-analytics)); admin-dashboard KPI wiring in progress                                          |
 | 15  | AI-assisted analytics                                                                                | Done ([backend](backend/README.md#analytics-analytics)); admin-dashboard UI not built                                                     |
 | 16  | Security hardening                                                                                   | Done ([backend](backend/README.md#security-considerations))                                                                               |
@@ -88,7 +88,7 @@ Each project is independently runnable — see its README for exact steps:
 
 - **Backend**: [backend/README.md#installation](backend/README.md#installation) — `npm install && npm run dev`, or `docker compose up --build` for API + MongoDB + Redis.
 - **Admin dashboard**: [admin-dashboard/README.md](admin-dashboard/README.md) — `npm install && npm run dev`.
-- **Mobile app**: [mobile-app/README.md](mobile-app/README.md) — requires a one-time `flutter create .` in this environment (no Flutter SDK available to have run it already).
+- **Mobile app**: [mobile-app/README.md](mobile-app/README.md) — `flutter pub get && flutter run`; `android`/`ios` are already scaffolded.
 
 ## Security & Performance
 
@@ -102,12 +102,12 @@ Backend-specific detail (auth model, RBAC enforcement, account lockout, rate lim
 | ------------------ | ------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `ci-backend.yml`  | Push/PR touching `backend/`          | lint, `format:check`, typecheck, the full Jest suite, `tsc` build, and a Docker image build — all real, no live database needed |
 | `ci-admin.yml`    | Push/PR touching `admin-dashboard/`  | lint, `format:check`, typecheck, Vite build — no test step, since none exists yet (see [Component Status](#component-status)) |
-| `ci-mobile.yml`   | Push/PR touching `mobile-app/`       | `flutter analyze` + `flutter test` — this repository's first-ever machine verification of the hand-written Dart in `lib/`, expected to need real fixes on its first run, not a guaranteed pass |
+| `ci-mobile.yml`   | Push/PR touching `mobile-app/`       | `flutter analyze` + `flutter test` + a debug `flutter build apk` — all now genuinely verified (see [mobile-app/README.md#status](mobile-app/README.md#status)) |
 | `deploy.yml`      | Push to `main`                       | Inert by default (gated on a `DEPLOY_ENABLED` repo variable) — the deploy-hook wiring for Render/Vercel projects that don't exist yet from this environment; a human with account access activates it, see the workflow file's header comment |
 
 ## Future Work
 
-The mobile half of offline sync (a Hive local queue, connectivity listener, and retry logic against the now-real `POST /attendance/sync` API) is still unbuilt — this environment has no Flutter SDK to build or verify it. Phase 20 (consolidated documentation) is the last numbered backend phase; beyond it, both client applications still need their feature UI designed and built (see [Component Status](#component-status)) — the backend's API surface for employees, attendance, leave, shifts, payroll, notifications, and analytics is ready and waiting for both. Backend-specific known simplifications (placeholder external-service integrations, deferred automation) are itemized in [backend/README.md#known-simplifications--future-work](backend/README.md#known-simplifications--future-work).
+The mobile half of offline sync (a Hive local queue, connectivity listener, and retry logic against the now-real `POST /attendance/sync` API) is still unbuilt — a scope gap now, not a tooling one, since Phase 20 got a real Flutter SDK verifying this codebase for the first time (see [mobile-app/README.md#status](mobile-app/README.md#status)). Phase 20 (consolidated documentation) is the last numbered backend phase; beyond it, both client applications still need their feature UI designed and built (see [Component Status](#component-status)) — the backend's API surface for employees, attendance, leave, shifts, payroll, notifications, and analytics is ready and waiting for both. Backend-specific known simplifications (placeholder external-service integrations, deferred automation) are itemized in [backend/README.md#known-simplifications--future-work](backend/README.md#known-simplifications--future-work).
 
 Both client applications (admin dashboard and mobile app) also still need their feature UI designed and built out — see [Component Status](#component-status). The backend's API surface for employees, attendance, leave, shifts, payroll, and notifications is ready and waiting for both.
 
