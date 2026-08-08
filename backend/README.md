@@ -291,16 +291,20 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-512 Jest tests across every module, none requiring a live database:
+536 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).
 - **`tests/models/*.test.ts`** — schema validation via Mongoose's in-process `validateSync()`.
-- **`tests/shared/*.test.ts`** — pure-function coverage for cross-cutting utilities (business-day math, shift-duration math, vector similarity, team scoping, actor helpers).
+- **`tests/shared/*.test.ts`** — pure-function coverage for cross-cutting utilities (business-day math, shift-duration math, vector similarity, team scoping, actor helpers, the atomic sequence counter, regex-escaping).
+- **`tests/middlewares/*.test.ts`** (Phase 18) — the central `errorHandler` exercised directly against every error shape it normalizes (`AppError`, Zod, Mongoose validation/cast errors, Multer, Mongo duplicate-key, a bare thrown string), including a separate file for its production-vs-development redaction branch (`isProduction` is computed once at module load, so it needs its own mocked module rather than a runtime toggle).
 
 ```bash
 npm test
+npm test -- --coverage   # writes an HTML+text report to coverage/
 ```
+
+**Coverage** (`--coverage`, this run): 87% statements, 73% branches, 72% functions, 88% lines. The gap is concentrated in one place on purpose, not an oversight: every `*.controller.ts` is 40–75% because a controller is intentionally "parse → call service → respond" with no branching logic of its own (see [Architecture](#architecture)) — its real behavior is what `*.service.test.ts` already covers, and its rejection paths (401/403/422) are what `*.routes.test.ts` already covers; testing a controller's success path directly would mean re-implementing a live-database integration test this suite deliberately avoids, for a file with nothing left to catch. The same reasoning applies to thin infrastructure wrappers (`cloudinary.ts`, `fileUpload.service.ts`, `database.ts`) — mocked out entirely by whatever calls them, on purpose, so a Cloudinary outage in this test suite is impossible by construction.
 
 ## Deployment
 
@@ -351,7 +355,7 @@ Other known, documented gaps:
 - **No DB transactions**: employee creation (User + Employee) and a few other multi-document writes are sequential, not transactional — acceptable on a single-node MongoDB (not a replica set) for now, revisited once running against Atlas.
 - **Only one `clientGeneratedId` is retained per attendance record**: the schema (by design, from Phase 0) stores a single idempotency key per document, not one per punch. A check-out punch's sync call overwrites the field a check-in punch's sync call set. In practice this is safe — the mobile client deletes a punch from its local queue the moment it gets back `applied`/`duplicate`, so an older punch is never resubmitted after a newer one has already landed — but it's a narrow theoretical gap worth naming rather than silently assuming away.
 
-Remaining platform-level phases (a mobile offline-sync client, expanded test coverage, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
+Remaining platform-level phases (a mobile offline-sync client, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
 
 ## License
 

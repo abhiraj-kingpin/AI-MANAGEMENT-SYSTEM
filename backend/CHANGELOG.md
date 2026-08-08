@@ -4,6 +4,15 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [Phase 18] — Expanded Test Coverage
+
+**Added** — `tests/shared/regex.test.ts`, `tests/shared/counter.test.ts`, `tests/modules/notifications/email.service.test.ts`, and `tests/middlewares/error.middleware.test.ts` + `.production.test.ts`.
+
+- Ran `npm test -- --coverage` first to find genuine gaps rather than guessing: `escapeRegExp` (a security-relevant helper — the one thing standing between user search text and `new RegExp()`), `nextSequence` (the atomic-counter pattern the Performance Notes already call out as important), `email.service.ts` (a documented placeholder that had never been tested _directly_, only mocked away by its callers), and `errorHandler` (the single piece of code every unhandled failure in the whole API funnels through) all had 0% function coverage before this phase. All four are now at 100%.
+- `errorHandler`'s production-vs-development redaction branch needed its own test file, not just another `it()`: `isProduction` is computed once at module load from `env.NODE_ENV`, so exercising the production path requires a file-scoped `jest.mock('../../src/config/env', ...)`, hoisted before any import — the exact same reason Phase 14/15/16/17's various env-dependent tests (`push.service.test.ts`, etc.) already isolate themselves into their own files.
+- **Deliberately not chased to 100%**: every `*.controller.ts` (40–75%, thin "parse → call service → respond" glue with no branching logic — its behavior is what `*.service.test.ts` covers, its rejection paths are what `*.routes.test.ts` covers) and infrastructure wrappers like `cloudinary.ts`/`fileUpload.service.ts`/`database.ts` (mocked out entirely by every caller, on purpose). Chasing these to 100% would mean either standing up a live-database integration layer this suite has deliberately avoided since Phase 0, or adding tests that re-assert "the mock returns what I told it to" — motion, not coverage that catches anything.
+- **Verified**: 536 Jest tests (up from 512 — 24 new). Overall coverage: 87% statements / 73% branches / 72% functions / 88% lines (up from 85.6%/69.6%/70.2%/86.5%), documented in full in [README's Testing section](README.md#testing) rather than just asserted.
+
 ## [Phase 17] — Performance
 
 **Added** — `shared/cache/memoryCache.ts` (a tiny in-process TTL cache, applied to `analytics.service.ts`'s two most-polled reads), two new `Attendance` indexes for Phase 15's query patterns, and `scripts/perf-smoke.ts` (`npm run perf:smoke`), a small dependency-free latency check.

@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Phase 18 — Expanded Test Coverage
+
+Backend: ran a real coverage report to find genuine gaps rather than guessing, then closed the four that mattered — `escapeRegExp` (search-injection guard), `nextSequence` (the atomic counter), `email.service.ts` (never tested directly, only mocked away), and the central `errorHandler` (every unhandled failure funnels through it), all now at 100%. Controllers and infrastructure wrappers stay intentionally uncovered — documented why, not silently skipped. 536 backend tests, 87% statement coverage overall. Details: [backend/CHANGELOG.md#phase-18--expanded-test-coverage](backend/CHANGELOG.md#phase-18--expanded-test-coverage).
+
 ## Phase 17 — Performance
 
 Backend: in-process 30s response caching for the two most-polled analytics reads (scope-keyed so no caller ever sees another's cached data), two new Attendance indexes for Phase 15's query patterns, a dependency-free `npm run perf:smoke` latency check, and a real bug fix — `/analytics/export/csv` had no row cap at all, unlike every other export in the codebase. 512 backend tests. Details: [backend/CHANGELOG.md#phase-17--performance](backend/CHANGELOG.md#phase-17--performance).
