@@ -90,6 +90,10 @@ function attendanceRecord(status: string, overtimeMinutes = 0) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // list()'s own batch employee-name lookup (see resolveEmployeeRefs) —
+  // distinct from mockedEmployeeFind's other use resolving a departmentId
+  // filter to employee ids, which individual tests below override.
+  mockedEmployeeFind.mockReturnValue(mockQuery([]));
 });
 
 describe('generatePayslipForEmployee', () => {
@@ -192,8 +196,29 @@ describe('payslipService.list', () => {
 
     await payslipService.list({ employeeId: EMPLOYEE_ID, page: 1, limit: 20 });
 
-    expect(mockedEmployeeFind).not.toHaveBeenCalled();
+    // Employee.find is still called once here — not for departmentId
+    // resolution (skipped, since an explicit employeeId takes precedence),
+    // but for the list's own batch employee-name lookup below.
     expect(mockedPayslipFind).toHaveBeenCalledWith({ employeeId: EMPLOYEE_ID });
+  });
+
+  it('attaches each row employee name/code from a single batch lookup', async () => {
+    mockedPayslipFind.mockReturnValue(mockQuery([fakePayslip()]));
+    mockedPayslipCount.mockResolvedValue(1);
+    mockedEmployeeFind.mockReturnValue(
+      mockQuery([
+        { _id: EMPLOYEE_ID, employeeCode: 'EMP-001', firstName: 'Priya', lastName: 'Nair' },
+      ]),
+    );
+
+    const result = await payslipService.list({ page: 1, limit: 20 });
+
+    expect(result.items[0].employee).toEqual({
+      id: EMPLOYEE_ID,
+      employeeCode: 'EMP-001',
+      firstName: 'Priya',
+      lastName: 'Nair',
+    });
   });
 });
 
@@ -215,6 +240,15 @@ describe('payslipService.getMyPayslips', () => {
       employeeId: EMPLOYEE_ID,
       status: 'released',
     });
+  });
+
+  it("never attaches an employee ref to the caller's own /me history", async () => {
+    mockedPayslipFind.mockReturnValue(mockQuery([fakePayslip({ status: 'released' })]));
+    const actor: ActorContext = { id: 'user-1', role: 'employee', employeeId: EMPLOYEE_ID };
+
+    const [payslip] = await payslipService.getMyPayslips(actor);
+
+    expect(payslip.employee).toBeUndefined();
   });
 });
 

@@ -1,8 +1,10 @@
+import type { EmployeeRefDTO } from '../../shared/utils/employeeRef';
 import type { IPayslip, PayslipStatus } from './payslip.model';
 
 export interface PayslipDTO {
   id: string;
   employeeId: string;
+  employee?: EmployeeRefDTO;
   salaryId: string;
   month: string;
   grossPay: number;
@@ -17,10 +19,11 @@ export interface PayslipDTO {
   updatedAt: Date;
 }
 
-export function toPayslipDTO(doc: IPayslip): PayslipDTO {
+export function toPayslipDTO(doc: IPayslip, employee?: EmployeeRefDTO): PayslipDTO {
   return {
     id: doc.id as string,
     employeeId: String(doc.employeeId),
+    employee,
     salaryId: String(doc.salaryId),
     month: doc.month,
     grossPay: doc.grossPay,

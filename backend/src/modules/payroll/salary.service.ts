@@ -1,5 +1,6 @@
 import { AppError } from '../../shared/errors/AppError';
 import type { PaginatedResult } from '../../shared/types/pagination';
+import { resolveEmployeeRefs } from '../../shared/utils/employeeRef';
 import { Salary } from './salary.model';
 import { type SalaryDTO, toSalaryDTO } from './salary.types';
 import type { CreateSalaryInput, ListSalariesQuery, UpdateSalaryInput } from './salary.validators';
@@ -45,8 +46,12 @@ export const salaryService = {
       Salary.countDocuments(filter),
     ]);
 
+    // Same gap as Attendance/Leave before it: this list is exactly what HR
+    // reads to find "whose salary is this", so a bare employeeId is useless.
+    const employeeById = await resolveEmployeeRefs(items, (item) => String(item.employeeId));
+
     return {
-      items: items.map(toSalaryDTO),
+      items: items.map((item) => toSalaryDTO(item, employeeById.get(String(item.employeeId)))),
       total,
       page: query.page,
       limit: query.limit,

@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Backend v1.1.3 — Salary & Payslip Lists: Real Employee Names
+
+The same class of gap as `v1.1.1`/`v1.1.2`, found this time while reading the Payroll module ahead of its admin-dashboard screen: `GET /salaries` and `GET /payslips` both had bare `employeeId`s, no names. Fixed with the same batch-lookup pattern — and, since this made three near-identical copies of that pattern, extracted it into a shared `resolveEmployeeRefs()` and switched Attendance's and Leave's existing code over to it too, rather than writing a fourth and fifth copy. 562 backend tests. Details: [backend/CHANGELOG.md#v113--salary--payslip-lists-real-employee-names-shared-resolveemployeerefs](backend/CHANGELOG.md#v113--salary--payslip-lists-real-employee-names-shared-resolveemployeerefs).
+
 ## Admin Dashboard — Shifts Feature
 
 Same shape as Leave: a "My Shift" card every role sees, above a Super Admin/HR-only section for shift definitions (create/edit/deactivate) and single-employee assignment (reusing the `EmployeePicker` typeahead built for Employees). `POST /shifts/assign/bulk` exists on the API but isn't wired up in the UI yet — a documented scope cut, not an oversight.

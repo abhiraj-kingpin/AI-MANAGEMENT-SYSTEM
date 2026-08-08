@@ -4,6 +4,15 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [v1.1.3] — Salary & Payslip Lists: Real Employee Names, Shared `resolveEmployeeRefs`
+
+**Fixed** — the same gap as `v1.1.1`/`v1.1.2`, this time in `salaryService.list` (`GET /salaries`) and `payslipService.list` (`GET /payslips`): both are HR-facing lists whose rows carried a bare `employeeId` with no name, found while reading the Payroll module ahead of building its admin-dashboard screen (before the frontend work even started this time, since the pattern was now recognizable on sight).
+
+- Added `SalaryDTO.employee`/`PayslipDTO.employee`, each resolved via one batch lookup per page in their respective `list()` methods.
+- **Refactored**: extracted the batch-lookup helper — hand-copied three times now (Attendance, Leave, and this pair) — into a shared `resolveEmployeeRefs()` in `shared/utils/employeeRef.ts`, and switched Attendance's and Leave's existing call sites over to it instead of leaving a fourth and fifth near-identical copy. `AttendanceEmployeeRefDTO`/`LeaveEmployeeRefDTO` are now both the same shared `EmployeeRefDTO` type. Pure extraction, no behavior change — every existing test for both modules still passes unmodified.
+- Also fixed the same `.map(toXDTO)` callback-collision pitfall `v1.1.1` hit, pre-emptively, in `payslipService.getMyPayslips`: `.map()`'s `(value, index)` would otherwise pass `index: number` as the DTO mapper's second (`employee`) parameter.
+- **Verified**: 562 Jest tests (up from 559). Had to add an `Employee` mock (and a test-isolation-safe default return value in `beforeEach`) to `salary.service.test.ts`, which had never needed one before; `payslip.service.test.ts` already mocked `Employee` but one existing assertion (`expect(mockedEmployeeFind).not.toHaveBeenCalled()`) was asserting the _old_ behavior and had to be corrected to match the new, real one.
+
 ## [v1.1.2] — Leave Review Queue: Real Employee & Leave-Type Names
 
 **Fixed** — the same gap as `v1.1.1`, found this time while starting the admin dashboard's Leave screen: `GET /leaves` (the HR/Manager review queue `leaveService.list` reads from) returned bare `employeeId`/`leaveTypeId` strings, no names — exactly what a reviewer needs to decide whether to approve a request.

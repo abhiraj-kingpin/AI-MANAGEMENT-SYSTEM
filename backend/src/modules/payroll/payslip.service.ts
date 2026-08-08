@@ -4,6 +4,7 @@ import { AppError } from '../../shared/errors/AppError';
 import type { ActorContext } from '../../shared/types/actorContext';
 import type { PaginatedResult } from '../../shared/types/pagination';
 import { requireEmployeeId } from '../../shared/utils/actor';
+import { resolveEmployeeRefs } from '../../shared/utils/employeeRef';
 import { round2 } from '../../shared/utils/math';
 import { Attendance } from '../attendance/attendance.model';
 import { Employee } from '../employees/employee.model';
@@ -169,8 +170,13 @@ export const payslipService = {
       Payslip.countDocuments(filter),
     ]);
 
+    // Same gap as Attendance/Leave/Salary before it: this is the HR-facing
+    // payslip list, so a bare employeeId is useless — a reviewer needs to
+    // know whose payslip they're looking at before deciding to release it.
+    const employeeById = await resolveEmployeeRefs(items, (item) => String(item.employeeId));
+
     return {
-      items: items.map(toPayslipDTO),
+      items: items.map((item) => toPayslipDTO(item, employeeById.get(String(item.employeeId)))),
       total,
       page: query.page,
       limit: query.limit,
@@ -185,7 +191,11 @@ export const payslipService = {
     if (month) filter.month = month;
 
     const payslips = await Payslip.find(filter).sort({ month: -1 });
-    return payslips.map(toPayslipDTO);
+    // Not `payslips.map(toPayslipDTO)` — `.map`'s (value, index, array)
+    // callback would pass `index: number` as `toPayslipDTO`'s second
+    // (employee) param. Same pitfall attendance.service.ts#getMyAttendance
+    // hit for the same reason.
+    return payslips.map((payslip) => toPayslipDTO(payslip));
   },
 
   async release(payslipId: string): Promise<PayslipDTO> {

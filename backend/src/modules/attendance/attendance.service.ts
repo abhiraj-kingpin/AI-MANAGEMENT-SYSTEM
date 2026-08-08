@@ -7,6 +7,7 @@ import type { ActorContext } from '../../shared/types/actorContext';
 import type { PaginatedResult } from '../../shared/types/pagination';
 import { requireEmployeeId } from '../../shared/utils/actor';
 import { combineDateAndTime, minutesBetween, startOfUtcDay } from '../../shared/utils/dateTime';
+import { resolveEmployeeRefs } from '../../shared/utils/employeeRef';
 import { getManagedEmployeeIds } from '../../shared/utils/teamScope';
 import { Employee } from '../employees/employee.model';
 import { faceService } from '../face-recognition/face.service';
@@ -474,22 +475,7 @@ export const attendanceService = {
     // Real bug, found while building the admin-dashboard's attendance list:
     // this report is exactly what an HR/Manager reads to see who did what —
     // showing a bare ObjectId instead of a name would be useless to them.
-    // One batch lookup for the whole page, not one query per row.
-    const employeeIds = [...new Set(items.map((item) => String(item.employeeId)))];
-    const employees = await Employee.find({ _id: { $in: employeeIds } }).select(
-      'employeeCode firstName lastName',
-    );
-    const employeeById = new Map(
-      employees.map((e) => [
-        String(e._id),
-        {
-          id: String(e._id),
-          employeeCode: e.employeeCode,
-          firstName: e.firstName,
-          lastName: e.lastName,
-        },
-      ]),
-    );
+    const employeeById = await resolveEmployeeRefs(items, (item) => String(item.employeeId));
 
     return {
       items: items.map((item) => toAttendanceDTO(item, employeeById.get(String(item.employeeId)))),

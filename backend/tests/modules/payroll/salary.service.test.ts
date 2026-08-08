@@ -4,6 +4,14 @@ jest.mock('../../../src/modules/payroll/salary.model', () => ({
   Salary: { create: jest.fn(), find: jest.fn(), findOne: jest.fn(), countDocuments: jest.fn() },
 }));
 
+// list() batch-resolves employee names (same gap Attendance/Leave had) —
+// without this mock, the real Employee.find would hang trying to reach a
+// live DB and every list() test would time out.
+jest.mock('../../../src/modules/employees/employee.model', () => ({
+  Employee: { find: jest.fn() },
+}));
+
+import { Employee } from '../../../src/modules/employees/employee.model';
 import { Salary } from '../../../src/modules/payroll/salary.model';
 import { salaryService } from '../../../src/modules/payroll/salary.service';
 
@@ -11,6 +19,7 @@ const mockedCreate = Salary.create as unknown as jest.Mock;
 const mockedFind = Salary.find as unknown as jest.Mock;
 const mockedFindOne = Salary.findOne as unknown as jest.Mock;
 const mockedCount = Salary.countDocuments as unknown as jest.Mock;
+const mockedEmployeeFind = Employee.find as unknown as jest.Mock;
 
 const EMPLOYEE_ID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -34,6 +43,7 @@ function fakeSalary(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockedEmployeeFind.mockReturnValue(mockQuery([]));
 });
 
 describe('salaryService.create', () => {
@@ -108,5 +118,24 @@ describe('salaryService.list', () => {
 
     expect(mockedFind).toHaveBeenCalledWith({});
     expect(result.items).toHaveLength(2);
+  });
+
+  it('attaches each row employee name/code from a single batch lookup', async () => {
+    mockedFind.mockReturnValue(mockQuery([fakeSalary()]));
+    mockedCount.mockResolvedValue(1);
+    mockedEmployeeFind.mockReturnValue(
+      mockQuery([
+        { _id: EMPLOYEE_ID, employeeCode: 'EMP-001', firstName: 'Priya', lastName: 'Nair' },
+      ]),
+    );
+
+    const result = await salaryService.list({ page: 1, limit: 20 });
+
+    expect(result.items[0].employee).toEqual({
+      id: EMPLOYEE_ID,
+      employeeCode: 'EMP-001',
+      firstName: 'Priya',
+      lastName: 'Nair',
+    });
   });
 });

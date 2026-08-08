@@ -1,3 +1,4 @@
+import type { EmployeeRefDTO } from '../../shared/utils/employeeRef';
 import type {
   AttendanceMethod,
   AttendanceStatus,
@@ -17,14 +18,6 @@ export interface GeoPointDTO {
   accuracyMeters?: number;
 }
 
-/** Only attached where a caller actually needs a name instead of a bare id — the HR/Manager report (`listAttendance`), not an employee's own `/me` history or a single check-in/out response. */
-export interface AttendanceEmployeeRefDTO {
-  id: string;
-  employeeCode: string;
-  firstName: string;
-  lastName: string;
-}
-
 export interface CorrectionRequestDTO {
   requestedCheckInAt: Date | null;
   requestedCheckOutAt: Date | null;
@@ -40,7 +33,7 @@ export interface CorrectionRequestDTO {
 export interface AttendanceDTO {
   id: string;
   employeeId: string;
-  employee?: AttendanceEmployeeRefDTO;
+  employee?: EmployeeRefDTO;
   date: Date;
   checkInAt: Date | null;
   checkOutAt: Date | null;
@@ -63,10 +56,7 @@ export interface AttendanceDTO {
   updatedAt: Date;
 }
 
-export function toAttendanceDTO(
-  doc: IAttendance,
-  employee?: AttendanceEmployeeRefDTO,
-): AttendanceDTO {
+export function toAttendanceDTO(doc: IAttendance, employee?: EmployeeRefDTO): AttendanceDTO {
   return {
     id: doc.id as string,
     employeeId: String(doc.employeeId),

@@ -247,16 +247,16 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Payroll (`/salaries`, `/payroll`, `/payslips`)
 
-| Method   | Path                          | Access                                             | Notes                                      |
-| -------- | ----------------------------- | -------------------------------------------------- | ------------------------------------------ |
-| GET/POST | `/salaries`                   | Super Admin/HR                                     | Base salary structure                      |
-| PATCH    | `/salaries/:employeeId`       | Super Admin/HR                                     | Allowances/deductions merged, not replaced |
-| POST     | `/payroll/run`                | Super Admin/HR                                     | `{month, departmentId?}` → `{runId}`       |
-| GET      | `/payroll/runs/:runId/status` | Super Admin/HR                                     | Poll batch progress                        |
-| GET      | `/payslips`                   | Super Admin/HR                                     | Filterable list                            |
-| GET      | `/payslips/me?month=`         | Self                                               | Released payslips only                     |
-| GET      | `/payslips/:id/pdf`           | Self (own, released) / Super Admin/HR (any status) |                                            |
-| PATCH    | `/payslips/:id/release`       | Super Admin/HR                                     | `generated` → `released`                   |
+| Method   | Path                          | Access                                             | Notes                                                                                       |
+| -------- | ----------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| GET/POST | `/salaries`                   | Super Admin/HR                                     | Base salary structure. List rows include `employee` name/code (batch-resolved, not per-row) |
+| PATCH    | `/salaries/:employeeId`       | Super Admin/HR                                     | Allowances/deductions merged, not replaced                                                  |
+| POST     | `/payroll/run`                | Super Admin/HR                                     | `{month, departmentId?}` → `{runId}`                                                        |
+| GET      | `/payroll/runs/:runId/status` | Super Admin/HR                                     | Poll batch progress                                                                         |
+| GET      | `/payslips`                   | Super Admin/HR                                     | Filterable list; rows include `employee` name/code (batch-resolved, not per-row)            |
+| GET      | `/payslips/me?month=`         | Self                                               | Released payslips only                                                                      |
+| GET      | `/payslips/:id/pdf`           | Self (own, released) / Super Admin/HR (any status) |                                                                                             |
+| PATCH    | `/payslips/:id/release`       | Super Admin/HR                                     | `generated` → `released`                                                                    |
 
 ### Notifications (`/notifications`)
 
@@ -300,7 +300,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-559 Jest tests across every module, none requiring a live database:
+562 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).
