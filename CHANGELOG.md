@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Mobile App — GPS Check-In/Check-Out
+
+The first feature added to the mobile app beyond auth: a `LocationService` wrapping `geolocator` (permission request + high-accuracy GPS read), composed with `POST /attendance/check-in`/`check-out` behind the same Clean Architecture layering the auth slice established (data/domain/presentation, a `Result<T>`-returning repository, Riverpod DI). The screen shows today's status, a single button that swaps between Check In and Check Out, and a pull-to-refresh history list. Also extracted `dio_exception_mapper.dart` out of `AuthRemoteDataSourceImpl` (which had it inlined) once Attendance needed the identical `DioException` → domain-`Exception` translation — the same "fix it once you've copied it twice" call made for the backend's `resolveEmployeeRefs`. `flutter analyze`: 0 issues; `flutter test`: 8/8 passing (up from 4). QR/Face check-in still need their own camera/ML plugins and aren't built yet.
+
 ## Admin Dashboard — Analytics Charts (Feature-Complete)
 
 `DashboardPage`'s last placeholder: a 6-month attendance-trend line chart (`GET /analytics/attendance-trend`, Super Admin/HR/Manager) and a department-comparison ranking (`GET /analytics/department-comparison`, Super Admin/HR only). Both hand-rolled in SVG/CSS rather than a charting library, matching the no-dependency approach the sparkline component already used. With this, the admin dashboard is feature-complete against the original 20-phase roadmap.

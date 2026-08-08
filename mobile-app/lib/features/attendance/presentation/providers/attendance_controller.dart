@@ -1,0 +1,76 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ai_management_system/features/attendance/domain/entities/attendance_entity.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/check_in_usecase.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/check_out_usecase.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/get_my_attendance_usecase.dart';
+import 'package:ai_management_system/features/attendance/presentation/providers/attendance_state.dart';
+
+class AttendanceController extends StateNotifier<AttendanceState> {
+  final CheckInUseCase _checkInUseCase;
+  final CheckOutUseCase _checkOutUseCase;
+  final GetMyAttendanceUseCase _getMyAttendanceUseCase;
+
+  AttendanceController({
+    required CheckInUseCase checkInUseCase,
+    required CheckOutUseCase checkOutUseCase,
+    required GetMyAttendanceUseCase getMyAttendanceUseCase,
+  })  : _checkInUseCase = checkInUseCase,
+        _checkOutUseCase = checkOutUseCase,
+        _getMyAttendanceUseCase = getMyAttendanceUseCase,
+        super(const AttendanceState()) {
+    loadHistory();
+  }
+
+  Future<void> loadHistory() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    final result = await _getMyAttendanceUseCase();
+    result.when(
+      success: (history) {
+        state = state.copyWith(
+          isLoading: false,
+          history: history,
+          today: _findToday(history),
+        );
+      },
+      failure: (failure) {
+        state = state.copyWith(isLoading: false, errorMessage: failure.message);
+      },
+    );
+  }
+
+  Future<void> checkIn() async {
+    state = state.copyWith(isActionInProgress: true, errorMessage: null);
+    final result = await _checkInUseCase();
+    await result.when(
+      success: (attendance) async {
+        state = state.copyWith(isActionInProgress: false, today: attendance);
+        await loadHistory();
+      },
+      failure: (failure) async {
+        state = state.copyWith(isActionInProgress: false, errorMessage: failure.message);
+      },
+    );
+  }
+
+  Future<void> checkOut() async {
+    state = state.copyWith(isActionInProgress: true, errorMessage: null);
+    final result = await _checkOutUseCase();
+    await result.when(
+      success: (attendance) async {
+        state = state.copyWith(isActionInProgress: false, today: attendance);
+        await loadHistory();
+      },
+      failure: (failure) async {
+        state = state.copyWith(isActionInProgress: false, errorMessage: failure.message);
+      },
+    );
+  }
+
+  AttendanceEntity? _findToday(List<AttendanceEntity> history) {
+    final now = DateTime.now();
+    for (final record in history) {
+      if (record.isSameDayAs(now)) return record;
+    }
+    return null;
+  }
+}

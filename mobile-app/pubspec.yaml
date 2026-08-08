@@ -29,8 +29,10 @@ dependencies:
   intl: ^0.19.0
   cupertino_icons: ^1.0.8
 
+  # Phase 6 — GPS attendance/geofencing (see core/services/location_service.dart).
+  geolocator: ^13.0.1
+
   # Added in their respective phases (kept here as a reference, not yet used):
-  # geolocator            — Phase 6, GPS attendance / geofencing
   # mobile_scanner        — Phase 7, QR attendance
   # google_mlkit_face_detection, camera, tflite_flutter — Phase 8, face recognition
   # firebase_messaging, firebase_core — Phase 12, push notifications

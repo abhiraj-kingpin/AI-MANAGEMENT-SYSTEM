@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:ai_management_system/core/router/app_router.dart';
 import 'package:ai_management_system/features/auth/presentation/providers/auth_providers.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -21,25 +23,72 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Welcome 👋', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text('Signed in as ${user?.email ?? ''} (${user?.role ?? ''})'),
-              const SizedBox(height: 24),
-              Text(
-                'GPS / QR / Face check-in land here in Phases 6–8 — '
-                'see docs/architecture/08-sequence-diagrams.md.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Welcome 👋', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 4),
+            Text('Signed in as ${user?.email ?? ''} (${user?.role ?? ''})'),
+            const SizedBox(height: 24),
+            _HomeCard(
+              icon: Icons.location_on_outlined,
+              title: 'Attendance',
+              subtitle: 'GPS check-in / check-out and your history',
+              onTap: () => context.push(attendancePath),
+            ),
+            const SizedBox(height: 12),
+            const _HomeCard(
+              icon: Icons.beach_access_outlined,
+              title: 'Leave',
+              subtitle: 'Coming soon',
+              onTap: null,
+            ),
+            const SizedBox(height: 12),
+            const _HomeCard(
+              icon: Icons.receipt_long_outlined,
+              title: 'Payslips',
+              subtitle: 'Coming soon',
+              onTap: null,
+            ),
+            const SizedBox(height: 12),
+            const _HomeCard(
+              icon: Icons.notifications_outlined,
+              title: 'Notifications',
+              subtitle: 'Coming soon',
+              onTap: null,
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _HomeCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  const _HomeCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        enabled: onTap != null,
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: onTap != null ? const Icon(Icons.chevron_right) : null,
+        onTap: onTap,
       ),
     );
   }

@@ -13,6 +13,10 @@ class ApiEndpoints {
   static const String logout = '/auth/logout';
   static const String me = '/auth/me';
 
-  // Attendance, leave, shift, payroll, notification endpoints are added here
-  // as each module lands — see docs/architecture/04-api-documentation.md.
+  static const String checkIn = '/attendance/check-in';
+  static const String checkOut = '/attendance/check-out';
+  static const String myAttendance = '/attendance/me';
+
+  // Leave, shift, payroll, notification endpoints are added here as each
+  // module lands — see docs/architecture/04-api-documentation.md.
 }

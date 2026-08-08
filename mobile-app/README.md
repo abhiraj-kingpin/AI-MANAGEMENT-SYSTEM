@@ -33,17 +33,19 @@ flutter run
 lib/
 ├── core/
 │   ├── constants/    # api_endpoints.dart
-│   ├── network/       # DioClient — auth header injection + refresh-on-401
+│   ├── network/       # DioClient (auth header + refresh-on-401), dio_exception_mapper (shared DioException → domain Exception translation)
+│   ├── services/       # LocationService — thin geolocator wrapper (permission + GPS read)
 │   ├── storage/        # SecureStorageService (JWT), HiveBoxes (offline queue, Phase 13)
 │   ├── error/           # Failure / Exception types
 │   ├── router/           # GoRouter + auth-aware redirect guard
-│   ├── providers/         # Riverpod DI roots (secureStorageProvider, dioClientProvider)
+│   ├── providers/         # Riverpod DI roots (secureStorageProvider, dioClientProvider, locationServiceProvider)
 │   └── utils/              # Result<T> functional-result type
 ├── features/
 │   ├── auth/          # data/domain/presentation — login, session bootstrap, logout
-│   └── home/            # placeholder landing screen
-│       # attendance/, leaves/, shifts/, payroll/, notifications/, profile/,
-│       # face_recognition/ arrive phase by phase — see docs/architecture/05-folder-structure.md
+│   ├── attendance/    # data/domain/presentation — GPS check-in/check-out, history
+│   └── home/            # landing screen — links into each feature
+│       # leaves/, shifts/, payroll/, notifications/, profile/, face_recognition/
+│       # arrive phase by phase — see docs/architecture/05-folder-structure.md
 ├── shared/            # theme, reusable widgets
 ├── app.dart            # MaterialApp.router wiring
 └── main.dart             # bootstrap: Hive init → ProviderScope → app
@@ -54,8 +56,14 @@ lib/
 - Tokens + a minimal cached user profile live in `flutter_secure_storage` (Keychain/Keystore) — never in plain SharedPreferences.
 - On launch, `AuthController` reads the cached session (no network round trip) to decide `/splash` → `/` or `/splash` → `/login`, via `core/router/app_router.dart`'s redirect guard.
 
+### Attendance (GPS check-in)
+- `LocationService` (`core/services/location_service.dart`) wraps `geolocator`: checks/requests permission, then reads a high-accuracy GPS fix — the only place the plugin is touched directly, mirroring `SecureStorageService`'s wrap of `flutter_secure_storage`.
+- `AttendanceRepository.checkInWithGps()` composes that position with `POST /attendance/check-in` (`method: 'gps'`); check-out's location is best-effort (a revoked permission or disabled GPS between check-in and check-out doesn't block it — the field is optional server-side too).
+- The screen shows today's status (not checked in / checked in at HH:mm / checked out, with worked hours), a single Check In/Check Out button that swaps based on that status, and a pull-to-refresh history list from `GET /attendance/me`.
+- QR and Face check-in are not built yet — both need a camera/ML plugin (`mobile_scanner`, `google_mlkit_face_detection` + `tflite_flutter`) this pass didn't add; GPS was the one method with no new native capability beyond a location permission.
+
 ## Status
 
-Phase 1 (project setup) scaffolding: Clean Architecture layering, DI wiring, and a complete auth vertical slice (login/logout/session-restore) as the reference pattern. Attendance (GPS/QR/Face), leave, shift, payroll, and notification features are added in their respective phases per the [project roadmap](../README.md).
+Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), and GPS check-in/check-out with attendance history — see [Features](#project-structure) above. Leave, shift, payroll, and notification features, plus QR/Face check-in and offline sync, are added in their respective passes per the [project roadmap](../README.md).
 
-**Machine-verified** (Phase 20) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it: `flutter analyze` → 0 issues (one `prefer_const_constructors` nit found and fixed), `flutter test` → 4/4 passing. `android/`/`ios/` were generated the same session. A debug APK build was attempted and didn't complete — this machine's Android SDK is missing `cmdline-tools` and hasn't accepted its licenses (`flutter doctor` shows exactly this), an environment-setup gap rather than a code problem; [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Flutter-equipped runners, which have a complete, license-accepted Android toolchain, so that CI path is unaffected by this machine's local gap.
+**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 8/8 passing. `android/`/`ios/` were generated in Phase 20; this pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions and an `NSLocationWhenInUseUsageDescription` iOS usage string for GPS check-in. A debug APK build was attempted locally and didn't complete — this machine's Android SDK is missing `cmdline-tools` and hasn't accepted its licenses (`flutter doctor` shows exactly this), an environment-setup gap rather than a code problem; [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Flutter-equipped runners, which have a complete, license-accepted Android toolchain, so that CI path is unaffected by this machine's local gap.
