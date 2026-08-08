@@ -592,10 +592,56 @@ describe('attendanceService.listAttendance (report scoping)', () => {
   it('gives HR unscoped visibility by default', async () => {
     mockedAttendanceFind.mockReturnValue(mockQuery([]));
     mockedAttendanceCount.mockResolvedValue(0);
+    mockedEmployeeFind.mockReturnValue(mockQuery([])); // no rows -> no employee refs to batch-resolve
 
     await attendanceService.listAttendance(baseListQuery, hr);
 
     expect(mockedAttendanceFind).toHaveBeenCalledWith({});
+  });
+
+  it("attaches each row's employee name/code from a single batch lookup, not one query per row", async () => {
+    const empA = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+    const empB = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+    mockedAttendanceFind.mockReturnValue(
+      mockQuery([
+        { id: 'att-1', employeeId: empA, status: 'present', breaks: [] },
+        { id: 'att-2', employeeId: empB, status: 'present', breaks: [] },
+        { id: 'att-3', employeeId: empA, status: 'late', breaks: [] }, // same employee again — still one lookup
+      ]),
+    );
+    mockedAttendanceCount.mockResolvedValue(3);
+    mockedEmployeeFind.mockReturnValue(
+      mockQuery([
+        { _id: empA, employeeCode: 'ENG-0001', firstName: 'Asha', lastName: 'Rao' },
+        { _id: empB, employeeCode: 'ENG-0002', firstName: 'Bilal', lastName: 'Khan' },
+      ]),
+    );
+
+    const result = await attendanceService.listAttendance(baseListQuery, hr);
+
+    expect(mockedEmployeeFind).toHaveBeenCalledTimes(1);
+    expect(mockedEmployeeFind).toHaveBeenCalledWith({ _id: { $in: [empA, empB] } });
+    expect(result.items[0].employee).toEqual({
+      id: empA,
+      employeeCode: 'ENG-0001',
+      firstName: 'Asha',
+      lastName: 'Rao',
+    });
+    expect(result.items[1].employee?.employeeCode).toBe('ENG-0002');
+    expect(result.items[2].employee).toEqual(result.items[0].employee);
+  });
+
+  it("never attaches an employee ref to the caller's own /me history (getMyAttendance)", async () => {
+    mockedAttendanceFind.mockReturnValue(
+      mockQuery([
+        { id: 'att-1', employeeId: 'aaaaaaaaaaaaaaaaaaaaaaaa', status: 'present', breaks: [] },
+      ]),
+    );
+
+    const result = await attendanceService.getMyAttendance(employee, {});
+
+    expect(result[0].employee).toBeUndefined();
+    expect(mockedEmployeeFind).not.toHaveBeenCalled();
   });
 });
 

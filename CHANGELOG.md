@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Backend v1.1.1 — Attendance Report: Real Employee Names
+
+Another real gap found while building the admin dashboard, this time for Attendance: `GET /attendance`'s rows had no employee name or code, just a bare id — useless for the HR/Manager report it's meant to be. Fixed with one batch lookup per page. Also caught and fixed a real test-isolation bug in the same file (a passing test that only passed because of mock state leaked from an earlier one). 557 backend tests. Details: [backend/CHANGELOG.md#v111--attendance-report-real-employee-names](backend/CHANGELOG.md#v111--attendance-report-real-employee-names).
+
 ## Admin Dashboard — Employees Feature
 
 The first full CRUD vertical slice built on the design system: a list (search, department/status filters, pagination), detail view, create/edit forms, and deactivate — role-gated to match the backend's own RBAC exactly (Super Admin/HR/Manager can list, Super Admin/HR can write). The manager field is a real typeahead against `GET /employees/search`, not a truncated dropdown. Sidebar nav now hides `/employees` entirely for a role that can't use it, rather than showing it and letting the API 403. See [admin-dashboard/README.md#features](admin-dashboard/README.md#features).

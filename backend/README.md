@@ -182,18 +182,18 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Attendance (`/attendance`)
 
-| Method | Path                                                       | Access                 | Notes                                                                   |
-| ------ | ---------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------- |
-| POST   | `/attendance/check-in`                                     | Self                   | `method: manual\|gps\|qr\|face`; `manual` is HR/Admin-only              |
-| POST   | `/attendance/check-out`                                    | Self                   |                                                                         |
-| POST   | `/attendance/sync`                                         | Self                   | Bulk-applies offline-queued punches, idempotent via `clientGeneratedId` |
-| POST   | `/attendance/break/start`, `/break/end`                    | Self                   |                                                                         |
-| GET    | `/attendance/me?from=&to=`                                 | Self                   |                                                                         |
-| GET    | `/attendance`                                              | Super Admin/HR/Manager | Paginated report, Manager team-scoped                                   |
-| GET    | `/attendance/export/excel`, `/export/pdf`                  | Super Admin/HR         | Capped at 5,000 rows                                                    |
-| PATCH  | `/attendance/:id/correct`                                  | Super Admin/HR         | Direct edit, audit-logged                                               |
-| POST   | `/attendance/:id/request-correction`                       | Self                   |                                                                         |
-| POST   | `/attendance/:id/approve-correction`, `/reject-correction` | Super Admin/HR/Manager | Team-scoped for Manager                                                 |
+| Method | Path                                                       | Access                 | Notes                                                                                                                     |
+| ------ | ---------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/attendance/check-in`                                     | Self                   | `method: manual\|gps\|qr\|face`; `manual` is HR/Admin-only                                                                |
+| POST   | `/attendance/check-out`                                    | Self                   |                                                                                                                           |
+| POST   | `/attendance/sync`                                         | Self                   | Bulk-applies offline-queued punches, idempotent via `clientGeneratedId`                                                   |
+| POST   | `/attendance/break/start`, `/break/end`                    | Self                   |                                                                                                                           |
+| GET    | `/attendance/me?from=&to=`                                 | Self                   |                                                                                                                           |
+| GET    | `/attendance`                                              | Super Admin/HR/Manager | Paginated report, Manager team-scoped; each row includes an `employee` name/code (one batch lookup per page, not per row) |
+| GET    | `/attendance/export/excel`, `/export/pdf`                  | Super Admin/HR         | Capped at 5,000 rows                                                                                                      |
+| PATCH  | `/attendance/:id/correct`                                  | Super Admin/HR         | Direct edit, audit-logged                                                                                                 |
+| POST   | `/attendance/:id/request-correction`                       | Self                   |                                                                                                                           |
+| POST   | `/attendance/:id/approve-correction`, `/reject-correction` | Super Admin/HR/Manager | Team-scoped for Manager                                                                                                   |
 
 ### GPS / Geofencing (`/geofences`)
 
@@ -300,7 +300,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-555 Jest tests across every module, none requiring a live database:
+557 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).

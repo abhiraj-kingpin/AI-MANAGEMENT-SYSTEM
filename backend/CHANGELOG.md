@@ -4,6 +4,15 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [v1.1.1] — Attendance Report: Real Employee Names
+
+**Fixed** — a real gap found while building the admin dashboard's Attendance screen: `GET /attendance` (the HR/Manager report `listAttendance` reads from) returned a bare `employeeId` string per row, with no name or code — exactly the information an HR/Manager reading this report actually needs. The Excel/PDF export functions already populated this; the JSON list endpoint never did.
+
+- Added `AttendanceEmployeeRefDTO`/`AttendanceDTO.employee` (`attendance.types.ts`) and one batch `Employee.find({_id: {$in: [...]}})` lookup per page in `listAttendance` — not a query per row, and not a Mongoose `.populate()` either (which would have changed `employeeId`'s type on the same DTO field in a way every other caller of `toAttendanceDTO` would have had to account for).
+- `getMyAttendance` (`/attendance/me`) deliberately does _not_ get this treatment — the caller already knows who they are.
+- **Real test bug caught while adding coverage for this**: the existing "gives HR unscoped visibility by default" test only passed because an _earlier_ test in the same file had left `Employee.find`'s mock return value configured from a previous case — `jest.clearAllMocks()` (and this project's `clearMocks: true` Jest config) resets call history, not configured return values. Fixed by giving that test its own explicit mock instead of silently relying on leakage from whichever test happened to run before it.
+- **Verified**: 557 Jest tests (up from 555).
+
 ## [v1.1.0] — Departments API
 
 **Added** — `modules/departments/`: `GET /departments`, `POST /departments`, `PATCH /departments/:id` (Super Admin/HR for writes; read open to any authenticated user).

@@ -446,7 +446,8 @@ export const attendanceService = {
     }
 
     const records = await Attendance.find(filter).sort({ date: -1 }).limit(90);
-    return records.map(toAttendanceDTO);
+    // Own history — the caller already knows who they are, no employee ref needed.
+    return records.map((record) => toAttendanceDTO(record));
   },
 
   async listAttendance(
@@ -470,8 +471,28 @@ export const attendanceService = {
       Attendance.countDocuments(filter),
     ]);
 
+    // Real bug, found while building the admin-dashboard's attendance list:
+    // this report is exactly what an HR/Manager reads to see who did what —
+    // showing a bare ObjectId instead of a name would be useless to them.
+    // One batch lookup for the whole page, not one query per row.
+    const employeeIds = [...new Set(items.map((item) => String(item.employeeId)))];
+    const employees = await Employee.find({ _id: { $in: employeeIds } }).select(
+      'employeeCode firstName lastName',
+    );
+    const employeeById = new Map(
+      employees.map((e) => [
+        String(e._id),
+        {
+          id: String(e._id),
+          employeeCode: e.employeeCode,
+          firstName: e.firstName,
+          lastName: e.lastName,
+        },
+      ]),
+    );
+
     return {
-      items: items.map(toAttendanceDTO),
+      items: items.map((item) => toAttendanceDTO(item, employeeById.get(String(item.employeeId)))),
       total,
       page: query.page,
       limit: query.limit,
