@@ -156,6 +156,61 @@ export interface CorrectAttendanceInput {
   reason: string;
 }
 
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+/** `GET /leave-types` — see backend/README.md#leave-leaves-leave-types-holidays. */
+export interface LeaveType {
+  id: string;
+  name: string;
+  defaultAnnualQuota: number;
+  isPaid: boolean;
+  carryForward: boolean;
+  maxCarryForwardDays: number;
+}
+
+/** `GET /leaves/balance` — one row per leave type, auto-allocated the instant it's read rather than requiring a separate seed step (see backend/README.md#leave-leaves-leave-types-holidays). */
+export interface LeaveBalance {
+  leaveTypeId: string;
+  leaveTypeName: string;
+  year: number;
+  allocated: number;
+  used: number;
+  carriedForward: number;
+  remaining: number;
+}
+
+/** `GET /leaves`, `/leaves/me` — see backend/README.md#leave-leaves-leave-types-holidays. `employee` is only ever present on the HR/Manager review queue (`GET /leaves`), never on the self-service `/leaves/me` history. */
+export interface Leave {
+  id: string;
+  employeeId: string;
+  employee?: EmployeeSummary;
+  leaveTypeId: string;
+  leaveTypeName?: string;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  reason: string;
+  status: LeaveStatus;
+  approvedBy: string | null;
+  managerComment?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApplyLeaveInput {
+  leaveTypeId: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+}
+
+export interface ListLeavesQuery {
+  page?: number;
+  limit?: number;
+  employeeId?: string;
+  status?: LeaveStatus;
+}
+
 export interface ListEmployeesQuery {
   page?: number;
   limit?: number;

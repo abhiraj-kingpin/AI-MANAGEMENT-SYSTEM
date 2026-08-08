@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-type ChipTone = 'success' | 'warning' | 'neutral';
+type ChipTone = 'success' | 'warning' | 'neutral' | 'danger';
 
 // Semantic state colors — deliberately separate from the blue accent, so
 // status reads at a glance without competing with it.
@@ -8,6 +8,7 @@ const TONE_CLASSES: Record<ChipTone, string> = {
   success: 'text-success bg-success/10',
   warning: 'text-warning bg-warning/10',
   neutral: 'text-text-dim bg-text-dim/10',
+  danger: 'text-danger bg-danger/10',
 };
 
 export function Chip({ tone, children }: { tone: ChipTone; children: ReactNode }) {

@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Admin Dashboard — Leave Feature
+
+The one screen every role reaches, not just Super Admin/HR/Manager: self-service balance cards, apply/cancel, and request history sit above a Super Admin/HR/Manager-only review queue rendered in the same page, gated by role rather than a separate route (a plain `employee` gets the self-service section only; the Sidebar link itself isn't role-hidden the way Employees/Attendance are). Building this screen is what surfaced the real backend gap fixed in `v1.1.2` below.
+
 ## Admin Dashboard — Attendance Feature
 
 The HR/Manager attendance report: date-range/department/status filters, pagination, direct corrections (Super Admin/HR, mandatory reason), and approve/reject on employee-initiated correction requests (Super Admin/HR/Manager). New shared `Modal` component. Building this screen is what surfaced the two real backend gaps fixed in `v1.1.0`/`v1.1.1` below — found by trying to build a real feature against the real API, not by auditing the backend in the abstract.

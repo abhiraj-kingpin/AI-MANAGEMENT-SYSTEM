@@ -7,6 +7,7 @@ import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { EmployeeDetailPage } from '@/features/employees/pages/EmployeeDetailPage';
 import { EmployeeFormPage } from '@/features/employees/pages/EmployeeFormPage';
 import { EmployeesListPage } from '@/features/employees/pages/EmployeesListPage';
+import { LeavePage } from '@/features/leaves/pages/LeavePage';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -22,8 +23,9 @@ export const router = createBrowserRouter([
           { path: 'employees/:id', element: <EmployeeDetailPage /> },
           { path: 'employees/:id/edit', element: <EmployeeFormPage /> },
           { path: 'attendance', element: <AttendancePage /> },
-          // Leaves, Shifts, Payroll, Geofence, QR, Notifications, and
-          // Analytics routes are added phase by phase — see
+          { path: 'leaves', element: <LeavePage /> },
+          // Shifts, Payroll, Geofence, QR, and Notifications routes are
+          // added phase by phase — see
           // docs/architecture/05-folder-structure.md for the target layout.
         ],
       },
