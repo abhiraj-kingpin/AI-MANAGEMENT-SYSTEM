@@ -13,6 +13,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+        // Required by geolocator_android (minSdkVersion here is 21, below
+        // the 26 threshold where the JDK APIs it uses are natively
+        // available) — see https://pub.dev/packages/geolocator#android.
+        coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
@@ -41,4 +45,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 }
