@@ -67,9 +67,11 @@ Full machine-readable contract lives in `docs/api/openapi.yaml` (generated from 
 | POST | `/attendance/break/start` | Employee | Starts a break window |
 | POST | `/attendance/break/end` | Employee | Ends the open break window |
 | GET | `/attendance/me` | Employee | Own history, `?from=&to=` |
+| POST | `/attendance/:id/request-correction` | Employee | Self-requests an amendment to their own check-in/out time; pending until reviewed |
 | GET | `/attendance` | HR, Manager, Admin | Filtered report, `?employeeId=&departmentId=&from=&to=&status=` |
-| PATCH | `/attendance/:id/correct` | HR, Admin | Manual correction with mandatory `reason` (audit-logged) |
-| POST | `/attendance/:id/approve-correction` | Manager, HR | Approves a self-requested correction |
+| PATCH | `/attendance/:id/correct` | HR, Admin | Direct correction, no approval step, mandatory `reason` (audit-logged) — distinct from the self-request flow above |
+| POST | `/attendance/:id/approve-correction` | Manager, HR, Admin | Approves a self-requested correction |
+| POST | `/attendance/:id/reject-correction` | Manager, HR, Admin | Rejects a self-requested correction |
 | GET | `/attendance/export/excel` | HR, Admin | Streams `.xlsx` |
 | GET | `/attendance/export/pdf` | HR, Admin | Streams `.pdf` |
 | POST | `/attendance/sync` | Employee (mobile) | Bulk-submit offline-queued punches, idempotent via `clientGeneratedId` |

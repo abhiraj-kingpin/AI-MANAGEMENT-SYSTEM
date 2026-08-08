@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Phase 20 — Documentation & Release — backend v1.0.0
+
+All 20 planned backend phases complete; backend tagged `v1.0.0` (admin-dashboard and mobile-app deliberately stay at `0.1.0` — neither is feature-complete yet, see [Component Status](README.md#component-status)). Caught and fixed a real CI bug on its first live GitHub Actions run (a `docker-build` path resolution mistake), machine-verified the mobile app for the first time ever in this project (installed a real Flutter SDK: 1 lint nit found and fixed, tests already passing, platform folders scaffolded), and fixed a real gap in the Phase 0 API documentation (two implemented endpoints missing from the architecture doc). Details: [backend/CHANGELOG.md#phase-20--documentation--release--v100](backend/CHANGELOG.md#phase-20--documentation--release--v100).
+
 ## Phase 19 — Deployment Pipeline
 
 Four GitHub Actions workflows: `ci-backend.yml` (lint/format/typecheck/test/build/Docker build — matches the original plan exactly), `ci-admin.yml` and `ci-mobile.yml` (both with one honest, documented deviation each — no admin-dashboard test suite exists yet, no mobile-app platform scaffolding exists yet), and `deploy.yml` (real but inert until a human connects an actual Render/Vercel account). Details: [backend/CHANGELOG.md#phase-19--deployment-pipeline](backend/CHANGELOG.md#phase-19--deployment-pipeline).
