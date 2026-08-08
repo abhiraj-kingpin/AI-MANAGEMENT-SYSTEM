@@ -44,9 +44,10 @@ lib/
 │   ├── auth/          # data/domain/presentation — login, session bootstrap, logout
 │   ├── attendance/    # data/domain/presentation — GPS check-in/check-out, history
 │   ├── leave/           # data/domain/presentation — apply/cancel, balance, history
-│   └── home/              # landing screen — links into each feature
-│       # shifts/, payroll/, notifications/, profile/, face_recognition/ arrive
-│       # phase by phase — see docs/architecture/05-folder-structure.md
+│   ├── payslips/          # data/domain/presentation — list, PDF download
+│   └── home/                # landing screen — links into each feature
+│       # shifts/, notifications/, profile/, face_recognition/ arrive phase
+│       # by phase — see docs/architecture/05-folder-structure.md
 ├── shared/            # theme, reusable widgets
 ├── app.dart            # MaterialApp.router wiring
 └── main.dart             # bootstrap: Hive init → ProviderScope → app
@@ -72,8 +73,12 @@ lib/
 - The apply form is a modal bottom sheet (`ApplyLeaveSheet`), not a separate route — four fields didn't justify a full-screen push. Overlap/balance/business-day validation all happens server-side; the sheet just surfaces whatever message comes back.
 - `LeaveEntity.isCancellable` mirrors `leave.service.ts#cancel`'s exact server-side rule (pending is always cancellable; an approved one only if it hasn't started yet) so the Cancel button only ever appears where the server would actually allow it — the server re-checks regardless.
 
+### Payslips (list + download)
+- `GET /payslips/:id/pdf` is the one binary response in the whole API — `PayslipRemoteDataSource.downloadPayslipPdf` fetches it as raw bytes (`ResponseType.bytes`), and `PayslipRepositoryImpl` writes them to the app's documents directory via `path_provider` (a first-party Flutter-team plugin — no permissions, no `flutter.compileSdkVersion`-style Gradle surprises like geolocator's, confirmed by checking its own `android/build.gradle` before adding it).
+- Deliberately doesn't open the saved PDF in a viewer — that needs another plugin (`open_filex` or similar) this pass didn't add. The screen reports the saved file path via a `SnackBar` instead, real working behavior rather than a half-built "open" button that silently does nothing.
+
 ## Status
 
-Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), GPS check-in/check-out with attendance history, and self-service Leave (apply/cancel/balance/history) — see Features above. Shift, payroll, and notification features, plus QR/Face check-in and offline sync, are added in their respective passes per the [project roadmap](../README.md).
+Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), GPS check-in/check-out with attendance history, self-service Leave (apply/cancel/balance/history), and Payslips (list + PDF download) — see Features above. Shift and notification features, plus QR/Face check-in and offline sync, are added in their respective passes per the [project roadmap](../README.md).
 
-**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 11/11 passing. `android/`/`ios/` were generated in Phase 20; the Attendance pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions, an `NSLocationWhenInUseUsageDescription` iOS usage string, and the two Gradle fixes above. A local `flutter build apk --debug` got further than ever before this pass (past both Gradle issues, all the way into Java compilation) before hitting a Windows-only obstacle unrelated to any of this project's code: a `jlink`/Gradle transform failure tied to this machine's username containing a space, a well-documented Windows Gradle limitation with no code-level fix. [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Linux runners, which don't have that path at all, so that CI path is unaffected by this machine's local gap — it's the real verification for this step, same as it's been since Phase 20.
+**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 14/14 passing. `android/`/`ios/` were generated in Phase 20; the Attendance pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions, an `NSLocationWhenInUseUsageDescription` iOS usage string, and two real Gradle compatibility fixes for `geolocator`. A local `flutter build apk --debug` got further than ever before that pass (past both Gradle issues, all the way into Java compilation) before hitting a Windows-only obstacle unrelated to any of this project's code: a `jlink`/Gradle transform failure tied to this machine's username containing a space, a well-documented Windows Gradle limitation with no code-level fix. [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Linux runners, which don't have that path at all, so that CI path is unaffected by this machine's local gap — it's the real verification for this step, same as it's been since Phase 20.

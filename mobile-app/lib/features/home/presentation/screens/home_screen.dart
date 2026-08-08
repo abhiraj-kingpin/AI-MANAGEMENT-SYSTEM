@@ -46,11 +46,11 @@ class HomeScreen extends ConsumerWidget {
               onTap: () => context.push(leavePath),
             ),
             const SizedBox(height: 12),
-            const _HomeCard(
+            _HomeCard(
               icon: Icons.receipt_long_outlined,
               title: 'Payslips',
-              subtitle: 'Coming soon',
-              onTap: null,
+              subtitle: 'View and download your released payslips',
+              onTap: () => context.push(payslipsPath),
             ),
             const SizedBox(height: 12),
             const _HomeCard(

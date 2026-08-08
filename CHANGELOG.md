@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Mobile App — Payslips (List + Download)
+
+Third feature beyond auth: lists released payslips (`GET /payslips/me`) and downloads the real PDF (`GET /payslips/:id/pdf`, the one binary response in the whole API) to the device's app-documents directory via `path_provider` — checked its `android/build.gradle` first to confirm it hardcodes `compileSdk` directly rather than referencing the same `flutter.compileSdkVersion` pattern that broke `geolocator`. Doesn't open the saved PDF in a viewer yet (needs another plugin this pass didn't add) — reports the saved path via a `SnackBar` instead, real working behavior rather than a half-built "open" action. `flutter test`: 14/14 passing (up from 11).
+
 ## Mobile App — Leave (Apply/Cancel/Balance)
 
 Second feature beyond auth, same shape as Attendance: data/domain/presentation, a `Result<T>`-returning `LeaveRepository`, one controller loading leave types + balance + history concurrently. The apply form is a modal bottom sheet rather than a separate route. `LeaveEntity.isCancellable` mirrors `leave.service.ts#cancel`'s exact server-side rule, so the Cancel button only appears where the server would actually allow it. `flutter test`: 11/11 passing (up from 8).

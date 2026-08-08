@@ -23,6 +23,9 @@ class ApiEndpoints {
   static const String myLeaveBalance = '/leaves/balance';
   static String cancelLeave(String id) => '/leaves/$id/cancel';
 
-  // Shift, payroll, notification endpoints are added here as each module
-  // lands — see docs/architecture/04-api-documentation.md.
+  static const String myPayslips = '/payslips/me';
+  static String payslipPdf(String id) => '/payslips/$id/pdf';
+
+  // Shift and notification endpoints are added here as each module lands —
+  // see docs/architecture/04-api-documentation.md.
 }

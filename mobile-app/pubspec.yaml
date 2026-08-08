@@ -29,6 +29,10 @@ dependencies:
   intl: ^0.19.0
   cupertino_icons: ^1.0.8
 
+  # Phase 11 — saving a downloaded payslip PDF to the device (see
+  # features/payslips/data/repositories_impl/payslip_repository_impl.dart).
+  path_provider: ^2.1.5
+
   # Phase 6 — GPS attendance/geofencing (see core/services/location_service.dart).
   # Pinned below 14.0.0 deliberately: geolocator 14.x resolves
   # geolocator_android 5.x, whose Dart code calls `Color.toARGB32()` — a
