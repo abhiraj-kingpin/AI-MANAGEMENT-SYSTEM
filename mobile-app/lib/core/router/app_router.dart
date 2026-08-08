@@ -5,11 +5,13 @@ import 'package:ai_management_system/features/auth/presentation/providers/auth_p
 import 'package:ai_management_system/features/auth/presentation/screens/login_screen.dart';
 import 'package:ai_management_system/features/auth/presentation/screens/splash_screen.dart';
 import 'package:ai_management_system/features/home/presentation/screens/home_screen.dart';
+import 'package:ai_management_system/features/leave/presentation/screens/leave_screen.dart';
 
 const splashPath = '/splash';
 const loginPath = '/login';
 const homePath = '/';
 const attendancePath = '/attendance';
+const leavePath = '/leave';
 
 /// Rebuilds whenever auth state changes (Riverpod re-invokes this provider),
 /// and its `redirect` callback enforces: unauthenticated → /login,
@@ -40,6 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: loginPath, builder: (context, state) => const LoginScreen()),
       GoRoute(path: homePath, builder: (context, state) => const HomeScreen()),
       GoRoute(path: attendancePath, builder: (context, state) => const AttendanceScreen()),
+      GoRoute(path: leavePath, builder: (context, state) => const LeaveScreen()),
     ],
   );
 });

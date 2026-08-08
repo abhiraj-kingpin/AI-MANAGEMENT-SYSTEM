@@ -39,11 +39,11 @@ class HomeScreen extends ConsumerWidget {
               onTap: () => context.push(attendancePath),
             ),
             const SizedBox(height: 12),
-            const _HomeCard(
+            _HomeCard(
               icon: Icons.beach_access_outlined,
               title: 'Leave',
-              subtitle: 'Coming soon',
-              onTap: null,
+              subtitle: 'Apply, cancel, and check your balance',
+              onTap: () => context.push(leavePath),
             ),
             const SizedBox(height: 12),
             const _HomeCard(

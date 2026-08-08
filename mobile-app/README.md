@@ -43,9 +43,10 @@ lib/
 ├── features/
 │   ├── auth/          # data/domain/presentation — login, session bootstrap, logout
 │   ├── attendance/    # data/domain/presentation — GPS check-in/check-out, history
-│   └── home/            # landing screen — links into each feature
-│       # leaves/, shifts/, payroll/, notifications/, profile/, face_recognition/
-│       # arrive phase by phase — see docs/architecture/05-folder-structure.md
+│   ├── leave/           # data/domain/presentation — apply/cancel, balance, history
+│   └── home/              # landing screen — links into each feature
+│       # shifts/, payroll/, notifications/, profile/, face_recognition/ arrive
+│       # phase by phase — see docs/architecture/05-folder-structure.md
 ├── shared/            # theme, reusable widgets
 ├── app.dart            # MaterialApp.router wiring
 └── main.dart             # bootstrap: Hive init → ProviderScope → app
@@ -61,9 +62,18 @@ lib/
 - `AttendanceRepository.checkInWithGps()` composes that position with `POST /attendance/check-in` (`method: 'gps'`); check-out's location is best-effort (a revoked permission or disabled GPS between check-in and check-out doesn't block it — the field is optional server-side too).
 - The screen shows today's status (not checked in / checked in at HH:mm / checked out, with worked hours), a single Check In/Check Out button that swaps based on that status, and a pull-to-refresh history list from `GET /attendance/me`.
 - QR and Face check-in are not built yet — both need a camera/ML plugin (`mobile_scanner`, `google_mlkit_face_detection` + `tflite_flutter`) this pass didn't add; GPS was the one method with no new native capability beyond a location permission.
+- Adding `geolocator` surfaced two real build bugs, both found by reproducing the CI failure locally (`flutter build apk --debug`) once GitHub's log API turned out to require auth this environment doesn't have:
+  1. `minSdkVersion` below 26 needs `coreLibraryDesugaringEnabled true` plus the `desugar_jdk_libs` dependency — geolocator's own documented Android requirement.
+  2. `geolocator_android`'s own `build.gradle` reads `flutter.compileSdkVersion` directly — a pattern from Flutter's older apply-script Gradle mechanism that used to inject that property onto every subproject automatically. This project's newer declarative plugin loading (`dev.flutter.flutter-gradle-plugin` applied only inside `:app`'s own build.gradle) doesn't do that anymore, so the property genuinely doesn't exist for a library subproject — fixed with a small compatibility shim in the root `android/build.gradle` (excluding `:app` itself, which needs its own real plugin-provided extension untouched).
+  Also pinned `geolocator` below `14.0.0`: `geolocator_android` 5.x's Dart code calls `Color.toARGB32()`, a `dart:ui` API this project's pinned Flutter 3.24.0 doesn't have yet.
+
+### Leave (apply/cancel/balance)
+- Mirrors Attendance's shape: data/domain/presentation, a `Result<T>`-returning `LeaveRepository`, one controller loading leave types + balance + history concurrently on open.
+- The apply form is a modal bottom sheet (`ApplyLeaveSheet`), not a separate route — four fields didn't justify a full-screen push. Overlap/balance/business-day validation all happens server-side; the sheet just surfaces whatever message comes back.
+- `LeaveEntity.isCancellable` mirrors `leave.service.ts#cancel`'s exact server-side rule (pending is always cancellable; an approved one only if it hasn't started yet) so the Cancel button only ever appears where the server would actually allow it — the server re-checks regardless.
 
 ## Status
 
-Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), and GPS check-in/check-out with attendance history — see [Features](#project-structure) above. Leave, shift, payroll, and notification features, plus QR/Face check-in and offline sync, are added in their respective passes per the [project roadmap](../README.md).
+Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), GPS check-in/check-out with attendance history, and self-service Leave (apply/cancel/balance/history) — see Features above. Shift, payroll, and notification features, plus QR/Face check-in and offline sync, are added in their respective passes per the [project roadmap](../README.md).
 
-**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 8/8 passing. `android/`/`ios/` were generated in Phase 20; this pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions and an `NSLocationWhenInUseUsageDescription` iOS usage string for GPS check-in. A debug APK build was attempted locally and didn't complete — this machine's Android SDK is missing `cmdline-tools` and hasn't accepted its licenses (`flutter doctor` shows exactly this), an environment-setup gap rather than a code problem; [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Flutter-equipped runners, which have a complete, license-accepted Android toolchain, so that CI path is unaffected by this machine's local gap.
+**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 11/11 passing. `android/`/`ios/` were generated in Phase 20; the Attendance pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions, an `NSLocationWhenInUseUsageDescription` iOS usage string, and the two Gradle fixes above. A local `flutter build apk --debug` got further than ever before this pass (past both Gradle issues, all the way into Java compilation) before hitting a Windows-only obstacle unrelated to any of this project's code: a `jlink`/Gradle transform failure tied to this machine's username containing a space, a well-documented Windows Gradle limitation with no code-level fix. [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Linux runners, which don't have that path at all, so that CI path is unaffected by this machine's local gap — it's the real verification for this step, same as it's been since Phase 20.
