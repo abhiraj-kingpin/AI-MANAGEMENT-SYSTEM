@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Mobile App — Notifications (Inbox)
+
+Fourth feature beyond auth: an inbox (`GET /notifications/me`, unread filter, mark-read/mark-all-read). Self-service only — sending a broadcast is Super Admin/HR only and already built on the admin dashboard, so this app doesn't duplicate that composer. Fetches a single generous page (`limit: 50`) rather than building full pagination UI, a documented scope cut. `flutter test`: 16/16 passing (up from 14).
+
 ## Mobile App — Payslips (List + Download)
 
 Third feature beyond auth: lists released payslips (`GET /payslips/me`) and downloads the real PDF (`GET /payslips/:id/pdf`, the one binary response in the whole API) to the device's app-documents directory via `path_provider` — checked its `android/build.gradle` first to confirm it hardcodes `compileSdk` directly rather than referencing the same `flutter.compileSdkVersion` pattern that broke `geolocator`. Doesn't open the saved PDF in a viewer yet (needs another plugin this pass didn't add) — reports the saved path via a `SnackBar` instead, real working behavior rather than a half-built "open" action. `flutter test`: 14/14 passing (up from 11).

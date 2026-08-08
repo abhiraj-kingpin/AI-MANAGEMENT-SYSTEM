@@ -6,6 +6,7 @@ import 'package:ai_management_system/features/auth/presentation/screens/login_sc
 import 'package:ai_management_system/features/auth/presentation/screens/splash_screen.dart';
 import 'package:ai_management_system/features/home/presentation/screens/home_screen.dart';
 import 'package:ai_management_system/features/leave/presentation/screens/leave_screen.dart';
+import 'package:ai_management_system/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:ai_management_system/features/payslips/presentation/screens/payslips_screen.dart';
 
 const splashPath = '/splash';
@@ -14,6 +15,7 @@ const homePath = '/';
 const attendancePath = '/attendance';
 const leavePath = '/leave';
 const payslipsPath = '/payslips';
+const notificationsPath = '/notifications';
 
 /// Rebuilds whenever auth state changes (Riverpod re-invokes this provider),
 /// and its `redirect` callback enforces: unauthenticated → /login,
@@ -46,6 +48,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: attendancePath, builder: (context, state) => const AttendanceScreen()),
       GoRoute(path: leavePath, builder: (context, state) => const LeaveScreen()),
       GoRoute(path: payslipsPath, builder: (context, state) => const PayslipsScreen()),
+      GoRoute(path: notificationsPath, builder: (context, state) => const NotificationsScreen()),
     ],
   );
 });

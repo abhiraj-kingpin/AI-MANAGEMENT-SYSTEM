@@ -45,9 +45,10 @@ lib/
 │   ├── attendance/    # data/domain/presentation — GPS check-in/check-out, history
 │   ├── leave/           # data/domain/presentation — apply/cancel, balance, history
 │   ├── payslips/          # data/domain/presentation — list, PDF download
-│   └── home/                # landing screen — links into each feature
-│       # shifts/, notifications/, profile/, face_recognition/ arrive phase
-│       # by phase — see docs/architecture/05-folder-structure.md
+│   ├── notifications/       # data/domain/presentation — inbox, mark-read
+│   └── home/                  # landing screen — links into each feature
+│       # shifts/, profile/, face_recognition/ arrive phase by phase — see
+│       # docs/architecture/05-folder-structure.md
 ├── shared/            # theme, reusable widgets
 ├── app.dart            # MaterialApp.router wiring
 └── main.dart             # bootstrap: Hive init → ProviderScope → app
@@ -77,8 +78,13 @@ lib/
 - `GET /payslips/:id/pdf` is the one binary response in the whole API — `PayslipRemoteDataSource.downloadPayslipPdf` fetches it as raw bytes (`ResponseType.bytes`), and `PayslipRepositoryImpl` writes them to the app's documents directory via `path_provider` (a first-party Flutter-team plugin — no permissions, no `flutter.compileSdkVersion`-style Gradle surprises like geolocator's, confirmed by checking its own `android/build.gradle` before adding it).
 - Deliberately doesn't open the saved PDF in a viewer — that needs another plugin (`open_filex` or similar) this pass didn't add. The screen reports the saved file path via a `SnackBar` instead, real working behavior rather than a half-built "open" button that silently does nothing.
 
+### Notifications (inbox)
+- `GET /notifications/me` fetches a single page (`limit: 50`) rather than full pagination UI — a documented scope cut, not an oversight; a real feed with true infinite scroll can follow if the inbox ever needs more than that at once.
+- No broadcast composer here — sending one (`POST /notifications/broadcast`) is Super Admin/HR only and already built on the admin dashboard; this app is the self-service inbox side only.
+- `NotificationState.unreadCount` derives from the currently-loaded list rather than a separate counter endpoint (the backend doesn't have one), same reasoning as the admin dashboard's Topbar badge.
+
 ## Status
 
-Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), GPS check-in/check-out with attendance history, self-service Leave (apply/cancel/balance/history), and Payslips (list + PDF download) — see Features above. Shift and notification features, plus QR/Face check-in and offline sync, are added in their respective passes per the [project roadmap](../README.md).
+Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), GPS check-in/check-out with attendance history, self-service Leave (apply/cancel/balance/history), Payslips (list + PDF download), and a Notifications inbox — see Features above. Shifts, QR/Face check-in, and the offline sync half are added in their respective passes per the [project roadmap](../README.md).
 
-**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 14/14 passing. `android/`/`ios/` were generated in Phase 20; the Attendance pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions, an `NSLocationWhenInUseUsageDescription` iOS usage string, and two real Gradle compatibility fixes for `geolocator`. A local `flutter build apk --debug` got further than ever before that pass (past both Gradle issues, all the way into Java compilation) before hitting a Windows-only obstacle unrelated to any of this project's code: a `jlink`/Gradle transform failure tied to this machine's username containing a space, a well-documented Windows Gradle limitation with no code-level fix. [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Linux runners, which don't have that path at all, so that CI path is unaffected by this machine's local gap — it's the real verification for this step, same as it's been since Phase 20.
+**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 16/16 passing. `android/`/`ios/` were generated in Phase 20; the Attendance pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions, an `NSLocationWhenInUseUsageDescription` iOS usage string, and two real Gradle compatibility fixes for `geolocator`. A local `flutter build apk --debug` got further than ever before that pass (past both Gradle issues, all the way into Java compilation) before hitting a Windows-only obstacle unrelated to any of this project's code: a `jlink`/Gradle transform failure tied to this machine's username containing a space, a well-documented Windows Gradle limitation with no code-level fix. [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Linux runners, which don't have that path at all, so that CI path is unaffected by this machine's local gap — it's the real verification for this step, same as it's been since Phase 20.

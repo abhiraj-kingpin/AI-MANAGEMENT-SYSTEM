@@ -53,11 +53,11 @@ class HomeScreen extends ConsumerWidget {
               onTap: () => context.push(payslipsPath),
             ),
             const SizedBox(height: 12),
-            const _HomeCard(
+            _HomeCard(
               icon: Icons.notifications_outlined,
               title: 'Notifications',
-              subtitle: 'Coming soon',
-              onTap: null,
+              subtitle: 'Your inbox',
+              onTap: () => context.push(notificationsPath),
             ),
           ],
         ),
