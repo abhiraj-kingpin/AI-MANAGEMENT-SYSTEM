@@ -11,10 +11,15 @@ import { Attendance } from '../attendance/attendance.model';
 import { Employee } from '../employees/employee.model';
 import { notify } from '../notifications/notification.service';
 import { getHolidayDatesInRange } from './holiday.service';
-import { Leave, type LeaveStatus } from './leave.model';
+import { type ILeave, Leave, type LeaveStatus } from './leave.model';
 import { LeaveBalance } from './leaveBalance.model';
 import { LeaveType } from './leaveType.model';
-import { type LeaveBalanceDTO, type LeaveDTO, toLeaveDTO } from './leave.types';
+import {
+  type LeaveBalanceDTO,
+  type LeaveDTO,
+  type LeaveEmployeeRefDTO,
+  toLeaveDTO,
+} from './leave.types';
 import type { ApplyLeaveInput, ListLeavesQuery } from './leave.validators';
 
 /**
@@ -95,6 +100,32 @@ async function clearFutureOnLeaveStubs(employeeId: string, from: Date): Promise<
     status: 'on_leave',
     checkInAt: null,
   });
+}
+
+/** One batch lookup for a page of leaves' distinct leave-type ids -> name, mirroring `getMyBalance`'s existing name resolution rather than leaving `list`/`getMyLeaves` as bare ids. */
+async function resolveLeaveTypeNames(leaves: ILeave[]): Promise<Map<string, string>> {
+  const leaveTypeIds = [...new Set(leaves.map((l) => String(l.leaveTypeId)))];
+  const leaveTypes = await LeaveType.find({ _id: { $in: leaveTypeIds } }).select('name');
+  return new Map(leaveTypes.map((lt) => [String(lt._id), lt.name]));
+}
+
+/** One batch lookup for a page of leaves' distinct employee ids -> name/code — the HR/Manager review queue needs a name, not a bare id (same gap Attendance's `listAttendance` had, fixed the same way). */
+async function resolveEmployeeRefs(leaves: ILeave[]): Promise<Map<string, LeaveEmployeeRefDTO>> {
+  const employeeIds = [...new Set(leaves.map((l) => String(l.employeeId)))];
+  const employees = await Employee.find({ _id: { $in: employeeIds } }).select(
+    'employeeCode firstName lastName',
+  );
+  return new Map(
+    employees.map((e) => [
+      String(e._id),
+      {
+        id: String(e._id),
+        employeeCode: e.employeeCode,
+        firstName: e.firstName,
+        lastName: e.lastName,
+      },
+    ]),
+  );
 }
 
 export const leaveService = {
@@ -199,7 +230,10 @@ export const leaveService = {
     if (status) filter.status = status;
 
     const leaves = await Leave.find(filter).sort({ createdAt: -1 });
-    return leaves.map(toLeaveDTO);
+    const leaveTypeNames = await resolveLeaveTypeNames(leaves);
+    return leaves.map((leave) =>
+      toLeaveDTO(leave, undefined, leaveTypeNames.get(String(leave.leaveTypeId))),
+    );
   },
 
   async getMyBalance(actor: ActorContext): Promise<LeaveBalanceDTO[]> {
@@ -257,8 +291,19 @@ export const leaveService = {
       Leave.countDocuments(filter),
     ]);
 
+    const [employeeRefs, leaveTypeNames] = await Promise.all([
+      resolveEmployeeRefs(items),
+      resolveLeaveTypeNames(items),
+    ]);
+
     return {
-      items: items.map(toLeaveDTO),
+      items: items.map((item) =>
+        toLeaveDTO(
+          item,
+          employeeRefs.get(String(item.employeeId)),
+          leaveTypeNames.get(String(item.leaveTypeId)),
+        ),
+      ),
       total,
       page: query.page,
       limit: query.limit,

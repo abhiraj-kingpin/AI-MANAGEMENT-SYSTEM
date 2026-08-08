@@ -4,6 +4,14 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [v1.1.2] — Leave Review Queue: Real Employee & Leave-Type Names
+
+**Fixed** — the same gap as `v1.1.1`, found this time while starting the admin dashboard's Leave screen: `GET /leaves` (the HR/Manager review queue `leaveService.list` reads from) returned bare `employeeId`/`leaveTypeId` strings, no names — exactly what a reviewer needs to decide whether to approve a request.
+
+- Added `LeaveEmployeeRefDTO`/`LeaveDTO.employee` and `LeaveDTO.leaveTypeName`, both resolved via one batch lookup per page in `list()` — same pattern as `attendance.service.ts#listAttendance`'s fix.
+- `getMyLeaves` (`/leaves/me`) also gained `leaveTypeName` (an employee viewing their own history still benefits from a real leave-type name instead of an id — `getMyBalance` in this same file already resolved this for balance rows, so `getMyLeaves` not doing it was an inconsistency within the file, not just against Attendance) — but deliberately not `employee`, for the same reason `getMyAttendance` doesn't get one: the caller already knows who they are.
+- **Verified**: 559 Jest tests (up from 557). Also had to add `find: jest.fn()` to `leave.service.test.ts`'s `Employee` mock — it previously only stubbed `findById`, since nothing in this file had ever needed `Employee.find` before.
+
 ## [v1.1.1] — Attendance Report: Real Employee Names
 
 **Fixed** — a real gap found while building the admin dashboard's Attendance screen: `GET /attendance` (the HR/Manager report `listAttendance` reads from) returned a bare `employeeId` string per row, with no name or code — exactly the information an HR/Manager reading this report actually needs. The Excel/PDF export functions already populated this; the JSON list endpoint never did.

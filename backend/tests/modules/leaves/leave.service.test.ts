@@ -28,7 +28,7 @@ jest.mock('../../../src/modules/attendance/attendance.model', () => ({
   Attendance: { updateOne: jest.fn(), deleteMany: jest.fn() },
 }));
 jest.mock('../../../src/modules/employees/employee.model', () => ({
-  Employee: { findById: jest.fn() },
+  Employee: { findById: jest.fn(), find: jest.fn() },
 }));
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notify: jest.fn(() => Promise.resolve()),
@@ -61,6 +61,7 @@ const mockedHolidayFind = Holiday.find as unknown as jest.Mock;
 const mockedAttendanceUpdateOne = Attendance.updateOne as unknown as jest.Mock;
 const mockedAttendanceDeleteMany = Attendance.deleteMany as unknown as jest.Mock;
 const mockedEmployeeFindById = Employee.findById as unknown as jest.Mock;
+const mockedEmployeeFind = Employee.find as unknown as jest.Mock;
 const mockedNotify = notify as unknown as jest.Mock;
 const mockedGetManagedEmployeeIds = getManagedEmployeeIds as unknown as jest.Mock;
 
@@ -109,6 +110,15 @@ beforeEach(() => {
   // notifications don't need to stub this too; it just means notify() is a
   // no-op (no manager to reach), not a crash.
   mockedEmployeeFindById.mockReturnValue(mockQuery(null));
+  // getMyLeaves/list both resolve leave-type names (and list also resolves
+  // employee names) via a batch lookup chaining `.select(...)` — mockQuery
+  // (not a bare mockResolvedValue) so that chain doesn't blow up — default
+  // to "nothing found" so tests that don't care about the resolved name
+  // don't need to stub this too, matching mockedEmployeeFindById's default
+  // above. getMyBalance's own unrelated `LeaveType.find()` call (no
+  // `.select()`) is unaffected by this and still overridden per-test below.
+  mockedLeaveTypeFind.mockReturnValue(mockQuery([]));
+  mockedEmployeeFind.mockReturnValue(mockQuery([]));
 });
 
 describe('leaveService.apply', () => {
@@ -312,6 +322,16 @@ describe('leaveService.getMyLeaves / getMyBalance', () => {
     expect(mockedLeaveFind).toHaveBeenCalledWith({ employeeId: EMPLOYEE_ID, status: 'approved' });
   });
 
+  it("resolves the leave type's real name instead of leaving it a bare id", async () => {
+    mockedLeaveFind.mockReturnValue(mockQuery([fakeLeave()]));
+    mockedLeaveTypeFind.mockReturnValue(mockQuery([{ _id: LEAVE_TYPE_ID, name: 'Casual Leave' }]));
+
+    const [leave] = await leaveService.getMyLeaves(employee);
+
+    expect(leave.leaveTypeName).toBe('Casual Leave');
+    expect(leave.employee).toBeUndefined(); // own history — no name needed for yourself
+  });
+
   it('computes remaining balance per leave type for the current year', async () => {
     mockedLeaveTypeFind.mockResolvedValue([fakeLeaveType({ id: LEAVE_TYPE_ID, name: 'Casual' })]);
     mockedBalanceFindOne.mockResolvedValue({ allocated: 12, used: 3, carriedForward: 0 });
@@ -370,6 +390,27 @@ describe('leaveService.list', () => {
     expect(mockedLeaveFind).toHaveBeenCalledWith({});
     expect(result.items).toHaveLength(2);
     expect(result.pages).toBe(1);
+  });
+
+  it("attaches each row's employee name/code and leave-type name — the review queue is useless as bare ids", async () => {
+    mockedLeaveFind.mockReturnValue(mockQuery([fakeLeave()]));
+    mockedLeaveCount.mockResolvedValue(1);
+    mockedEmployeeFind.mockReturnValue(
+      mockQuery([
+        { _id: EMPLOYEE_ID, employeeCode: 'ENG-0001', firstName: 'Asha', lastName: 'Rao' },
+      ]),
+    );
+    mockedLeaveTypeFind.mockReturnValue(mockQuery([{ _id: LEAVE_TYPE_ID, name: 'Casual Leave' }]));
+
+    const result = await leaveService.list({ page: 1, limit: 20 }, hr);
+
+    expect(result.items[0].employee).toEqual({
+      id: EMPLOYEE_ID,
+      employeeCode: 'ENG-0001',
+      firstName: 'Asha',
+      lastName: 'Rao',
+    });
+    expect(result.items[0].leaveTypeName).toBe('Casual Leave');
   });
 });
 

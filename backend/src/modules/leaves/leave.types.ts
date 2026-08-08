@@ -1,9 +1,19 @@
 import type { ILeave, LeaveStatus } from './leave.model';
 
+/** Only attached where a caller needs a name instead of a bare id — the HR/Manager review queue (`list`), not an employee's own `/me` history. */
+export interface LeaveEmployeeRefDTO {
+  id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+}
+
 export interface LeaveDTO {
   id: string;
   employeeId: string;
+  employee?: LeaveEmployeeRefDTO;
   leaveTypeId: string;
+  leaveTypeName?: string;
   startDate: Date;
   endDate: Date;
   totalDays: number;
@@ -25,11 +35,17 @@ export interface LeaveBalanceDTO {
   remaining: number;
 }
 
-export function toLeaveDTO(doc: ILeave): LeaveDTO {
+export function toLeaveDTO(
+  doc: ILeave,
+  employee?: LeaveEmployeeRefDTO,
+  leaveTypeName?: string,
+): LeaveDTO {
   return {
     id: doc.id as string,
     employeeId: String(doc.employeeId),
+    employee,
     leaveTypeId: String(doc.leaveTypeId),
+    leaveTypeName,
     startDate: doc.startDate,
     endDate: doc.endDate,
     totalDays: doc.totalDays,

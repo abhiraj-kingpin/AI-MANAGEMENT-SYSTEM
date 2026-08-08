@@ -224,16 +224,16 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Leave (`/leaves`, `/leave-types`, `/holidays`)
 
-| Method   | Path                             | Access                                     | Notes                                               |
-| -------- | -------------------------------- | ------------------------------------------ | --------------------------------------------------- |
-| POST     | `/leaves`                        | Self                                       | Overlap/balance/business-day checks before creation |
-| GET      | `/leaves/me?status=`             | Self                                       |                                                     |
-| GET      | `/leaves/balance`                | Self                                       | Per leave-type, current year                        |
-| PATCH    | `/leaves/:id/cancel`             | Self                                       |                                                     |
-| GET      | `/leaves`                        | Super Admin/HR/Manager                     | Review queue, team-scoped for Manager               |
-| PATCH    | `/leaves/:id/approve`, `/reject` | Super Admin/HR/Manager                     |                                                     |
-| GET/POST | `/leave-types`                   | Read: authenticated. Write: Super Admin/HR |                                                     |
-| GET/POST | `/holidays?year=`                | Read: authenticated. Write: Super Admin/HR |                                                     |
+| Method   | Path                             | Access                                     | Notes                                                                                                                           |
+| -------- | -------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| POST     | `/leaves`                        | Self                                       | Overlap/balance/business-day checks before creation                                                                             |
+| GET      | `/leaves/me?status=`             | Self                                       |                                                                                                                                 |
+| GET      | `/leaves/balance`                | Self                                       | Per leave-type, current year                                                                                                    |
+| PATCH    | `/leaves/:id/cancel`             | Self                                       |                                                                                                                                 |
+| GET      | `/leaves`                        | Super Admin/HR/Manager                     | Review queue, team-scoped for Manager; each row includes `employee` name/code and `leaveTypeName` (batch-resolved, not per-row) |
+| PATCH    | `/leaves/:id/approve`, `/reject` | Super Admin/HR/Manager                     |                                                                                                                                 |
+| GET/POST | `/leave-types`                   | Read: authenticated. Write: Super Admin/HR |                                                                                                                                 |
+| GET/POST | `/holidays?year=`                | Read: authenticated. Write: Super Admin/HR |                                                                                                                                 |
 
 ### Shifts (`/shifts`)
 
@@ -300,7 +300,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-557 Jest tests across every module, none requiring a live database:
+559 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).

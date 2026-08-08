@@ -6,6 +6,10 @@ Repository-wide build history, in order. Backend module-level detail (what was a
 
 The HR/Manager attendance report: date-range/department/status filters, pagination, direct corrections (Super Admin/HR, mandatory reason), and approve/reject on employee-initiated correction requests (Super Admin/HR/Manager). New shared `Modal` component. Building this screen is what surfaced the two real backend gaps fixed in `v1.1.0`/`v1.1.1` below — found by trying to build a real feature against the real API, not by auditing the backend in the abstract.
 
+## Backend v1.1.2 — Leave Review Queue: Real Employee & Leave-Type Names
+
+The same class of gap as `v1.1.1`, found this time while starting the admin dashboard's Leave screen: `GET /leaves` had bare `employeeId`/`leaveTypeId` strings, no names — exactly what a reviewer needs to decide on a request. Fixed with the same batch-lookup pattern. Also fixed a smaller inconsistency within the same file: `getMyBalance` already resolved leave-type names for balance rows, but `getMyLeaves` didn't for history rows — now it does too. 559 backend tests. Details: [backend/CHANGELOG.md#v112--leave-review-queue-real-employee--leave-type-names](backend/CHANGELOG.md#v112--leave-review-queue-real-employee--leave-type-names).
+
 ## Backend v1.1.1 — Attendance Report: Real Employee Names
 
 Another real gap found while building the admin dashboard, this time for Attendance: `GET /attendance`'s rows had no employee name or code, just a bare id — useless for the HR/Manager report it's meant to be. Fixed with one batch lookup per page. Also caught and fixed a real test-isolation bug in the same file (a passing test that only passed because of mock state leaked from an earlier one). 557 backend tests. Details: [backend/CHANGELOG.md#v111--attendance-report-real-employee-names](backend/CHANGELOG.md#v111--attendance-report-real-employee-names).
