@@ -40,16 +40,17 @@ const liveItems: NavItem[] = [
   // card), while shift definitions/assignment inside the same page are
   // gated to Super Admin/HR (see ShiftsPage's `canManage`).
   { to: '/shifts', label: 'Shifts', icon: '◫', end: false },
+  // Same shape again: GET /payslips/me is open to every role (a "My
+  // Payslips" section), while salaries and the HR payslip queue inside the
+  // same page are gated to Super Admin/HR (see PayrollPage's `canManage`).
+  { to: '/payroll', label: 'Payroll', icon: '◈', end: false },
 ];
 
 // Not wired up yet — the backend has full APIs for all of these (see
 // backend/README.md#api-reference), but no admin-dashboard screen exists
 // for them yet. Shown, not hidden, so the nav reflects where the product is
 // going — but dimmed and inert rather than pretending they work.
-const comingSoonItems = [
-  { label: 'Payroll', icon: '◈' },
-  { label: 'Notifications', icon: '◎' },
-];
+const comingSoonItems = [{ label: 'Notifications', icon: '◎' }];
 
 const comingSoonConfig = [
   { label: 'Geofences', icon: '◍' },

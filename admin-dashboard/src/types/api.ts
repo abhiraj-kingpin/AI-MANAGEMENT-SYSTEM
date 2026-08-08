@@ -211,6 +211,107 @@ export interface ListLeavesQuery {
   status?: LeaveStatus;
 }
 
+export interface Allowances {
+  hra?: number;
+  transport?: number;
+  medical?: number;
+  other?: number;
+}
+
+export interface Deductions {
+  pf?: number;
+  tax?: number;
+  other?: number;
+}
+
+/** `GET/POST /salaries`, `PATCH /salaries/:employeeId` — see backend/README.md#payroll-salaries-payroll-payslips. `employee` is only ever present on the HR list (`GET /salaries`). */
+export interface Salary {
+  id: string;
+  employeeId: string;
+  employee?: EmployeeSummary;
+  baseSalary: number;
+  allowances: Allowances;
+  deductions: Deductions;
+  currency: string;
+  effectiveFrom: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSalaryInput {
+  employeeId: string;
+  baseSalary: number;
+  allowances?: Allowances;
+  deductions?: Deductions;
+  currency?: string;
+  effectiveFrom: string;
+}
+
+export type UpdateSalaryInput = Partial<Omit<CreateSalaryInput, 'employeeId'>>;
+
+export interface ListSalariesQuery {
+  employeeId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export type PayslipStatus = 'draft' | 'generated' | 'released';
+
+/** `GET /payslips`, `/payslips/me` — see backend/README.md#payroll-salaries-payroll-payslips. `employee` is only ever present on the HR list (`GET /payslips`), never on the self-service `/me` history. */
+export interface Payslip {
+  id: string;
+  employeeId: string;
+  employee?: EmployeeSummary;
+  salaryId: string;
+  month: string; // "YYYY-MM"
+  grossPay: number;
+  netPay: number;
+  latePenalty: number;
+  overtimePay: number;
+  bonus: number;
+  status: PayslipStatus;
+  generatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListPayslipsQuery {
+  month?: string;
+  departmentId?: string;
+  employeeId?: string;
+  status?: PayslipStatus;
+  page?: number;
+  limit?: number;
+}
+
+export type PayrollRunStatus = 'processing' | 'completed' | 'failed';
+
+export interface PayrollRunFailure {
+  employeeId: string;
+  message: string;
+}
+
+/** `POST /payroll/run`, `GET /payroll/runs/:runId/status` — see backend/README.md#payroll-salaries-payroll-payslips. The run registry lives in the API process's memory, not a durable queue (documented backend limitation) — polling stops making sense across a server restart mid-run. */
+export interface PayrollRunRecord {
+  runId: string;
+  month: string;
+  departmentId?: string;
+  status: PayrollRunStatus;
+  totalEmployees: number;
+  processed: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: PayrollRunFailure[];
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface RunPayrollInput {
+  month: string;
+  departmentId?: string;
+}
+
 export type ShiftType = 'morning' | 'night' | 'rotational' | 'flexible';
 
 /** `GET /shifts` — see backend/README.md#shifts-shifts. */

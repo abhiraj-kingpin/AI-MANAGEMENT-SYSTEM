@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Admin Dashboard — Payroll Feature
+
+Same shape as Leave and Shifts: a "My Payslips" section (list + PDF download) every role sees, above a Super Admin/HR-only area for salary structures and the payslip queue (filter, release, download) plus a "Run Payroll" action that starts a batch job and polls its status until it finishes. The PDF download is the one binary response in the whole API, fetched as a blob rather than JSON. Building this screen surfaced the real backend gap fixed in `v1.1.3` below.
+
 ## Backend v1.1.3 — Salary & Payslip Lists: Real Employee Names
 
 The same class of gap as `v1.1.1`/`v1.1.2`, found this time while reading the Payroll module ahead of its admin-dashboard screen: `GET /salaries` and `GET /payslips` both had bare `employeeId`s, no names. Fixed with the same batch-lookup pattern — and, since this made three near-identical copies of that pattern, extracted it into a shared `resolveEmployeeRefs()` and switched Attendance's and Leave's existing code over to it too, rather than writing a fourth and fifth copy. 562 backend tests. Details: [backend/CHANGELOG.md#v113--salary--payslip-lists-real-employee-names-shared-resolveemployeerefs](backend/CHANGELOG.md#v113--salary--payslip-lists-real-employee-names-shared-resolveemployeerefs).
