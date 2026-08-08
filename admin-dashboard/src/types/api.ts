@@ -34,6 +34,88 @@ export interface EmployeeSummary {
   lastName: string;
 }
 
+export type EmploymentStatus = 'active' | 'on_leave' | 'suspended' | 'terminated';
+
+export interface EmergencyContact {
+  name?: string;
+  relationship?: string;
+  phone?: string;
+}
+
+export interface Address {
+  line1?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+}
+
+/** `GET /departments` — see backend/README.md#departments-departments. */
+export interface Department {
+  id: string;
+  name: string;
+  code: string;
+  headOfDepartment: EmployeeSummary | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `GET /employees/:id`, list items — see backend/README.md#employees-employees. */
+export interface Employee extends EmployeeSummary {
+  email: string;
+  role: Role;
+  isActive: boolean;
+  phone: string;
+  profileImageUrl: string | null;
+  department: { id: string; name: string; code: string } | null;
+  designation: string;
+  manager: EmployeeSummary | null;
+  dateOfJoining: string;
+  employmentStatus: EmploymentStatus;
+  emergencyContact: EmergencyContact;
+  address: Address;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeInput {
+  email: string;
+  role?: Exclude<Role, 'super_admin'>;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  departmentId: string;
+  designation: string;
+  managerId?: string;
+  dateOfJoining: string;
+  emergencyContact?: EmergencyContact;
+  address?: Address;
+}
+
+export interface UpdateEmployeeInput {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  departmentId?: string;
+  designation?: string;
+  managerId?: string | null;
+  dateOfJoining?: string;
+  employmentStatus?: EmploymentStatus;
+  emergencyContact?: EmergencyContact;
+  address?: Address;
+}
+
+export interface ListEmployeesQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  department?: string;
+  status?: EmploymentStatus;
+  sortBy?: 'firstName' | 'lastName' | 'dateOfJoining' | 'createdAt';
+  order?: 'asc' | 'desc';
+}
+
 /** `GET /analytics/dashboard` — see backend/README.md#analytics-analytics. `date` arrives as an ISO string over JSON, not a `Date`. */
 export interface DashboardKpis {
   date: string;

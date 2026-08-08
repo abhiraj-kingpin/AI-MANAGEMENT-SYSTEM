@@ -1,13 +1,34 @@
 import { NavLink } from 'react-router-dom';
+import { useAuthStore } from '@/stores/authStore';
+import type { Role } from '@/types/api';
 
-const liveItems = [{ to: '/', label: 'Dashboard', icon: '◆', end: true }];
+interface NavItem {
+  to: string;
+  label: string;
+  icon: string;
+  end: boolean;
+  roles?: Role[];
+}
+
+const liveItems: NavItem[] = [
+  { to: '/', label: 'Dashboard', icon: '◆', end: true },
+  // GET /employees is Super Admin/HR/Manager-only server-side — hidden for a
+  // plain employee rather than shown and then 403ing (see EmployeesListPage's
+  // error state for what happens if the backend ever disagrees with this).
+  {
+    to: '/employees',
+    label: 'Employees',
+    icon: '◇',
+    end: false,
+    roles: ['super_admin', 'hr', 'manager'],
+  },
+];
 
 // Not wired up yet — the backend has full APIs for all of these (see
 // backend/README.md#api-reference), but no admin-dashboard screen exists
 // for them yet. Shown, not hidden, so the nav reflects where the product is
 // going — but dimmed and inert rather than pretending they work.
 const comingSoonItems = [
-  { label: 'Employees', icon: '◇' },
   { label: 'Attendance', icon: '◷' },
   { label: 'Leave', icon: '▤' },
   { label: 'Shifts', icon: '◫' },
@@ -21,6 +42,11 @@ const comingSoonConfig = [
 ];
 
 export function Sidebar() {
+  const role = useAuthStore((s) => s.user?.role);
+  const visibleLiveItems = liveItems.filter(
+    (item) => !item.roles || (role && item.roles.includes(role)),
+  );
+
   return (
     <aside className="hidden w-[248px] shrink-0 flex-col gap-6 border-r border-border bg-white/[0.015] p-4 sm:flex">
       <div className="flex items-center gap-2.5 px-2">
@@ -31,7 +57,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-0.5">
-        {liveItems.map((item) => (
+        {visibleLiveItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

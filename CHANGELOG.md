@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Admin Dashboard — Employees Feature
+
+The first full CRUD vertical slice built on the design system: a list (search, department/status filters, pagination), detail view, create/edit forms, and deactivate — role-gated to match the backend's own RBAC exactly (Super Admin/HR/Manager can list, Super Admin/HR can write). The manager field is a real typeahead against `GET /employees/search`, not a truncated dropdown. Sidebar nav now hides `/employees` entirely for a role that can't use it, rather than showing it and letting the API 403. See [admin-dashboard/README.md#features](admin-dashboard/README.md#features).
+
 ## Backend v1.1.0 — Departments API
 
 A real gap found while starting the admin dashboard's Employees screen: the backend referenced `Department` everywhere but had no way to ever create one — no route, no seed script. Added `GET/POST /departments` and `PATCH /departments/:id` (Super Admin/HR for writes, read open to all). 555 backend tests. Details: [backend/CHANGELOG.md#v110--departments-api](backend/CHANGELOG.md#v110--departments-api).

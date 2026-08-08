@@ -32,13 +32,14 @@ Requires the [backend](../backend/) running (default `http://localhost:5000`).
 ```
 src/
 ├── app/            # router (+ ProtectedRoute guard), providers (TanStack Query), layout shell, Atmosphere background
-├── features/        # one folder per domain: auth/ + dashboard/ + employees/ (headcount) + analytics/ (dashboard KPIs)
-│                     #   scaffolded now; full employees/attendance/leaves/shifts/payroll/geofence/qr/
-│                     #   notifications screens, plus analytics trend charts, arrive phase by phase
+├── features/        # one folder per domain: auth/, dashboard/, analytics/ (dashboard KPIs),
+│                     #   departments/ (dropdown data source), employees/ (full CRUD — list/search/
+│                     #   filter/paginate, create, edit, detail, deactivate); attendance/leaves/
+│                     #   shifts/payroll/geofence/qr/notifications screens arrive phase by phase
 ├── shared/
 │   ├── hooks/        # useReveal, useCountUp, useMagneticHover, usePrefersReducedMotion
-│   ├── ui/            # Button, Card, Chip, Reveal, StatCard — the design system's component layer
-│   └── lib/            # axios instance (auth header + refresh-on-401), sparkline canvas renderer
+│   ├── ui/            # Button, Card, Chip, Field/Input/Select, Reveal, StatCard — the design system's component layer
+│   └── lib/            # axios instance (auth header + refresh-on-401), apiError (real backend messages, not hardcoded ones), sparkline canvas renderer
 ├── stores/           # zustand — session state only (access token in memory, never persisted)
 └── types/             # hand-maintained mirror of docs/architecture/04-api-documentation.md
 ```
@@ -69,6 +70,12 @@ Every animation (mesh drift, scroll-reveal, count-up, magnetic hover, shine-swee
 - On page load, `features/auth/hooks/useAuthHydration.ts` silently attempts a refresh to restore the session from that cookie before `ProtectedRoute` decides whether to redirect to `/login`.
 - `LoginPage` surfaces the backend's actual error message rather than a hardcoded one — needed once the backend's Phase 16 account lockout could return a distinct "try again in N minutes" response that a generic "Invalid email or password" would have hidden.
 
+## Features
+
+- **Auth**: login, session restore, sign-out.
+- **Dashboard**: four live KPI cards (headcount, attendance rate, late arrivals, on leave) from `GET /employees`/`GET /analytics/dashboard`; a trend-chart/department-comparison panel is still a placeholder pointing at the two backend endpoints that already exist for it (`/analytics/attendance-trend`, `/analytics/department-comparison`).
+- **Employees**: list (search, department/status filters, pagination), detail view, create, edit, deactivate — role-gated to Super Admin/HR/Manager (list) and Super Admin/HR (create/edit/deactivate), matching the backend's own RBAC exactly rather than re-deciding it client-side. The manager field is a real typeahead against `GET /employees/search`, not a truncated dropdown (an org can have hundreds of employees).
+
 ## Status
 
-Phase 1 scaffolding (routing, auth session plumbing) plus a real design system applied to the two screens that exist today: `LoginPage` and the `AppShell`/`DashboardPage` (sidebar nav shows every planned module, with the unbuilt ones visibly dimmed and marked "Soon" rather than linking nowhere). `DashboardPage`'s four KPI cards are fully live now (headcount, attendance rate, late arrivals, on leave, from `GET /employees` and `GET /analytics/dashboard`); the trend-chart and department-comparison panel underneath is still a placeholder pointing at the two backend endpoints (`/analytics/attendance-trend`, `/analytics/department-comparison`) that already exist for it. Feature screens for employees, attendance, leave, shifts, payroll, and notifications — the backend has full APIs for all of them already — land on this same design system in their own passes. `lint`/`typecheck`/`format:check`/`build` all pass.
+Phase 1 scaffolding (routing, auth session plumbing, design system) plus two fully-built screens: `LoginPage` and `DashboardPage`. The Employees feature (list/detail/create/edit/deactivate) is the first full CRUD vertical slice built on top of that foundation — see [Features](#features) above. Sidebar nav shows every planned module, with the unbuilt ones visibly dimmed and marked "Soon" rather than linking nowhere; a role that can't use a *built* screen (e.g. a plain employee and `/employees`) has that nav item hidden entirely rather than shown and left to 403. Attendance, leave, shifts, payroll, notifications, geofences, QR, and analytics charts — the backend has full APIs for all of them already — land on this same design system in their own passes. `lint`/`typecheck`/`format:check`/`build` all pass; there is no frontend test suite yet (see [ci-admin.yml](../.github/workflows/ci-admin.yml)'s comment on why that step doesn't exist).
