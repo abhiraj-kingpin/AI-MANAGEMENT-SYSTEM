@@ -106,6 +106,56 @@ export interface UpdateEmployeeInput {
   address?: Address;
 }
 
+export type AttendanceMethod = 'gps' | 'qr' | 'face' | 'manual';
+export type AttendanceStatus = 'present' | 'late' | 'half_day' | 'absent' | 'on_leave';
+export type CorrectionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CorrectionRequest {
+  requestedCheckInAt: string | null;
+  requestedCheckOutAt: string | null;
+  reason: string;
+  requestedBy: string;
+  requestedAt: string;
+  status: CorrectionStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewComment?: string;
+}
+
+/** `GET /attendance` — see backend/README.md#attendance-attendance. `employee` is only ever present on this HR/Manager report, never on `/attendance/me`. */
+export interface Attendance {
+  id: string;
+  employeeId: string;
+  employee?: EmployeeSummary;
+  date: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  method: AttendanceMethod;
+  workingMinutes: number;
+  status: AttendanceStatus;
+  isOvertime: boolean;
+  overtimeMinutes: number;
+  isCorrected: boolean;
+  correctionRequest: CorrectionRequest | null;
+}
+
+export interface ListAttendanceQuery {
+  page?: number;
+  limit?: number;
+  employeeId?: string;
+  departmentId?: string;
+  status?: AttendanceStatus;
+  from?: string;
+  to?: string;
+}
+
+export interface CorrectAttendanceInput {
+  checkInAt?: string;
+  checkOutAt?: string;
+  status?: AttendanceStatus;
+  reason: string;
+}
+
 export interface ListEmployeesQuery {
   page?: number;
   limit?: number;

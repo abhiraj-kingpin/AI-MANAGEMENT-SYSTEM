@@ -33,12 +33,12 @@ Requires the [backend](../backend/) running (default `http://localhost:5000`).
 src/
 ├── app/            # router (+ ProtectedRoute guard), providers (TanStack Query), layout shell, Atmosphere background
 ├── features/        # one folder per domain: auth/, dashboard/, analytics/ (dashboard KPIs),
-│                     #   departments/ (dropdown data source), employees/ (full CRUD — list/search/
-│                     #   filter/paginate, create, edit, detail, deactivate); attendance/leaves/
-│                     #   shifts/payroll/geofence/qr/notifications screens arrive phase by phase
+│                     #   departments/ (dropdown data source), employees/ (full CRUD), attendance/
+│                     #   (report + corrections); leaves/shifts/payroll/geofence/qr/notifications
+│                     #   screens arrive phase by phase
 ├── shared/
 │   ├── hooks/        # useReveal, useCountUp, useMagneticHover, usePrefersReducedMotion
-│   ├── ui/            # Button, Card, Chip, Field/Input/Select, Reveal, StatCard — the design system's component layer
+│   ├── ui/            # Button, Card, Chip, Field/Input/Select, Modal, Reveal, StatCard — the design system's component layer
 │   └── lib/            # axios instance (auth header + refresh-on-401), apiError (real backend messages, not hardcoded ones), sparkline canvas renderer
 ├── stores/           # zustand — session state only (access token in memory, never persisted)
 └── types/             # hand-maintained mirror of docs/architecture/04-api-documentation.md
@@ -75,7 +75,8 @@ Every animation (mesh drift, scroll-reveal, count-up, magnetic hover, shine-swee
 - **Auth**: login, session restore, sign-out.
 - **Dashboard**: four live KPI cards (headcount, attendance rate, late arrivals, on leave) from `GET /employees`/`GET /analytics/dashboard`; a trend-chart/department-comparison panel is still a placeholder pointing at the two backend endpoints that already exist for it (`/analytics/attendance-trend`, `/analytics/department-comparison`).
 - **Employees**: list (search, department/status filters, pagination), detail view, create, edit, deactivate — role-gated to Super Admin/HR/Manager (list) and Super Admin/HR (create/edit/deactivate), matching the backend's own RBAC exactly rather than re-deciding it client-side. The manager field is a real typeahead against `GET /employees/search`, not a truncated dropdown (an org can have hundreds of employees).
+- **Attendance**: the HR/Manager report — date-range/department/status filters, pagination, direct corrections (`PATCH /attendance/:id/correct`, Super Admin/HR only, mandatory reason) and approve/reject on employee-initiated correction requests (Super Admin/HR/Manager). Building this screen surfaced two real backend gaps, both fixed rather than worked around client-side: `GET /attendance` had no employee name/code per row (fixed in `backend-v1.1.1`), and there was no way to create a `Department` at all (fixed in `backend-v1.1.0`) — see [backend/CHANGELOG.md](../backend/CHANGELOG.md).
 
 ## Status
 
-Phase 1 scaffolding (routing, auth session plumbing, design system) plus two fully-built screens: `LoginPage` and `DashboardPage`. The Employees feature (list/detail/create/edit/deactivate) is the first full CRUD vertical slice built on top of that foundation — see [Features](#features) above. Sidebar nav shows every planned module, with the unbuilt ones visibly dimmed and marked "Soon" rather than linking nowhere; a role that can't use a _built_ screen (e.g. a plain employee and `/employees`) has that nav item hidden entirely rather than shown and left to 403. Attendance, leave, shifts, payroll, notifications, geofences, QR, and analytics charts — the backend has full APIs for all of them already — land on this same design system in their own passes. `lint`/`typecheck`/`format:check`/`build` all pass; there is no frontend test suite yet (see [ci-admin.yml](../.github/workflows/ci-admin.yml)'s comment on why that step doesn't exist).
+Phase 1 scaffolding (routing, auth session plumbing, design system) plus two fully-built screens: `LoginPage` and `DashboardPage`. Employees and Attendance are the first two full feature verticals built on top of that foundation — see [Features](#features) above, including two real backend bugs their construction caught. Sidebar nav shows every planned module, with the unbuilt ones visibly dimmed and marked "Soon" rather than linking nowhere; a role that can't use a _built_ screen (e.g. a plain employee and `/employees` or `/attendance`) has that nav item hidden entirely rather than shown and left to 403. Leave, shifts, payroll, notifications, geofences, QR, and analytics charts — the backend has full APIs for all of them already — land on this same design system in their own passes. `lint`/`typecheck`/`format:check`/`build` all pass; there is no frontend test suite yet (see [ci-admin.yml](../.github/workflows/ci-admin.yml)'s comment on why that step doesn't exist).

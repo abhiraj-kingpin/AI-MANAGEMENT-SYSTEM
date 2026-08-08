@@ -22,6 +22,15 @@ const liveItems: NavItem[] = [
     end: false,
     roles: ['super_admin', 'hr', 'manager'],
   },
+  // GET /attendance (the report this screen reads) is Super Admin/HR/Manager
+  // only server-side too — same reasoning as Employees above.
+  {
+    to: '/attendance',
+    label: 'Attendance',
+    icon: '◷',
+    end: false,
+    roles: ['super_admin', 'hr', 'manager'],
+  },
 ];
 
 // Not wired up yet — the backend has full APIs for all of these (see
@@ -29,7 +38,6 @@ const liveItems: NavItem[] = [
 // for them yet. Shown, not hidden, so the nav reflects where the product is
 // going — but dimmed and inert rather than pretending they work.
 const comingSoonItems = [
-  { label: 'Attendance', icon: '◷' },
   { label: 'Leave', icon: '▤' },
   { label: 'Shifts', icon: '◫' },
   { label: 'Payroll', icon: '◈' },
