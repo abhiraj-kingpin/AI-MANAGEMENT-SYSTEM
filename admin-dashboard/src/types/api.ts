@@ -211,6 +211,46 @@ export interface ListLeavesQuery {
   status?: LeaveStatus;
 }
 
+export type ShiftType = 'morning' | 'night' | 'rotational' | 'flexible';
+
+/** `GET /shifts` — see backend/README.md#shifts-shifts. */
+export interface Shift {
+  id: string;
+  name: string;
+  type: ShiftType;
+  startTime: string; // "HH:mm", 24-hour
+  endTime: string; // "HH:mm", 24-hour
+  gracePeriodMinutes: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateShiftInput {
+  name: string;
+  type: ShiftType;
+  startTime: string;
+  endTime: string;
+  gracePeriodMinutes?: number;
+}
+
+export type UpdateShiftInput = Partial<CreateShiftInput & { isActive: boolean }>;
+
+/** `GET /shifts/me`, `POST /shifts/assign` — see backend/README.md#shifts-shifts. */
+export interface ShiftAssignment {
+  id: string;
+  employeeId: string;
+  shift: Shift;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export interface AssignShiftInput {
+  employeeId: string;
+  shiftId: string;
+  effectiveFrom: string;
+}
+
 export interface ListEmployeesQuery {
   page?: number;
   limit?: number;

@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Admin Dashboard — Shifts Feature
+
+Same shape as Leave: a "My Shift" card every role sees, above a Super Admin/HR-only section for shift definitions (create/edit/deactivate) and single-employee assignment (reusing the `EmployeePicker` typeahead built for Employees). `POST /shifts/assign/bulk` exists on the API but isn't wired up in the UI yet — a documented scope cut, not an oversight.
+
 ## Admin Dashboard — Leave Feature
 
 The one screen every role reaches, not just Super Admin/HR/Manager: self-service balance cards, apply/cancel, and request history sit above a Super Admin/HR/Manager-only review queue rendered in the same page, gated by role rather than a separate route (a plain `employee` gets the self-service section only; the Sidebar link itself isn't role-hidden the way Employees/Attendance are). Building this screen is what surfaced the real backend gap fixed in `v1.1.2` below.

@@ -8,6 +8,7 @@ import { EmployeeDetailPage } from '@/features/employees/pages/EmployeeDetailPag
 import { EmployeeFormPage } from '@/features/employees/pages/EmployeeFormPage';
 import { EmployeesListPage } from '@/features/employees/pages/EmployeesListPage';
 import { LeavePage } from '@/features/leaves/pages/LeavePage';
+import { ShiftsPage } from '@/features/shifts/pages/ShiftsPage';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -24,8 +25,9 @@ export const router = createBrowserRouter([
           { path: 'employees/:id/edit', element: <EmployeeFormPage /> },
           { path: 'attendance', element: <AttendancePage /> },
           { path: 'leaves', element: <LeavePage /> },
-          // Shifts, Payroll, Geofence, QR, and Notifications routes are
-          // added phase by phase — see
+          { path: 'shifts', element: <ShiftsPage /> },
+          // Payroll, Geofence, QR, and Notifications routes are added
+          // phase by phase — see
           // docs/architecture/05-folder-structure.md for the target layout.
         ],
       },

@@ -36,6 +36,10 @@ const liveItems: NavItem[] = [
   // sees only the self-service section, while the review queue inside the
   // same page is itself gated by role (see LeavePage's `canReview`).
   { to: '/leaves', label: 'Leave', icon: '▤', end: false },
+  // Same shape as Leave: GET /shifts/me is open to every role (a "My Shift"
+  // card), while shift definitions/assignment inside the same page are
+  // gated to Super Admin/HR (see ShiftsPage's `canManage`).
+  { to: '/shifts', label: 'Shifts', icon: '◫', end: false },
 ];
 
 // Not wired up yet — the backend has full APIs for all of these (see
@@ -43,7 +47,6 @@ const liveItems: NavItem[] = [
 // for them yet. Shown, not hidden, so the nav reflects where the product is
 // going — but dimmed and inert rather than pretending they work.
 const comingSoonItems = [
-  { label: 'Shifts', icon: '◫' },
   { label: 'Payroll', icon: '◈' },
   { label: 'Notifications', icon: '◎' },
 ];
