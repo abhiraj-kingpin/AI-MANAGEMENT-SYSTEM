@@ -4,6 +4,17 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [v1.1.0] — Departments API
+
+**Added** — `modules/departments/`: `GET /departments`, `POST /departments`, `PATCH /departments/:id` (Super Admin/HR for writes; read open to any authenticated user).
+
+- **A real gap found while starting the admin-dashboard's Employees screen, not while planning it**: this codebase had a `Department` Mongoose model, referenced it everywhere (`Employee.departmentId`, `employee.service.ts`'s `assertDepartmentExists`, the whole `/analytics/department-comparison` endpoint), and yet had _no way to ever create one_ — no route, no seed script, nothing. Every department in this system could only ever have existed via someone manually inserting a document straight into MongoDB. Confirmed by grepping the entire codebase for `Department.create`/`new Department(` and finding zero matches outside the new module itself.
+- Not in the original Phase 0 plan either — `docs/architecture/04-api-documentation.md` never mentioned a `/departments` endpoint. Added there now rather than left as a second undocumented gap.
+- `code` is always uppercased before uniqueness-checking and storing, matching `Department.model.ts`'s schema-level `uppercase: true` — the service enforces the same normalization the schema declares, rather than relying on Mongoose's cast to paper over a service that checked uniqueness pre-normalization.
+- `headOfDepartment` is validated against real, non-deleted employees on both create and update; explicitly clearing it to `null` is allowed without that validation (there's nothing to validate — it's the "no head assigned" state, not a reference to check).
+- **Verified**: 555 Jest tests (up from 536 — 19 new, split across `department.service.test.ts` and `department.routes.test.ts`).
+- Version bumped to `1.1.0` — a new, backward-compatible feature, not a breaking change, so a minor bump rather than another major one so soon after `v1.0.0`.
+
 ## [Phase 20] — Documentation & Release — v1.0.0
 
 **Version bumped to `1.0.0`** — all 20 planned backend phases (Phase 0's architecture through this one) are now complete, tested, and documented. Scoped precisely: this is the _backend's_ v1.0.0, not the product's — `admin-dashboard` and `mobile-app` stay at `0.1.0`, since both are genuinely early (a login screen and a dashboard; an auth vertical slice) relative to the backend API surface they're built against. See the [repository root](../README.md#component-status) for the honest breakdown.

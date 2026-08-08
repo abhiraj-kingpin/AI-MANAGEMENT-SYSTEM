@@ -49,6 +49,7 @@ Cross-module reuse goes through `src/shared/`, not through one module importing 
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Authentication**        | JWT access + rotating refresh tokens, reuse detection, RBAC (`super_admin`/`hr`/`manager`/`employee`), forgot/reset/change password                                              |
 | **Employees**             | CRUD, profile photo + document upload (Cloudinary), search, department/status filtering, manager-scoped visibility                                                               |
+| **Departments**           | CRUD (Super Admin/HR), read open to any authenticated user — every employee-creation form and filter dropdown needs the list regardless of role                                  |
 | **Attendance**            | Check-in/out, breaks, working-hours/overtime/half-day computation, offline-punch sync, HR reporting with Excel/PDF export, two-track correction workflow                         |
 | **GPS Attendance**        | Geofenced check-in via indexed `$geoNear` distance queries                                                                                                                       |
 | **QR Attendance**         | Time-boxed, HMAC-signed, optionally single-use QR codes                                                                                                                          |
@@ -171,6 +172,14 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 | POST       | `/employees/:id/image`     | Super Admin/HR/self                                                             | Cloudinary upload                                                       |
 | POST`/GET` | `/employees/:id/documents` | Super Admin/HR/self                                                             | Cloudinary upload/list                                                  |
 
+### Departments (`/departments`)
+
+| Method | Path               | Access         | Notes                                                                   |
+| ------ | ------------------ | -------------- | ----------------------------------------------------------------------- |
+| GET    | `/departments`     | Authenticated  | `?includeInactive=true` to see deactivated ones; active-only by default |
+| POST   | `/departments`     | Super Admin/HR | `{ name, code, headOfDepartment? }` — `code` is uppercased              |
+| PATCH  | `/departments/:id` | Super Admin/HR | Partial update, including deactivating (`isActive: false`)              |
+
 ### Attendance (`/attendance`)
 
 | Method | Path                                                       | Access                 | Notes                                                                   |
@@ -291,7 +300,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-536 Jest tests across every module, none requiring a live database:
+555 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).

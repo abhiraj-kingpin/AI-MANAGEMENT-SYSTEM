@@ -58,6 +58,16 @@ Full machine-readable contract lives in `docs/api/openapi.yaml` (generated from 
 | GET | `/employees/:id/documents` | List documents |
 | GET | `/employees/search?q=` | Typeahead search (name/code/email) |
 
+## Departments (`/departments`) — read: any authenticated user; write: Super Admin, HR
+
+Added post-v1.0.0 (`v1.1.0`) — not part of this document's original plan, which referenced `Employee.departmentId` and `/analytics/department-comparison` throughout without ever specifying how a `Department` itself gets created. Found and fixed while building the admin dashboard's employee-creation form, which needs this list to populate its department selector.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/departments` | List, `?includeInactive=true` (active-only by default) |
+| POST | `/departments` | Create `{ name, code, headOfDepartment? }` |
+| PATCH | `/departments/:id` | Update fields, including deactivating (`isActive: false`) |
+
 ## Attendance (`/attendance`)
 
 | Method | Path | Role | Description |

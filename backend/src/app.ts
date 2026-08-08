@@ -13,6 +13,7 @@ import { analyticsRouter } from './modules/analytics/analytics.routes';
 import { attendanceRouter } from './modules/attendance/attendance.routes';
 import { auditRouter } from './modules/audit/audit.routes';
 import { authRouter } from './modules/auth/auth.routes';
+import { departmentRouter } from './modules/departments/department.routes';
 import { employeeRouter } from './modules/employees/employee.routes';
 import { faceRouter } from './modules/face-recognition/face.routes';
 import { geofenceRouter } from './modules/geofence/geofence.routes';
@@ -67,6 +68,7 @@ export function createApp(): Application {
   app.use(`${env.API_PREFIX}/health`, healthRouter);
   app.use(`${env.API_PREFIX}/auth`, authRouter);
   app.use(`${env.API_PREFIX}/employees`, employeeRouter);
+  app.use(`${env.API_PREFIX}/departments`, departmentRouter);
   app.use(`${env.API_PREFIX}/attendance`, attendanceRouter);
   app.use(`${env.API_PREFIX}/geofences`, geofenceRouter);
   app.use(`${env.API_PREFIX}/qr`, qrRouter);
