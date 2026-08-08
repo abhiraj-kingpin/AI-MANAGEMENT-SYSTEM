@@ -11,13 +11,19 @@ on:
       - 'backend/**'
       - '.github/workflows/ci-backend.yml'
 
-defaults:
-  run:
-    working-directory: backend
-
 jobs:
   lint-typecheck-test-build:
     runs-on: ubuntu-latest
+    # Scoped to this job only, not the whole workflow — docker-build below
+    # needs to run from the repo root, since its build context path
+    # (./backend) is relative to the runner's working directory. A
+    # workflow-level `defaults.run.working-directory` would have applied to
+    # both jobs and silently resolved that path to backend/backend, which
+    # doesn't exist — exactly the bug this comment is here to prevent
+    # reintroducing.
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
