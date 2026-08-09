@@ -32,6 +32,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // camera + google_mlkit_face_detection push the app past the 64K
+        // method limit on minSdk 21 (multidex isn't automatic there the
+        // way it is below API 21) — added proactively alongside those two
+        // plugins rather than waiting to hit the dex-merge failure on CI.
+        multiDexEnabled true
     }
 
     buildTypes {

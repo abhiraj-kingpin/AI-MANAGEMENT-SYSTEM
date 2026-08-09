@@ -8,10 +8,12 @@
 class PendingPunch {
   final String clientGeneratedId;
   final String type; // 'check_in' | 'check_out'
-  final String? method;
+  final String? method; // 'gps' | 'face'
   final double? lat;
   final double? lng;
   final double? accuracyMeters;
+  final List<double>? faceEmbedding;
+  final bool? livenessPassed;
   final DateTime occurredAt;
 
   const PendingPunch({
@@ -22,6 +24,8 @@ class PendingPunch {
     this.lat,
     this.lng,
     this.accuracyMeters,
+    this.faceEmbedding,
+    this.livenessPassed,
   });
 
   Map<String, dynamic> toJson() {
@@ -35,6 +39,8 @@ class PendingPunch {
           'lng': lng,
           if (accuracyMeters != null) 'accuracyMeters': accuracyMeters,
         },
+      if (faceEmbedding != null) 'faceEmbedding': faceEmbedding,
+      if (livenessPassed != null) 'livenessPassed': livenessPassed,
       'occurredAt': occurredAt.toIso8601String(),
     };
   }
@@ -48,6 +54,7 @@ class PendingPunch {
 
   factory PendingPunch.fromJson(Map<String, dynamic> json) {
     final location = json['location'] as Map<String, dynamic>?;
+    final embedding = json['faceEmbedding'] as List<dynamic>?;
     return PendingPunch(
       clientGeneratedId: json['clientGeneratedId'] as String,
       type: json['type'] as String,
@@ -55,6 +62,8 @@ class PendingPunch {
       lat: (location?['lat'] as num?)?.toDouble(),
       lng: (location?['lng'] as num?)?.toDouble(),
       accuracyMeters: (location?['accuracyMeters'] as num?)?.toDouble(),
+      faceEmbedding: embedding?.map((v) => (v as num).toDouble()).toList(),
+      livenessPassed: json['livenessPassed'] as bool?,
       occurredAt: DateTime.parse(json['occurredAt'] as String),
     );
   }

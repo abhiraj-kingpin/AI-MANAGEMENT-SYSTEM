@@ -2,20 +2,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ai_management_system/core/error/failures.dart';
 import 'package:ai_management_system/features/attendance/domain/entities/attendance_entity.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_usecase.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_face_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_out_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/get_my_attendance_usecase.dart';
 import 'package:ai_management_system/features/attendance/presentation/providers/attendance_state.dart';
 
 class AttendanceController extends StateNotifier<AttendanceState> {
   final CheckInUseCase _checkInUseCase;
+  final CheckInWithFaceUseCase _checkInWithFaceUseCase;
   final CheckOutUseCase _checkOutUseCase;
   final GetMyAttendanceUseCase _getMyAttendanceUseCase;
 
   AttendanceController({
     required CheckInUseCase checkInUseCase,
+    required CheckInWithFaceUseCase checkInWithFaceUseCase,
     required CheckOutUseCase checkOutUseCase,
     required GetMyAttendanceUseCase getMyAttendanceUseCase,
   })  : _checkInUseCase = checkInUseCase,
+        _checkInWithFaceUseCase = checkInWithFaceUseCase,
         _checkOutUseCase = checkOutUseCase,
         _getMyAttendanceUseCase = getMyAttendanceUseCase,
         super(const AttendanceState()) {
@@ -42,6 +46,29 @@ class AttendanceController extends StateNotifier<AttendanceState> {
   Future<void> checkIn() async {
     state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
     final result = await _checkInUseCase();
+    await result.when(
+      success: (attendance) async {
+        state = state.copyWith(isActionInProgress: false, today: attendance);
+        await loadHistory();
+      },
+      failure: (failure) async {
+        state = _applyActionFailure(failure);
+      },
+    );
+  }
+
+  /// Called once `features/face/` has already computed the embedding and
+  /// run the liveness check — this controller doesn't touch the camera or
+  /// ML Kit itself, same separation `checkIn()` keeps from `geolocator`.
+  Future<void> checkInWithFace({
+    required List<double> embedding,
+    required bool livenessPassed,
+  }) async {
+    state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
+    final result = await _checkInWithFaceUseCase(
+      embedding: embedding,
+      livenessPassed: livenessPassed,
+    );
     await result.when(
       success: (attendance) async {
         state = state.copyWith(isActionInProgress: false, today: attendance);

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:ai_management_system/core/router/app_router.dart';
 import 'package:ai_management_system/features/attendance/domain/entities/attendance_entity.dart';
 import 'package:ai_management_system/features/attendance/presentation/providers/attendance_providers.dart';
 import 'package:ai_management_system/shared/widgets/primary_button.dart';
@@ -61,13 +63,21 @@ class AttendanceScreen extends ConsumerWidget {
                       ),
                     ],
                     const SizedBox(height: 20),
-                    if (!hasCheckedInToday || today.checkInAt == null)
+                    if (!hasCheckedInToday || today.checkInAt == null) ...[
                       PrimaryButton(
-                        label: 'Check In',
+                        label: 'Check In with GPS',
                         isLoading: state.isActionInProgress,
                         onPressed: controller.checkIn,
-                      )
-                    else if (today.checkOutAt == null)
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.face_outlined),
+                        label: const Text('Check In with Face'),
+                        onPressed: state.isActionInProgress
+                            ? null
+                            : () => context.push(faceCheckInPath),
+                      ),
+                    ] else if (today.checkOutAt == null)
                       PrimaryButton(
                         label: 'Check Out',
                         isLoading: state.isActionInProgress,

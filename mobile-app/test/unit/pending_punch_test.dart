@@ -42,6 +42,24 @@ void main() {
       expect(restored.lng, isNull);
     });
 
+    test('round-trips a face check-in punch with an embedding', () {
+      final punch = PendingPunch(
+        clientGeneratedId: 'device-face-1',
+        type: 'check_in',
+        method: 'face',
+        faceEmbedding: List<double>.generate(67, (i) => i / 67),
+        livenessPassed: true,
+        occurredAt: DateTime.utc(2026, 8, 9, 9, 0),
+      );
+
+      final restored = PendingPunch.fromJson(punch.toJson());
+
+      expect(restored.method, 'face');
+      expect(restored.faceEmbedding, punch.faceEmbedding);
+      expect(restored.livenessPassed, isTrue);
+      expect(restored.lat, isNull);
+    });
+
     test('toSyncPayload matches toJson (same wire shape today)', () {
       final punch = PendingPunch(
         clientGeneratedId: 'device-789',

@@ -7,6 +7,15 @@ abstract class AttendanceRepository {
   /// domain layer never touches `geolocator` directly.
   Future<Result<AttendanceEntity>> checkInWithGps();
 
+  /// Submits a `method: 'face'` check-in. The embedding and liveness
+  /// verdict are computed entirely by `features/face/` before this is
+  /// called — this repository only forwards them, the same separation
+  /// `checkInWithGps()` keeps from `geolocator`.
+  Future<Result<AttendanceEntity>> checkInWithFace({
+    required List<double> embedding,
+    required bool livenessPassed,
+  });
+
   /// Attaches the current GPS position if it's available, but never blocks
   /// check-out on it — `location` is optional server-side for check-out,
   /// unlike check-in.

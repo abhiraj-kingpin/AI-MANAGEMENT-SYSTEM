@@ -38,7 +38,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     try {
       final position = await _locationService.getCurrentPosition();
       try {
-        final attendance = await _remoteDataSource.checkIn(
+        final attendance = await _remoteDataSource.checkInWithGps(
           lat: position.latitude,
           lng: position.longitude,
           accuracyMeters: position.accuracy,
@@ -68,6 +68,39 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       return ResultFailure(ValidationFailure(e.message));
     } on LocationPermissionDeniedException catch (e) {
       return ResultFailure(ValidationFailure(e.message));
+    } on ServerException catch (e) {
+      return ResultFailure(ServerFailure(e.message, code: e.code));
+    }
+  }
+
+  @override
+  Future<Result<AttendanceEntity>> checkInWithFace({
+    required List<double> embedding,
+    required bool livenessPassed,
+  }) async {
+    try {
+      final attendance = await _remoteDataSource.checkInWithFace(
+        embedding: embedding,
+        livenessPassed: livenessPassed,
+      );
+      return Success(attendance);
+    } on NetworkException {
+      // The embedding/liveness verdict were already computed on-device by
+      // the time this is called — only the network round trip failed, so
+      // queue exactly what would have been sent, same as GPS.
+      await _offlineQueue.enqueue(
+        PendingPunch(
+          clientGeneratedId: _generateClientId(),
+          type: 'check_in',
+          method: 'face',
+          faceEmbedding: embedding,
+          livenessPassed: livenessPassed,
+          occurredAt: DateTime.now(),
+        ),
+      );
+      return const ResultFailure(
+        OfflineQueuedFailure('No connection — check-in queued, will sync automatically.'),
+      );
     } on ServerException catch (e) {
       return ResultFailure(ServerFailure(e.message, code: e.code));
     }

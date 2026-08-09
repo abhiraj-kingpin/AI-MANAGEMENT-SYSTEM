@@ -2,6 +2,12 @@
     <!-- Phase 6 — GPS check-in (see lib/core/services/location_service.dart). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Phase 8 — face check-in (see lib/core/services/camera_service.dart).
+         Already merged in transitively via the camera plugin's own manifest,
+         declared here too for the same explicit-over-implicit reason as the
+         location permissions above. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="ai_management_system"
         android:name="${applicationName}"

@@ -5,10 +5,15 @@ import 'package:ai_management_system/core/network/dio_exception_mapper.dart';
 import 'package:ai_management_system/features/attendance/data/models/attendance_model.dart';
 
 abstract class AttendanceRemoteDataSource {
-  Future<AttendanceModel> checkIn({
+  Future<AttendanceModel> checkInWithGps({
     required double lat,
     required double lng,
     double? accuracyMeters,
+  });
+
+  Future<AttendanceModel> checkInWithFace({
+    required List<double> embedding,
+    required bool livenessPassed,
   });
 
   Future<AttendanceModel> checkOut({double? lat, double? lng, double? accuracyMeters});
@@ -21,7 +26,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   const AttendanceRemoteDataSourceImpl({required Dio dio}) : _dio = dio;
 
   @override
-  Future<AttendanceModel> checkIn({
+  Future<AttendanceModel> checkInWithGps({
     required double lat,
     required double lng,
     double? accuracyMeters,
@@ -31,7 +36,31 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         ApiEndpoints.checkIn,
         data: {
           'method': 'gps',
-          'location': {'lat': lat, 'lng': lng, if (accuracyMeters != null) 'accuracyMeters': accuracyMeters},
+          'location': {
+            'lat': lat,
+            'lng': lng,
+            if (accuracyMeters != null) 'accuracyMeters': accuracyMeters,
+          },
+        },
+      );
+      return _parseAttendance(response.data);
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  @override
+  Future<AttendanceModel> checkInWithFace({
+    required List<double> embedding,
+    required bool livenessPassed,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiEndpoints.checkIn,
+        data: {
+          'method': 'face',
+          'faceEmbedding': embedding,
+          'livenessPassed': livenessPassed,
         },
       );
       return _parseAttendance(response.data);
