@@ -4,6 +4,7 @@ import { sendSuccess } from '../../shared/utils/apiResponse';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
 import { faceService } from './face.service';
 import type {
+  RegisterFaceEmbeddingsInput,
   RegisterFaceInput,
   RegistrationStatusQuery,
   VerifyFaceInput,
@@ -18,6 +19,18 @@ export const registerFace = asyncHandler(async (req, res) => {
 
   const result = await faceService.register(
     files.map((f) => f.buffer),
+    employeeId,
+    actorFromRequest(req),
+  );
+  sendSuccess(res, result, 201);
+});
+
+/** Mobile's on-device-computed-embedding registration path — see `faceService.registerWithEmbeddings`'s doc comment. */
+export const registerFaceEmbeddings = asyncHandler(async (req, res) => {
+  const { employeeId, embeddings } = req.body as RegisterFaceEmbeddingsInput;
+
+  const result = await faceService.registerWithEmbeddings(
+    embeddings,
     employeeId,
     actorFromRequest(req),
   );

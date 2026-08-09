@@ -215,12 +215,13 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Face Recognition (`/face`)
 
-| Method | Path                        | Access                                 | Notes                          |
-| ------ | --------------------------- | -------------------------------------- | ------------------------------ |
-| POST   | `/face/register`            | Self, or HR/Admin for another employee | 3–5 photos                     |
-| GET    | `/face/registration-status` | Self, or HR/Admin via `?employeeId=`   |                                |
-| POST   | `/face/verify`              | Self                                   | Standalone test endpoint       |
-| DELETE | `/face/:employeeId`         | Super Admin/HR                         | Hard delete (right-to-erasure) |
+| Method | Path                         | Access                                  | Notes                                                        |
+| ------ | ---------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| POST   | `/face/register`             | Self, or HR/Admin for another employee   | 3–5 photos (multipart upload)                                |
+| POST   | `/face/register-embeddings`  | Self, or HR/Admin for another employee   | 3–5 client-computed embeddings (JSON body, no image upload) |
+| GET    | `/face/registration-status`  | Self, or HR/Admin via `?employeeId=`     |                                                               |
+| POST   | `/face/verify`               | Self                                     | Standalone test endpoint                                     |
+| DELETE | `/face/:employeeId`          | Super Admin/HR                           | Hard delete (right-to-erasure)                               |
 
 ### Leave (`/leaves`, `/leave-types`, `/holidays`)
 
@@ -300,7 +301,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-562 Jest tests across every module, none requiring a live database:
+569 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).
@@ -350,10 +351,12 @@ Two external-service integrations are intentionally-labeled placeholders — the
 
 | Seam                          | Where                                        | What's real                                                                                                                | What's stubbed                                                                                                                                                      |
 | ----------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Face embedding generation     | `face-recognition/faceEmbedding.provider.ts` | Registration flow, cosine-similarity matching, liveness gating, confidence thresholding                                    | The photo→vector step itself (needs a real FaceNet/MobileFaceNet model — no GPU/model runtime here); deterministically hashes image bytes instead                   |
+| Face embedding generation     | `face-recognition/faceEmbedding.provider.ts` | Registration flow (`POST /face/register`), cosine-similarity matching, liveness gating, confidence thresholding            | The photo→vector step itself (needs a real FaceNet/MobileFaceNet model — no GPU/model runtime here); deterministically hashes image bytes instead                   |
 | Push notification delivery    | `notifications/push.service.ts`              | Notification persistence, read state, triggers wired into leave/payroll/shift/attendance events, device-token registration | The actual Firebase Cloud Messaging network call (no Firebase project/credentials here); logs what would be sent                                                    |
 | Payroll batch job queue       | `payroll/payrollRun.service.ts`              | The payroll computation itself, run status tallying, per-employee failure isolation                                        | Job durability across a process restart — an in-memory map stands in for BullMQ/Redis, which is provisioned in `docker-compose.yml` but not wired into any code yet |
 | Password-reset email delivery | `notifications/email.service.ts`             | Token generation, hashing, expiry                                                                                          | The actual SMTP send — logs the reset link when no `SMTP_HOST` is configured                                                                                        |
+
+**`POST /face/register-embeddings` exists to close a real mismatch, not to duplicate `/register`.** The mobile app's face check-in ([`mobile-app/README.md`](../mobile-app/README.md#face-check-in)) computes its own embeddings on-device from ML Kit face-landmark geometry — a 67-number vector, structurally unrelated to `faceEmbedding.provider.ts`'s image-byte hash. An employee registered via the original `/register` (photo upload → server-side hash) can never cosine-match a check-in embedding computed by the phone, no matter how genuine the liveness check is. `/face/register-embeddings` accepts the phone's own embeddings directly at registration time so both ends of a given employee's face data are generated the same way. This closes the mismatch **only where both sides are actually used**: the mobile app has no registration screen calling this endpoint yet (still on the roadmap — see the mobile-app README's Known Limitations), so today it's reachable but only exercised by tests and any other API client.
 
 **"AI-Assisted Analytics" (Phase 15) is real math, honestly named — not a stub, but also not a trained model.** `/analytics/ai/late-risk`, `/analytics/ai/absenteeism-trend`, and `/analytics/ai/anomalies` are transparent, reconstructible statistics: late-risk is a rate plus a first-half-vs-second-half trend nudge; the absenteeism forecast is a stated least-squares line (`method: "linear-regression"` is in the response itself, not marketing copy); anomaly detection is three independent rule-based checks (haversine-distance implied travel speed, leave-one-out z-scores on overtime totals, pairwise cosine similarity on face embeddings). No neural network, no training data, and the response never claims otherwise. The one caveat worth repeating: `duplicate_face` inherits Phase 8's documented placeholder — the embeddings it compares are hashed image bytes, not real facial features, so a flagged pair means "similar-looking source photos," not confirmed shared identity; every `duplicate_face` anomaly says so in its own `detail` field.
 

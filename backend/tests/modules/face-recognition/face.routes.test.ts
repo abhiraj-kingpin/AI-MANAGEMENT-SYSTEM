@@ -19,6 +19,28 @@ describe('face routes — validation and access control wiring', () => {
     expect(res.body.error.code).toBe('MISSING_TOKEN');
   });
 
+  it('POST /face/register-embeddings rejects an unauthenticated caller', async () => {
+    const res = await request(app).post('/api/v1/face/register-embeddings');
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /face/register-embeddings rejects fewer than 3 embeddings (422, not 500)', async () => {
+    const res = await request(app)
+      .post('/api/v1/face/register-embeddings')
+      .set('Authorization', `Bearer ${tokenFor('employee')}`)
+      .send({ embeddings: [Array(67).fill(0.1), Array(67).fill(0.2)] });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('POST /face/register-embeddings rejects an embedding that is too short', async () => {
+    const res = await request(app)
+      .post('/api/v1/face/register-embeddings')
+      .set('Authorization', `Bearer ${tokenFor('employee')}`)
+      .send({ embeddings: [[1, 2, 3], Array(67).fill(0.2), Array(67).fill(0.3)] });
+    expect(res.status).toBe(422);
+  });
+
   it('POST /face/verify rejects an unauthenticated caller', async () => {
     const res = await request(app).post('/api/v1/face/verify').send({ embedding: [] });
     expect(res.status).toBe(401);

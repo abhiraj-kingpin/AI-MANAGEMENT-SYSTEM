@@ -37,6 +37,17 @@ function resolveTargetEmployeeId(requested: string | undefined, actor: ActorCont
   return target;
 }
 
+/** Deactivates embeddings from a previous registration — re-registering replaces the reference set rather than accumulating it unboundedly. Excludes by id (not a time cutoff) so a slow request processing several images/embeddings can never deactivate one of its own just-created rows before it finishes the batch. Shared by both registration paths (image-based and client-computed-embedding-based) — the exact same rule either way. */
+async function deactivatePreviousEmbeddings(
+  employeeId: string,
+  keepIds: Types.ObjectId[],
+): Promise<void> {
+  await FaceEmbedding.updateMany(
+    { employeeId, isActive: true, _id: { $nin: keepIds } },
+    { $set: { isActive: false } },
+  );
+}
+
 export const faceService = {
   async register(
     images: Buffer[],
@@ -90,15 +101,7 @@ export const faceService = {
       );
     }
 
-    // Deactivate embeddings from a previous registration — re-registering
-    // replaces the reference set rather than accumulating it unboundedly.
-    // Excludes by id (not a time cutoff) so a slow request processing
-    // several images can never deactivate one of its own just-created
-    // embeddings before it finishes the batch.
-    await FaceEmbedding.updateMany(
-      { employeeId, isActive: true, _id: { $nin: newEmbeddingIds } },
-      { $set: { isActive: false } },
-    );
+    await deactivatePreviousEmbeddings(employeeId, newEmbeddingIds);
 
     // TODO(Phase 12): push via FCM once notifications are wired in.
     logger.info(`Face registration complete for employee ${employeeId}`, {
@@ -110,6 +113,49 @@ export const faceService = {
       status: 'registered',
       embeddingCount: newEmbeddingIds.length,
       discardedCount: discarded,
+    };
+  },
+
+  /**
+   * Registers using embeddings the client already computed on-device,
+   * rather than uploaded photos — see `faceEmbedding.model.ts`'s doc
+   * comment on `sourceImageUrl` for why no image is stored for these rows.
+   * No quality-score filtering here: unlike `generateFaceEmbedding`'s
+   * placeholder heuristic (a crude proxy for photo file size),
+   * a client that ran real on-device face detection to produce these
+   * vectors has already made its own quality decision before submitting.
+   */
+  async registerWithEmbeddings(
+    embeddings: number[][],
+    requestedEmployeeId: string | undefined,
+    actor: ActorContext,
+  ): Promise<FaceRegisterResultDTO> {
+    const employeeId = resolveTargetEmployeeId(requestedEmployeeId, actor);
+
+    const newEmbeddingIds: Types.ObjectId[] = [];
+    for (const vector of embeddings) {
+      const doc = await FaceEmbedding.create({
+        employeeId,
+        vector,
+        qualityScore: null,
+        isActive: true,
+      });
+      newEmbeddingIds.push(doc._id);
+    }
+
+    await deactivatePreviousEmbeddings(employeeId, newEmbeddingIds);
+
+    logger.info(
+      `Face registration (client-computed embeddings) complete for employee ${employeeId}`,
+      {
+        kept: newEmbeddingIds.length,
+      },
+    );
+
+    return {
+      status: 'registered',
+      embeddingCount: newEmbeddingIds.length,
+      discardedCount: 0,
     };
   },
 

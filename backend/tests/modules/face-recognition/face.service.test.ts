@@ -127,6 +127,60 @@ describe('faceService.register', () => {
   });
 });
 
+describe('faceService.registerWithEmbeddings', () => {
+  const threeEmbeddings = [Array(67).fill(0.1), Array(67).fill(0.2), Array(67).fill(0.3)];
+
+  it('stores one row per submitted embedding with no image reference', async () => {
+    mockedCreate.mockImplementation((data: Record<string, unknown>) =>
+      Promise.resolve({ _id: `id-${Math.random()}`, ...data }),
+    );
+
+    const result = await faceService.registerWithEmbeddings(threeEmbeddings, undefined, self);
+
+    expect(result).toEqual({ status: 'registered', embeddingCount: 3, discardedCount: 0 });
+    expect(mockedCreate).toHaveBeenCalledTimes(3);
+    for (const call of mockedCreate.mock.calls) {
+      expect(call[0]).not.toHaveProperty('sourceImageUrl');
+      expect(call[0]).toMatchObject({ employeeId: 'emp-1', qualityScore: null, isActive: true });
+    }
+  });
+
+  it('deactivates the previous reference set, same as image-based registration', async () => {
+    mockedCreate.mockImplementation((data: Record<string, unknown>) =>
+      Promise.resolve({ _id: 'new-id', ...data }),
+    );
+
+    await faceService.registerWithEmbeddings(threeEmbeddings, undefined, self);
+
+    expect(mockedUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        employeeId: 'emp-1',
+        isActive: true,
+        _id: { $nin: expect.arrayContaining(['new-id']) },
+      }),
+      { $set: { isActive: false } },
+    );
+  });
+
+  it('lets HR register on behalf of another employee', async () => {
+    mockedCreate.mockImplementation((data: Record<string, unknown>) =>
+      Promise.resolve({ _id: 'id', ...data }),
+    );
+
+    await expect(
+      faceService.registerWithEmbeddings(threeEmbeddings, 'emp-2', hr),
+    ).resolves.toMatchObject({ status: 'registered' });
+    expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'emp-2' }));
+  });
+
+  it('blocks a plain employee from registering face data for someone else', async () => {
+    await expect(
+      faceService.registerWithEmbeddings(threeEmbeddings, 'emp-2', self),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockedCreate).not.toHaveBeenCalled();
+  });
+});
+
 describe('faceService.getRegistrationStatus', () => {
   it('reports not_registered when there are no active embeddings', async () => {
     mockedFind.mockReturnValue(mockQuery([]));

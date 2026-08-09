@@ -5,6 +5,7 @@ import { uploadImage } from '../../middlewares/upload.middleware';
 import { validate } from '../../middlewares/validate.middleware';
 import * as faceController from './face.controller';
 import {
+  registerFaceEmbeddingsSchema,
   registerFaceSchema,
   registrationStatusQuerySchema,
   verifyFaceSchema,
@@ -22,6 +23,14 @@ router.post(
   uploadImage.array('images', 5),
   validate(registerFaceSchema),
   faceController.registerFace,
+);
+// Mobile's on-device-computed-embedding path — a plain JSON body, no
+// multipart/image upload at all (see faceEmbedding.model.ts's
+// sourceImageUrl doc comment for why that's by design here).
+router.post(
+  '/register-embeddings',
+  validate(registerFaceEmbeddingsSchema),
+  faceController.registerFaceEmbeddings,
 );
 router.get(
   '/registration-status',

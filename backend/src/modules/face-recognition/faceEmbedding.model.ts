@@ -3,7 +3,14 @@ import { type Document, Schema, type Types, model } from 'mongoose';
 export interface IFaceEmbedding extends Document {
   employeeId: Types.ObjectId;
   vector: number[]; // 128-d (ML Kit) or 512-d (TFLite FaceNet-style model)
-  sourceImageUrl: string;
+  // Undefined for an embedding computed entirely on-device and submitted
+  // via POST /face/register-embeddings — by design, per
+  // docs/architecture/06-tech-stack-justification.md's "on-device keeps
+  // biometric processing off the wire entirely except the final embedding
+  // vector": requiring an uploaded image alongside a client-computed
+  // embedding would defeat that privacy rationale. Only ever set for the
+  // image-upload registration path (POST /face/register).
+  sourceImageUrl?: string;
   qualityScore: number | null;
   isActive: boolean;
   registeredAt: Date;
@@ -20,8 +27,9 @@ const faceEmbeddingSchema = new Schema<IFaceEmbedding>({
     },
   },
   // Private/signed Cloudinary reference, HR/Admin access only — excluded
-  // from default query projections.
-  sourceImageUrl: { type: String, required: true, select: false },
+  // from default query projections. Not required: see the interface's doc
+  // comment above.
+  sourceImageUrl: { type: String, select: false },
   qualityScore: { type: Number, default: null },
   isActive: { type: Boolean, default: true },
   registeredAt: { type: Date, default: Date.now },
