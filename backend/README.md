@@ -215,13 +215,13 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Face Recognition (`/face`)
 
-| Method | Path                         | Access                                  | Notes                                                        |
-| ------ | ---------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| POST   | `/face/register`             | Self, or HR/Admin for another employee   | 3–5 photos (multipart upload)                                |
-| POST   | `/face/register-embeddings`  | Self, or HR/Admin for another employee   | 3–5 client-computed embeddings (JSON body, no image upload) |
-| GET    | `/face/registration-status`  | Self, or HR/Admin via `?employeeId=`     |                                                               |
-| POST   | `/face/verify`               | Self                                     | Standalone test endpoint                                     |
-| DELETE | `/face/:employeeId`          | Super Admin/HR                           | Hard delete (right-to-erasure)                               |
+| Method | Path                        | Access                                 | Notes                                                       |
+| ------ | --------------------------- | -------------------------------------- | ----------------------------------------------------------- |
+| POST   | `/face/register`            | Self, or HR/Admin for another employee | 3–5 photos (multipart upload)                               |
+| POST   | `/face/register-embeddings` | Self, or HR/Admin for another employee | 3–5 client-computed embeddings (JSON body, no image upload) |
+| GET    | `/face/registration-status` | Self, or HR/Admin via `?employeeId=`   |                                                             |
+| POST   | `/face/verify`              | Self                                   | Standalone test endpoint                                    |
+| DELETE | `/face/:employeeId`         | Super Admin/HR                         | Hard delete (right-to-erasure)                              |
 
 ### Leave (`/leaves`, `/leave-types`, `/holidays`)
 
