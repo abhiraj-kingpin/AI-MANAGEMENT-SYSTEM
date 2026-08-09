@@ -7,12 +7,18 @@ class AttendanceState {
   final List<AttendanceEntity> history;
   final String? errorMessage;
 
+  /// Set instead of [errorMessage] when a check-in/check-out couldn't reach
+  /// the server and was queued locally (see `OfflineQueuedFailure`) — shown
+  /// as neutral "queued" messaging rather than a red error banner.
+  final String? infoMessage;
+
   const AttendanceState({
     this.isLoading = true,
     this.isActionInProgress = false,
     this.today,
     this.history = const [],
     this.errorMessage,
+    this.infoMessage,
   });
 
   AttendanceState copyWith({
@@ -21,6 +27,7 @@ class AttendanceState {
     AttendanceEntity? today,
     List<AttendanceEntity>? history,
     String? errorMessage,
+    String? infoMessage,
   }) {
     return AttendanceState(
       isLoading: isLoading ?? this.isLoading,
@@ -28,6 +35,7 @@ class AttendanceState {
       today: today ?? this.today,
       history: history ?? this.history,
       errorMessage: errorMessage,
+      infoMessage: infoMessage,
     );
   }
 }

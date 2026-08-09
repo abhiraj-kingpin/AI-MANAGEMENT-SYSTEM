@@ -35,11 +35,12 @@ lib/
 │   ├── constants/    # api_endpoints.dart
 │   ├── network/       # DioClient (auth header + refresh-on-401), dio_exception_mapper (shared DioException → domain Exception translation)
 │   ├── services/       # LocationService — thin geolocator wrapper (permission + GPS read)
-│   ├── storage/        # SecureStorageService (JWT), HiveBoxes (offline queue, Phase 13)
-│   ├── error/           # Failure / Exception types
-│   ├── router/           # GoRouter + auth-aware redirect guard
-│   ├── providers/         # Riverpod DI roots (secureStorageProvider, dioClientProvider, locationServiceProvider)
-│   └── utils/              # Result<T> functional-result type
+│   ├── storage/        # SecureStorageService (JWT), HiveBoxes (offline queue box name)
+│   ├── offline/          # PendingPunch, OfflineQueueService (Hive), ConnectivityService, SyncService
+│   ├── error/             # Failure / Exception types (incl. OfflineQueuedFailure)
+│   ├── router/             # GoRouter + auth-aware redirect guard
+│   ├── providers/           # Riverpod DI roots (secureStorageProvider, dioClientProvider, locationServiceProvider, syncServiceProvider, ...)
+│   └── utils/                # Result<T> functional-result type
 ├── features/
 │   ├── auth/          # data/domain/presentation — login, session bootstrap, logout
 │   ├── attendance/    # data/domain/presentation — GPS check-in/check-out, history
@@ -83,8 +84,15 @@ lib/
 - No broadcast composer here — sending one (`POST /notifications/broadcast`) is Super Admin/HR only and already built on the admin dashboard; this app is the self-service inbox side only.
 - `NotificationState.unreadCount` derives from the currently-loaded list rather than a separate counter endpoint (the backend doesn't have one), same reasoning as the admin dashboard's Topbar badge.
 
+### Offline Sync (attendance queue)
+- `AttendanceRepositoryImpl.checkInWithGps()`/`checkOut()` catch a `NetworkException` specifically (as opposed to every other failure type) and enqueue the punch into `OfflineQueueService` — a Hive `Box<Map>` keyed by a client-generated id, no generated `TypeAdapter` (this project has no `build_runner` step; Hive natively stores plain Maps of primitives).
+- Returns `OfflineQueuedFailure` in that case — a real `Failure` subtype, deliberately, so it fits `Result`'s two-branch shape without inventing a third `Result` case, but one `AttendanceController` pattern-matches on to show neutral "queued, will sync automatically" text instead of a red error banner.
+- `ConnectivityService.onConnected` (wrapping `connectivity_plus`) emits only on actual offline→online transitions, not every connectivity change, so `SyncService` doesn't fire a sync attempt on every wifi/cellular handoff while already online.
+- `SyncService.syncPending()` posts the whole queue to `POST /attendance/sync` in one batch and removes every result — `applied`, `duplicate`, or a definitive `conflict` — since retrying a business-rule conflict with the same stale data would just fail identically again (matches the backend's own `applySyncPunch` semantics, see attendance.service.ts). Starts once, from `syncServiceProvider`'s body, the first time `HomeScreen` reads it — a `Provider` body only runs once per app lifetime, so this is a clean way to guarantee "start exactly once, right after the user is authenticated" without a dedicated app-shell widget.
+- Check-in only (not check-out) actually queues on failure right now — check-out is best-effort about location but not about the request itself in this pass; a fully symmetric queue is a natural follow-up, not a fundamental limitation.
+
 ## Status
 
-Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), GPS check-in/check-out with attendance history, self-service Leave (apply/cancel/balance/history), Payslips (list + PDF download), and a Notifications inbox — see Features above. Shifts, QR/Face check-in, and the offline sync half are added in their respective passes per the [project roadmap](../README.md).
+Phase 1 (project setup) scaffolding, a complete auth vertical slice (login/logout/session-restore), GPS check-in/check-out with attendance history and offline-queue fallback, self-service Leave (apply/cancel/balance/history), Payslips (list + PDF download), and a Notifications inbox — see Features above. Shifts and QR/Face check-in are added in their respective passes per the [project roadmap](../README.md).
 
-**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 16/16 passing. `android/`/`ios/` were generated in Phase 20; the Attendance pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions, an `NSLocationWhenInUseUsageDescription` iOS usage string, and two real Gradle compatibility fixes for `geolocator`. A local `flutter build apk --debug` got further than ever before that pass (past both Gradle issues, all the way into Java compilation) before hitting a Windows-only obstacle unrelated to any of this project's code: a `jlink`/Gradle transform failure tied to this machine's username containing a space, a well-documented Windows Gradle limitation with no code-level fix. [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Linux runners, which don't have that path at all, so that CI path is unaffected by this machine's local gap — it's the real verification for this step, same as it's been since Phase 20.
+**Machine-verified** (Phase 20, extended since) — this codebase's Dart was hand-written without a local Flutter SDK available, so it went untested against a real toolchain until Phase 20, when one was installed specifically to check it. Current state: `flutter analyze` → 0 issues, `flutter test` → 20/20 passing. `android/`/`ios/` were generated in Phase 20; the Attendance pass added the `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` Android permissions, an `NSLocationWhenInUseUsageDescription` iOS usage string, and two real Gradle compatibility fixes for `geolocator`. A local `flutter build apk --debug` got further than ever before that pass (past both Gradle issues, all the way into Java compilation) before hitting a Windows-only obstacle unrelated to any of this project's code: a `jlink`/Gradle transform failure tied to this machine's username containing a space, a well-documented Windows Gradle limitation with no code-level fix. [`ci-mobile.yml`](../.github/workflows/ci-mobile.yml) runs on GitHub's Linux runners, which don't have that path at all, so that CI path is unaffected by this machine's local gap — it's the real verification for this step, same as it's been since Phase 20.

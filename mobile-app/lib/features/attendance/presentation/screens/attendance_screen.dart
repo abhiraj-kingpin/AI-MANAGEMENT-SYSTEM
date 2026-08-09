@@ -50,6 +50,16 @@ class AttendanceScreen extends ConsumerWidget {
                         style: TextStyle(color: Theme.of(context).colorScheme.error),
                       ),
                     ],
+                    if (state.infoMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Icon(Icons.cloud_off, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(state.infoMessage!)),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     if (!hasCheckedInToday || today.checkInAt == null)
                       PrimaryButton(

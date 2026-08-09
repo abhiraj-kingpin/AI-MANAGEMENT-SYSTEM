@@ -2,6 +2,10 @@
 
 Repository-wide build history, in order. Backend module-level detail (what was added, what bugs were caught, what was deliberately simplified and why) lives in [backend/CHANGELOG.md](backend/CHANGELOG.md) — this file covers cross-project milestones and links to that detail rather than duplicating it.
 
+## Mobile App — Offline Sync (Attendance Queue)
+
+Fifth feature beyond auth, completing Phase 13's mobile half (the backend side, `POST /attendance/sync`, has existed since the backend's own Phase 13). `AttendanceRepositoryImpl` catches a `NetworkException` specifically on check-in and enqueues the punch into a Hive-backed `OfflineQueueService` (plain `Map` storage, no generated `TypeAdapter` — this project has no `build_runner` step) rather than failing outright, returning a new `OfflineQueuedFailure` type the UI shows as neutral "queued" text instead of a red error. `ConnectivityService` (wrapping `connectivity_plus`) emits only on real offline→online transitions; `SyncService` drains the whole queue against `POST /attendance/sync` in one batch on each transition, removing every terminal result (applied, duplicate, or a definitive conflict) the same way the backend's own sync endpoint treats them. Check-in only for now, not check-out — a natural, documented follow-up rather than a fundamental limit. `flutter test`: 20/20 passing (up from 16). With this, the mobile app is feature-complete against its scope of the original 20-phase roadmap; only QR/Face check-in and Shifts (a screen, not a roadmap phase gap) remain.
+
 ## Mobile App — Notifications (Inbox)
 
 Fourth feature beyond auth: an inbox (`GET /notifications/me`, unread filter, mark-read/mark-all-read). Self-service only — sending a broadcast is Super Admin/HR only and already built on the admin dashboard, so this app doesn't duplicate that composer. Fetches a single generous page (`limit: 50`) rather than building full pagination UI, a documented scope cut. `flutter test`: 16/16 passing (up from 14).

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ai_management_system/core/providers/core_providers.dart';
 import 'package:ai_management_system/core/router/app_router.dart';
 import 'package:ai_management_system/features/auth/presentation/providers/auth_providers.dart';
 
@@ -9,6 +10,14 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Reading this once here (return value unused) is what starts the
+    // offline-sync connectivity listener — `syncServiceProvider`'s body
+    // runs only on this first read and is cached for the app's lifetime,
+    // and this screen is the first one reached once actually
+    // authenticated (unlike Splash/Login, where syncing has nothing to do
+    // yet — /attendance/sync is itself behind auth).
+    ref.watch(syncServiceProvider);
+
     final authState = ref.watch(authControllerProvider);
     final user = authState.user;
 

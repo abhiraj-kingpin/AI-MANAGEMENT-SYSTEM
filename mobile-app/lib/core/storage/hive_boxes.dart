@@ -1,9 +1,9 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
-/// Local box registry for offline-first data. Only initialization lives here
-/// in Phase 1 — typed adapters (e.g. `PendingPunchAdapter`) and the boxes
-/// that use them are registered from Phase 13 (Offline Mode) onward, once
-/// the offline attendance queue model exists.
+/// Local box registry for offline-first data. `pendingAttendance` is opened
+/// by `core/offline/offline_queue_service.dart` as a plain `Box<Map>` — no
+/// generated `TypeAdapter` (this project has no `build_runner` step), each
+/// entry is just a `PendingPunch.toJson()` map keyed by `clientGeneratedId`.
 class HiveBoxes {
   HiveBoxes._();
 

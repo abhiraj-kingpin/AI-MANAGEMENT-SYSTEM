@@ -17,6 +17,7 @@ final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
   return AttendanceRepositoryImpl(
     remoteDataSource: ref.watch(_attendanceRemoteDataSourceProvider),
     locationService: ref.watch(locationServiceProvider),
+    offlineQueue: ref.watch(offlineQueueServiceProvider),
   );
 });
 

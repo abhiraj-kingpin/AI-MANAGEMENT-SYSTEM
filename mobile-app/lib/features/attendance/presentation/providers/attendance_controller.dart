@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ai_management_system/core/error/failures.dart';
 import 'package:ai_management_system/features/attendance/domain/entities/attendance_entity.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_out_usecase.dart';
@@ -39,7 +40,7 @@ class AttendanceController extends StateNotifier<AttendanceState> {
   }
 
   Future<void> checkIn() async {
-    state = state.copyWith(isActionInProgress: true, errorMessage: null);
+    state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
     final result = await _checkInUseCase();
     await result.when(
       success: (attendance) async {
@@ -47,13 +48,13 @@ class AttendanceController extends StateNotifier<AttendanceState> {
         await loadHistory();
       },
       failure: (failure) async {
-        state = state.copyWith(isActionInProgress: false, errorMessage: failure.message);
+        state = _applyActionFailure(failure);
       },
     );
   }
 
   Future<void> checkOut() async {
-    state = state.copyWith(isActionInProgress: true, errorMessage: null);
+    state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
     final result = await _checkOutUseCase();
     await result.when(
       success: (attendance) async {
@@ -61,9 +62,19 @@ class AttendanceController extends StateNotifier<AttendanceState> {
         await loadHistory();
       },
       failure: (failure) async {
-        state = state.copyWith(isActionInProgress: false, errorMessage: failure.message);
+        state = _applyActionFailure(failure);
       },
     );
+  }
+
+  /// `OfflineQueuedFailure` isn't really an error (see its own doc comment)
+  /// — routed to `infoMessage` so the screen shows it as neutral "queued"
+  /// text instead of a red error banner.
+  AttendanceState _applyActionFailure(Failure failure) {
+    if (failure is OfflineQueuedFailure) {
+      return state.copyWith(isActionInProgress: false, infoMessage: failure.message);
+    }
+    return state.copyWith(isActionInProgress: false, errorMessage: failure.message);
   }
 
   AttendanceEntity? _findToday(List<AttendanceEntity> history) {

@@ -16,6 +16,7 @@ class ApiEndpoints {
   static const String checkIn = '/attendance/check-in';
   static const String checkOut = '/attendance/check-out';
   static const String myAttendance = '/attendance/me';
+  static const String attendanceSync = '/attendance/sync';
 
   static const String leaveTypes = '/leave-types';
   static const String leaves = '/leaves';
