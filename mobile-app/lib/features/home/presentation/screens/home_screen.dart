@@ -68,6 +68,13 @@ class HomeScreen extends ConsumerWidget {
               subtitle: 'Your inbox',
               onTap: () => context.push(notificationsPath),
             ),
+            const SizedBox(height: 12),
+            _HomeCard(
+              icon: Icons.face_retouching_natural_outlined,
+              title: 'Face Registration',
+              subtitle: 'Set up or update your face for check-in',
+              onTap: () => context.push(faceRegistrationPath),
+            ),
           ],
         ),
       ),

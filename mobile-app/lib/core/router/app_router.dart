@@ -5,6 +5,7 @@ import 'package:ai_management_system/features/auth/presentation/providers/auth_p
 import 'package:ai_management_system/features/auth/presentation/screens/login_screen.dart';
 import 'package:ai_management_system/features/auth/presentation/screens/splash_screen.dart';
 import 'package:ai_management_system/features/face/presentation/screens/face_checkin_screen.dart';
+import 'package:ai_management_system/features/face/presentation/screens/face_registration_screen.dart';
 import 'package:ai_management_system/features/home/presentation/screens/home_screen.dart';
 import 'package:ai_management_system/features/leave/presentation/screens/leave_screen.dart';
 import 'package:ai_management_system/features/notifications/presentation/screens/notifications_screen.dart';
@@ -15,6 +16,7 @@ const loginPath = '/login';
 const homePath = '/';
 const attendancePath = '/attendance';
 const faceCheckInPath = '/attendance/face';
+const faceRegistrationPath = '/face/register';
 const leavePath = '/leave';
 const payslipsPath = '/payslips';
 const notificationsPath = '/notifications';
@@ -49,6 +51,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: homePath, builder: (context, state) => const HomeScreen()),
       GoRoute(path: attendancePath, builder: (context, state) => const AttendanceScreen()),
       GoRoute(path: faceCheckInPath, builder: (context, state) => const FaceCheckInScreen()),
+      GoRoute(
+        path: faceRegistrationPath,
+        builder: (context, state) => const FaceRegistrationScreen(),
+      ),
       GoRoute(path: leavePath, builder: (context, state) => const LeaveScreen()),
       GoRoute(path: payslipsPath, builder: (context, state) => const PayslipsScreen()),
       GoRoute(path: notificationsPath, builder: (context, state) => const NotificationsScreen()),

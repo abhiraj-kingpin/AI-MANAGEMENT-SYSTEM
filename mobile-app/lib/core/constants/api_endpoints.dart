@@ -18,6 +18,9 @@ class ApiEndpoints {
   static const String myAttendance = '/attendance/me';
   static const String attendanceSync = '/attendance/sync';
 
+  static const String faceRegisterEmbeddings = '/face/register-embeddings';
+  static const String faceRegistrationStatus = '/face/registration-status';
+
   static const String leaveTypes = '/leave-types';
   static const String leaves = '/leaves';
   static const String myLeaves = '/leaves/me';
