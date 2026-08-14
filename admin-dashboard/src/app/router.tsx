@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@/app/layout/AppShell';
 import { ProtectedRoute } from '@/app/ProtectedRoute';
+import { AiInsightsPage } from '@/features/analytics/pages/AiInsightsPage';
 import { AttendancePage } from '@/features/attendance/pages/AttendancePage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <DashboardPage /> },
+          { path: 'ai-insights', element: <AiInsightsPage /> },
           { path: 'employees', element: <EmployeesListPage /> },
           { path: 'employees/new', element: <EmployeeFormPage /> },
           { path: 'employees/:id', element: <EmployeeDetailPage /> },

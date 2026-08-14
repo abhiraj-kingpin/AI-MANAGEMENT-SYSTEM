@@ -462,6 +462,53 @@ export interface DepartmentComparison {
   lateRate: number;
 }
 
+// Phase 15 — AI-assisted analytics. Real statistical/rule-based scoring,
+// explicitly labeled as such by the backend (see
+// backend/README.md#known-simplifications--future-work's "AI-Assisted
+// Analytics" note) — transparent math, not a trained model.
+
+export type RiskTrend = 'increasing' | 'decreasing' | 'stable';
+
+/** `GET /analytics/ai/late-risk` — team-scoped like `AttendanceTrendPoint`. */
+export interface LateRiskEmployee {
+  employeeId: string;
+  employeeCode: string;
+  employeeName: string;
+  riskScore: number; // 0-100, higher = more likely to be late again soon
+  lateDays: number;
+  workingDays: number;
+  lateRate: number;
+  trend: RiskTrend; // second half of the query window vs. the first half
+}
+
+export interface AbsenteeismTrendPoint {
+  month: string; // "YYYY-MM"
+  absenteeismRate: number;
+}
+
+/** `GET /analytics/ai/absenteeism-trend` — team-scoped like `AttendanceTrendPoint`. `method` is in the response itself, not marketing copy — a stated least-squares line over `history`, nothing more. */
+export interface AbsenteeismForecast {
+  history: AbsenteeismTrendPoint[];
+  forecastMonth: string;
+  forecastRate: number;
+  method: 'linear-regression';
+}
+
+export type AnomalyType = 'location_anomaly' | 'duplicate_face' | 'overtime_outlier';
+export type AnomalySeverity = 'low' | 'medium' | 'high';
+
+/** `GET /analytics/ai/anomalies` — Super Admin/HR only, same gating as `DepartmentComparison` (no "my team" reading of an org-wide investigative sweep). */
+export interface Anomaly {
+  type: AnomalyType;
+  severity: AnomalySeverity;
+  employeeId: string;
+  employeeName: string;
+  relatedEmployeeId?: string;
+  relatedEmployeeName?: string;
+  detail: string; // human-readable explanation carrying the real numbers behind the flag
+  detectedAt: string; // ISO string over JSON, not a Date
+}
+
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;

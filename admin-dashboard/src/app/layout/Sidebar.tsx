@@ -12,6 +12,17 @@ interface NavItem {
 
 const liveItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: '◆', end: true },
+  // GET /analytics/ai/late-risk and /ai/absenteeism-trend are Super
+  // Admin/HR/Manager-only server-side (same scoping as Attendance below);
+  // the anomalies section inside the page is gated further, to Super
+  // Admin/HR only (see AiInsightsPage's `canViewAnomalies`).
+  {
+    to: '/ai-insights',
+    label: 'AI Insights',
+    icon: '✦',
+    end: false,
+    roles: ['super_admin', 'hr', 'manager'],
+  },
   // GET /employees is Super Admin/HR/Manager-only server-side — hidden for a
   // plain employee rather than shown and then 403ing (see EmployeesListPage's
   // error state for what happens if the backend ever disagrees with this).
