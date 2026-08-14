@@ -71,6 +71,13 @@ class AttendanceScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
+                        icon: const Icon(Icons.qr_code_scanner_outlined),
+                        label: const Text('Check In with QR'),
+                        onPressed:
+                            state.isActionInProgress ? null : () => context.push(qrCheckInPath),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
                         icon: const Icon(Icons.face_outlined),
                         label: const Text('Check In with Face'),
                         onPressed: state.isActionInProgress

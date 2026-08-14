@@ -7,6 +7,12 @@ abstract class AttendanceRepository {
   /// domain layer never touches `geolocator` directly.
   Future<Result<AttendanceEntity>> checkInWithGps();
 
+  /// Submits a `method: 'qr'` check-in with the token scanned from a
+  /// physical/displayed QR code — the same raw string the backend encoded
+  /// into the QR image (`qrService.generate`), just read back off camera
+  /// instead of typed in.
+  Future<Result<AttendanceEntity>> checkInWithQr(String qrToken);
+
   /// Submits a `method: 'face'` check-in. The embedding and liveness
   /// verdict are computed entirely by `features/face/` before this is
   /// called — this repository only forwards them, the same separation

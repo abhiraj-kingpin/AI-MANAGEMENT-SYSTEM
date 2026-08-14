@@ -3,22 +3,26 @@ import 'package:ai_management_system/core/error/failures.dart';
 import 'package:ai_management_system/features/attendance/domain/entities/attendance_entity.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_face_usecase.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_qr_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_out_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/get_my_attendance_usecase.dart';
 import 'package:ai_management_system/features/attendance/presentation/providers/attendance_state.dart';
 
 class AttendanceController extends StateNotifier<AttendanceState> {
   final CheckInUseCase _checkInUseCase;
+  final CheckInWithQrUseCase _checkInWithQrUseCase;
   final CheckInWithFaceUseCase _checkInWithFaceUseCase;
   final CheckOutUseCase _checkOutUseCase;
   final GetMyAttendanceUseCase _getMyAttendanceUseCase;
 
   AttendanceController({
     required CheckInUseCase checkInUseCase,
+    required CheckInWithQrUseCase checkInWithQrUseCase,
     required CheckInWithFaceUseCase checkInWithFaceUseCase,
     required CheckOutUseCase checkOutUseCase,
     required GetMyAttendanceUseCase getMyAttendanceUseCase,
   })  : _checkInUseCase = checkInUseCase,
+        _checkInWithQrUseCase = checkInWithQrUseCase,
         _checkInWithFaceUseCase = checkInWithFaceUseCase,
         _checkOutUseCase = checkOutUseCase,
         _getMyAttendanceUseCase = getMyAttendanceUseCase,
@@ -46,6 +50,23 @@ class AttendanceController extends StateNotifier<AttendanceState> {
   Future<void> checkIn() async {
     state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
     final result = await _checkInUseCase();
+    await result.when(
+      success: (attendance) async {
+        state = state.copyWith(isActionInProgress: false, today: attendance);
+        await loadHistory();
+      },
+      failure: (failure) async {
+        state = _applyActionFailure(failure);
+      },
+    );
+  }
+
+  /// Called once a QR code has already been scanned — this controller
+  /// doesn't touch the scanner plugin itself, same separation `checkIn()`
+  /// keeps from `geolocator`.
+  Future<void> checkInWithQr(String qrToken) async {
+    state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
+    final result = await _checkInWithQrUseCase(qrToken);
     await result.when(
       success: (attendance) async {
         state = state.copyWith(isActionInProgress: false, today: attendance);

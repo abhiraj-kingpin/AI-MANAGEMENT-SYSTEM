@@ -5,6 +5,7 @@ import 'package:ai_management_system/features/attendance/data/repositories_impl/
 import 'package:ai_management_system/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_face_usecase.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_qr_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_out_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/get_my_attendance_usecase.dart';
 import 'package:ai_management_system/features/attendance/presentation/providers/attendance_controller.dart';
@@ -27,6 +28,7 @@ final attendanceControllerProvider =
   final repository = ref.watch(attendanceRepositoryProvider);
   return AttendanceController(
     checkInUseCase: CheckInUseCase(repository),
+    checkInWithQrUseCase: CheckInWithQrUseCase(repository),
     checkInWithFaceUseCase: CheckInWithFaceUseCase(repository),
     checkOutUseCase: CheckOutUseCase(repository),
     getMyAttendanceUseCase: GetMyAttendanceUseCase(repository),

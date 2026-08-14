@@ -11,6 +11,8 @@ abstract class AttendanceRemoteDataSource {
     double? accuracyMeters,
   });
 
+  Future<AttendanceModel> checkInWithQr({required String qrToken});
+
   Future<AttendanceModel> checkInWithFace({
     required List<double> embedding,
     required bool livenessPassed,
@@ -42,6 +44,19 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             if (accuracyMeters != null) 'accuracyMeters': accuracyMeters,
           },
         },
+      );
+      return _parseAttendance(response.data);
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  @override
+  Future<AttendanceModel> checkInWithQr({required String qrToken}) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiEndpoints.checkIn,
+        data: {'method': 'qr', 'qrToken': qrToken},
       );
       return _parseAttendance(response.data);
     } on DioException catch (e) {

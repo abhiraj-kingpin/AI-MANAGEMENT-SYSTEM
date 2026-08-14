@@ -8,10 +8,11 @@
 class PendingPunch {
   final String clientGeneratedId;
   final String type; // 'check_in' | 'check_out'
-  final String? method; // 'gps' | 'face'
+  final String? method; // 'gps' | 'qr' | 'face'
   final double? lat;
   final double? lng;
   final double? accuracyMeters;
+  final String? qrToken;
   final List<double>? faceEmbedding;
   final bool? livenessPassed;
   final DateTime occurredAt;
@@ -24,6 +25,7 @@ class PendingPunch {
     this.lat,
     this.lng,
     this.accuracyMeters,
+    this.qrToken,
     this.faceEmbedding,
     this.livenessPassed,
   });
@@ -39,6 +41,7 @@ class PendingPunch {
           'lng': lng,
           if (accuracyMeters != null) 'accuracyMeters': accuracyMeters,
         },
+      if (qrToken != null) 'qrToken': qrToken,
       if (faceEmbedding != null) 'faceEmbedding': faceEmbedding,
       if (livenessPassed != null) 'livenessPassed': livenessPassed,
       'occurredAt': occurredAt.toIso8601String(),
@@ -62,6 +65,7 @@ class PendingPunch {
       lat: (location?['lat'] as num?)?.toDouble(),
       lng: (location?['lng'] as num?)?.toDouble(),
       accuracyMeters: (location?['accuracyMeters'] as num?)?.toDouble(),
+      qrToken: json['qrToken'] as String?,
       faceEmbedding: embedding?.map((v) => (v as num).toDouble()).toList(),
       livenessPassed: json['livenessPassed'] as bool?,
       occurredAt: DateTime.parse(json['occurredAt'] as String),

@@ -53,8 +53,14 @@ dependencies:
   camera: ^0.11.0+2
   google_mlkit_face_detection: ^0.12.0
 
-  # Added in their respective phases (kept here as a reference, not yet used):
-  # mobile_scanner        — Phase 7, QR attendance
+  # Phase 7 — QR check-in: scans the same token the backend encodes into
+  # the QR image it generates (see core/services/... — QrCheckInScreen
+  # owns the plugin's MobileScannerController/MobileScanner widget
+  # directly, the same "presentation layer touches the plugin type"
+  # exception FaceCheckInScreen already has for CameraController/CameraPreview).
+  mobile_scanner: ^6.0.2
+
+  # Added in its respective phase (kept here as a reference, not yet used):
   # firebase_messaging, firebase_core — Phase 12, push notifications
 
 dev_dependencies:

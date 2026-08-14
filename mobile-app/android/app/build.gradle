@@ -7,15 +7,28 @@ plugins {
 
 android {
     namespace = "com.aimanagementsystem.ai_management_system"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Overridden above flutter.compileSdkVersion (34) — mobile_scanner
+    // itself (not just its androidx.camera transitives) requires compiling
+    // against API 36, the highest requirement among this project's plugins
+    // (they're backward-compatible, so the highest one wins). Found via
+    // two successive real local `flutter build apk --debug` failures, see
+    // settings.gradle's AGP-bump comment for the paired fix. Flutter's own
+    // docs document this exact override pattern for plugins that need a
+    // newer SDK than Flutter's bundled default.
+    compileSdk = 36
+    // Overridden above flutter.ndkVersion (23.1.7779620, Flutter's older
+    // bundled default) — camera/connectivity_plus/geolocator_android/
+    // google_mlkit_face_detection/mobile_scanner/etc. all declare a
+    // dependency on 26.1.10909125; NDK versions are backward-compatible,
+    // so taking the highest one satisfies all of them at once.
+    ndkVersion = "26.1.10909125"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
-        // Required by geolocator_android (minSdkVersion here is 21, below
-        // the 26 threshold where the JDK APIs it uses are natively
-        // available) — see https://pub.dev/packages/geolocator#android.
+        // Required by geolocator_android (minSdk here is 23, below the 26
+        // threshold where the JDK APIs it uses are natively available) —
+        // see https://pub.dev/packages/geolocator#android.
         coreLibraryDesugaringEnabled true
     }
 
@@ -28,14 +41,30 @@ android {
         applicationId = "com.aimanagementsystem.ai_management_system"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Overridden above flutter.minSdkVersion (21) — androidx.camera:
+        // camera-video:1.5.0 (a mobile_scanner/camera transitive) declares
+        // minSdkVersion 23 in its own manifest, and the manifest merger
+        // fails outright if the app declares anything lower (a real local
+        // build failure, not a guess — Gradle's own error names the exact
+        // library and version). Drops official support for Android 5.0/5.1
+        // (API 21-22) devices; every other plugin here is already fine at
+        // 23. Library subprojects reading `flutter.minSdkVersion` directly
+        // (geolocator_android, via the compatibility shim in the root
+        // android/build.gradle) can stay declared at 21 — the merger only
+        // requires the *app's* effective minSdk to be >= every library's,
+        // and 23 already is.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // camera + google_mlkit_face_detection push the app past the 64K
-        // method limit on minSdk 21 (multidex isn't automatic there the
-        // way it is below API 21) — added proactively alongside those two
-        // plugins rather than waiting to hit the dex-merge failure on CI.
+        // method limit. Native multidex via D8 is automatic at API 21+ (no
+        // extra library/Application-class change needed, unlike the
+        // legacy Dalvik-era multidex support library required below API
+        // 21) — this flag mainly documents the reason explicitly rather
+        // than changing runtime behavior, added proactively alongside
+        // those two plugins rather than waiting to hit a dex-merge failure
+        // on CI.
         multiDexEnabled true
     }
 

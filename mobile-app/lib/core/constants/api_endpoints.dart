@@ -21,6 +21,8 @@ class ApiEndpoints {
   static const String faceRegisterEmbeddings = '/face/register-embeddings';
   static const String faceRegistrationStatus = '/face/registration-status';
 
+  static const String myShift = '/shifts/me';
+
   static const String leaveTypes = '/leave-types';
   static const String leaves = '/leaves';
   static const String myLeaves = '/leaves/me';

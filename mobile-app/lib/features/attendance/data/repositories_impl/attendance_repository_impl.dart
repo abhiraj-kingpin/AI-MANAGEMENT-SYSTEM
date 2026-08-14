@@ -74,6 +74,40 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }
 
   @override
+  Future<Result<AttendanceEntity>> checkInWithQr(String qrToken) async {
+    try {
+      final attendance = await _remoteDataSource.checkInWithQr(qrToken: qrToken);
+      return Success(attendance);
+    } on NetworkException {
+      // Queued the same way GPS/Face are, for consistency — but honestly,
+      // less useful here: a QR token is time-boxed (`QR_DEFAULT_VALID_MINUTES`
+      // server-side) and `validateAndConsumeQrToken` checks it against
+      // "now" at sync time, not the punch's original `occurredAt`. If the
+      // outage outlasts the token's validity window (likely — outages
+      // rarely resolve in under a few minutes), the eventual sync attempt
+      // will come back `QR_EXPIRED`, which `SyncService` already treats as
+      // a terminal (non-retried) result, same as any other conflict. Queued
+      // anyway rather than special-cased out: it's still strictly better
+      // than silently discarding the attempt, and correct when the outage
+      // is short.
+      await _offlineQueue.enqueue(
+        PendingPunch(
+          clientGeneratedId: _generateClientId(),
+          type: 'check_in',
+          method: 'qr',
+          qrToken: qrToken,
+          occurredAt: DateTime.now(),
+        ),
+      );
+      return const ResultFailure(
+        OfflineQueuedFailure('No connection — check-in queued, will sync automatically.'),
+      );
+    } on ServerException catch (e) {
+      return ResultFailure(ServerFailure(e.message, code: e.code));
+    }
+  }
+
+  @override
   Future<Result<AttendanceEntity>> checkInWithFace({
     required List<double> embedding,
     required bool livenessPassed,

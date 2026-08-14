@@ -18,8 +18,25 @@ pluginManagement {
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "8.1.0" apply false
-    id "org.jetbrains.kotlin.android" version "1.8.22" apply false
+    // Bumped from 8.1.0 for mobile_scanner (Phase 7 QR check-in): its
+    // transitive androidx.camera:camera-camera2:1.5.0 dependency requires
+    // both AGP 8.6.0+ and compileSdk 35+ (see app/build.gradle's compileSdk
+    // override) — a real local `flutter build apk --debug` failure, not a
+    // guess; Gradle's own error names both exact minimums. Requires the
+    // Gradle wrapper bump alongside it (see gradle-wrapper.properties):
+    // AGP 8.6.0 needs Gradle 8.7+.
+    id "com.android.application" version "8.6.0" apply false
+    // Bumped from 1.8.22, also for mobile_scanner: its own build.gradle
+    // declares (and compiles its Kotlin sources against) kotlin-gradle-plugin
+    // 2.2.20 in its own buildscript block, but this project's central
+    // `org.jetbrains.kotlin.android` plugin-ID resolution wins over that
+    // per-module declaration — a real local build failure ("Class
+    // 'kotlin.Unit' was compiled with an incompatible version of Kotlin...
+    // metadata version is 2.1.0, but the compiler version 1.8.0 can read
+    // versions up to 1.9.0"), not a guess; Flutter's own error output named
+    // this exact file as the fix point. Matches mobile_scanner's own
+    // requested version exactly rather than picking an arbitrary newer one.
+    id "org.jetbrains.kotlin.android" version "2.2.20" apply false
 }
 
 include ":app"

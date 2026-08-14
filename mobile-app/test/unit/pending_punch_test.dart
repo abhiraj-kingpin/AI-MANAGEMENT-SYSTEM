@@ -60,6 +60,23 @@ void main() {
       expect(restored.lat, isNull);
     });
 
+    test('round-trips a QR check-in punch with a token', () {
+      final punch = PendingPunch(
+        clientGeneratedId: 'device-qr-1',
+        type: 'check_in',
+        method: 'qr',
+        qrToken: 'eyJhbGciOiJIUzI1NiJ9.scanned-token',
+        occurredAt: DateTime.utc(2026, 8, 9, 9, 15),
+      );
+
+      final restored = PendingPunch.fromJson(punch.toJson());
+
+      expect(restored.method, 'qr');
+      expect(restored.qrToken, punch.qrToken);
+      expect(restored.lat, isNull);
+      expect(restored.faceEmbedding, isNull);
+    });
+
     test('toSyncPayload matches toJson (same wire shape today)', () {
       final punch = PendingPunch(
         clientGeneratedId: 'device-789',

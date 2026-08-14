@@ -75,6 +75,13 @@ class HomeScreen extends ConsumerWidget {
               subtitle: 'Set up or update your face for check-in',
               onTap: () => context.push(faceRegistrationPath),
             ),
+            const SizedBox(height: 12),
+            _HomeCard(
+              icon: Icons.event_note_outlined,
+              title: 'My Shift',
+              subtitle: 'Your assigned working hours',
+              onTap: () => context.push(shiftPath),
+            ),
           ],
         ),
       ),
