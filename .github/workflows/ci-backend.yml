@@ -29,14 +29,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Was '20'. npm test was aborting with SIGABRT (exit 134) inside
-          # onnxruntime-node's native init path (initOrt/session-handler
-          # construction, backend.js:136) as soon as the face-recognition
-          # tests loaded their first real model — 608/608 passed locally
-          # the whole time, on Node 24. Same class of bug as the ci-admin.yml
-          # fix: Node 20 is too old for a native dependency, this time
-          # onnxruntime-node@1.27 rather than Vitest's undici. Bumping to
-          # match that fix.
+          # Was '20'. npm test aborts with SIGABRT (exit 134) inside
+          # onnxruntime-node's native init path as soon as the
+          # face-recognition tests load their first real model.
+          # Bumped to 22 on the hypothesis this was the same failure class
+          # as the ci-admin.yml fix (Node 20 too old for a native
+          # dependency) — that hypothesis was WRONG, the crash reproduces
+          # identically on 22. Left at 22 anyway since >=22 is correct
+          # regardless (package.json#engines), but the real cause is still
+          # open — see the diagnostic step below.
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
@@ -50,7 +51,21 @@ jobs:
       # at .env.test (dummy values, committed — see that file) instead of a
       # real .env. No live MongoDB, no secrets: every test in this suite
       # mocks its own models (see README.md#testing).
-      - run: npm test
+      #
+      # TEMPORARY DIAGNOSTIC (reinstated): the Node 20->22 bump didn't fix
+      # the SIGABRT, so it isn't a Node-ABI issue. Re-capturing the crash
+      # trace to see if it changed at all under Node 22.
+      - name: npm test (diagnostic)
+        run: |
+          set +e
+          npm test > test-output.log 2>&1
+          EXIT_CODE=$?
+          echo "npm test exit code: $EXIT_CODE"
+          cat test-output.log
+          grep -E "PASS|FAIL|RUNS|^[0-9]+: |Aborted|exit code|Fatal|terminate|what\(\)|abi::|Segmentation|malloc|corrupted|double free" test-output.log | tail -n 9 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+          exit $EXIT_CODE
 
       - run: npm run build
 
