@@ -138,6 +138,15 @@ export const syncAttendanceSchema = z.object({
   }),
 });
 
+// `date` optional — the controller defaults to "yesterday" (see
+// attendance.controller.ts#absenceSweep), the common case for an
+// end-of-day/next-morning HR action.
+export const absenceSweepSchema = z.object({
+  body: z.object({
+    date: z.coerce.date().optional(),
+  }),
+});
+
 export type GeoPointInput = z.infer<typeof geoPointSchema>;
 export type CheckInInput = z.infer<typeof checkInSchema>['body'];
 export type CheckOutInput = z.infer<typeof checkOutSchema>['body'];
@@ -147,3 +156,4 @@ export type CorrectAttendanceInput = z.infer<typeof correctAttendanceSchema>['bo
 export type RequestCorrectionInput = z.infer<typeof requestCorrectionSchema>['body'];
 export type SyncPunchInput = z.infer<typeof syncPunchSchema>;
 export type SyncAttendanceInput = z.infer<typeof syncAttendanceSchema>['body'];
+export type AbsenceSweepInput = z.infer<typeof absenceSweepSchema>['body'];

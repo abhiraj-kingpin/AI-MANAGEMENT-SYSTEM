@@ -43,6 +43,18 @@ export const rejectLeaveSchema = z.object({
   }),
 });
 
+// Both optional — the controller defaults to "last calendar year into this
+// one" when omitted, the common case (see leave.controller.ts#carryForward).
+// Bounded to a sane range so a typo doesn't silently write balances for
+// year 0 or year 99999.
+export const carryForwardSchema = z.object({
+  body: z.object({
+    fromYear: z.coerce.number().int().min(2000).max(3000).optional(),
+    toYear: z.coerce.number().int().min(2000).max(3000).optional(),
+  }),
+});
+
 export type ApplyLeaveInput = z.infer<typeof applyLeaveSchema>['body'];
 export type ListLeavesQuery = z.infer<typeof listLeavesQuerySchema>['query'];
 export type MyLeavesQuery = z.infer<typeof myLeavesQuerySchema>['query'];
+export type CarryForwardInput = z.infer<typeof carryForwardSchema>['body'];

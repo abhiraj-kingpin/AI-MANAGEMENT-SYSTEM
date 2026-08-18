@@ -1,8 +1,10 @@
 import { actorFromRequest } from '../../shared/utils/actor';
 import { sendSuccess } from '../../shared/utils/apiResponse';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
+import { runAbsenceSweep } from './absenceDetection.service';
 import { attendanceService } from './attendance.service';
 import type {
+  AbsenceSweepInput,
   CheckInInput,
   CheckOutInput,
   ListAttendanceQuery,
@@ -109,4 +111,12 @@ export const exportPdf = asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename="attendance-report.pdf"');
   res.send(buffer);
+});
+
+/** Defaults to "yesterday" — the common case for a next-morning HR action. */
+export const absenceSweep = asyncHandler(async (req, res) => {
+  const { date } = req.body as AbsenceSweepInput;
+  const targetDate = date ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const result = await runAbsenceSweep(targetDate);
+  sendSuccess(res, result);
 });

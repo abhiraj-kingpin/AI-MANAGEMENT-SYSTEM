@@ -126,4 +126,26 @@ describe('attendance routes — validation and access control wiring', () => {
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('MISSING_TOKEN');
   });
+
+  it('POST /attendance/absence-sweep rejects an unauthenticated caller', async () => {
+    const res = await request(app).post('/api/v1/attendance/absence-sweep').send({});
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /attendance/absence-sweep rejects a Manager (org-wide batch action is Super Admin/HR only)', async () => {
+    const res = await request(app)
+      .post('/api/v1/attendance/absence-sweep')
+      .set('Authorization', `Bearer ${tokenFor('manager')}`)
+      .send({});
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /attendance/absence-sweep rejects a non-date value (422, not 500)', async () => {
+    const res = await request(app)
+      .post('/api/v1/attendance/absence-sweep')
+      .set('Authorization', `Bearer ${tokenFor('hr')}`)
+      .send({ date: 'not-a-date' });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
 });

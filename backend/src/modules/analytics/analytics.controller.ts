@@ -37,3 +37,14 @@ export const exportAttendanceCsv = asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="attendance-${from}-to-${to}.csv"`);
   res.send(csv);
 });
+
+export const exportAttendancePdf = asyncHandler(async (req, res) => {
+  const query = req.validated!.query as ExportAttendanceCsvQuery;
+  const buffer = await analyticsService.exportAttendancePdf(query);
+
+  const from = query.from.toISOString().slice(0, 10);
+  const to = query.to.toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="attendance-${from}-to-${to}.pdf"`);
+  res.send(buffer);
+});

@@ -11,7 +11,17 @@ export async function connectDatabase(): Promise<typeof mongoose> {
   mongoose.connection.on('error', (err) => logger.error('MongoDB connection error', { err }));
   mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
 
-  return mongoose.connect(env.MONGO_URI);
+  // Explicit rather than left at the driver's defaults (maxPoolSize 100,
+  // minPoolSize 0) — see env.ts's doc comment on MONGO_MAX_POOL_SIZE/
+  // MONGO_MIN_POOL_SIZE. This used to be flagged in backend/README.md's
+  // Performance Notes as "not yet done"; the actual throughput effect is
+  // still unverified without a live multi-connection load test against a
+  // real MongoDB instance (this environment has neither), so this is a
+  // real, documented config change, not a measured tuning result.
+  return mongoose.connect(env.MONGO_URI, {
+    maxPoolSize: env.MONGO_MAX_POOL_SIZE,
+    minPoolSize: env.MONGO_MIN_POOL_SIZE,
+  });
 }
 
 export async function disconnectDatabase(): Promise<void> {

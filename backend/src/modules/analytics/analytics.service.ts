@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import PDFDocument from 'pdfkit';
 import { analyticsCache } from '../../shared/cache/memoryCache';
 import { AppError } from '../../shared/errors/AppError';
 import type { ActorContext } from '../../shared/types/actorContext';
@@ -77,6 +78,29 @@ function tallyStatuses(records: Array<{ status: string }>): {
 /** Wraps a field in quotes (doubling embedded quotes) only when it contains a comma, quote, or newline — the minimal correct CSV-escaping rule (RFC 4180). */
 function escapeCsvField(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/**
+ * The shared employee-filter + date-range fetch behind both
+ * `exportAttendanceCsv` and `exportAttendancePdf` — same records, same
+ * 5,000-row cap, two different renderings. Extracted once the PDF export
+ * needed the identical query rather than copying it a second time.
+ */
+async function fetchExportRecords(query: ExportAttendanceCsvQuery) {
+  const filter: Record<string, unknown> = { isDeleted: false };
+  if (query.departmentId) filter.departmentId = query.departmentId;
+
+  const employees = await Employee.find(filter).select('employeeCode firstName lastName');
+  const employeeById = new Map(employees.map((e) => [String(e._id), e]));
+
+  const records = await Attendance.find({
+    employeeId: { $in: employees.map((e) => e._id) },
+    date: { $gte: startOfUtcDay(query.from), $lte: startOfUtcDay(query.to) },
+  })
+    .sort({ date: 1, employeeId: 1 })
+    .limit(5000);
+
+  return { records, employeeById };
 }
 
 // Both cached reads below are polled repeatedly by a live admin dashboard
@@ -257,25 +281,17 @@ export const analyticsService = {
     });
   },
 
-  /** Raw per-record attendance export for a date range — an org-wide report (HR/Admin only, gated at the route). */
+  /**
+   * Raw per-record attendance export for a date range — an org-wide report
+   * (HR/Admin only, gated at the route). Hard cap on report size for v1 —
+   * not a paginated/streamed export, same convention as
+   * attendance.service.ts's exportExcel/exportPdf. Found and fixed in Phase
+   * 17: this query had no limit at all until then, so a wide `from`/`to`
+   * range on a large org could have pulled the entire Attendance collection
+   * into memory in one request. See `fetchExportRecords`.
+   */
   async exportAttendanceCsv(query: ExportAttendanceCsvQuery): Promise<string> {
-    const filter: Record<string, unknown> = { isDeleted: false };
-    if (query.departmentId) filter.departmentId = query.departmentId;
-
-    const employees = await Employee.find(filter).select('employeeCode firstName lastName');
-    const employeeById = new Map(employees.map((e) => [String(e._id), e]));
-
-    // Hard cap on report size for v1 — not a paginated/streamed export, same
-    // convention as attendance.service.ts's exportExcel/exportPdf. Found and
-    // fixed in Phase 17: this query had no limit at all until then, so a
-    // wide `from`/`to` range on a large org could have pulled the entire
-    // Attendance collection into memory in one request.
-    const records = await Attendance.find({
-      employeeId: { $in: employees.map((e) => e._id) },
-      date: { $gte: startOfUtcDay(query.from), $lte: startOfUtcDay(query.to) },
-    })
-      .sort({ date: 1, employeeId: 1 })
-      .limit(5000);
+    const { records, employeeById } = await fetchExportRecords(query);
 
     const header =
       'Employee Code,Employee Name,Date,Status,Check In,Check Out,Working Minutes,Overtime Minutes';
@@ -296,5 +312,70 @@ export const analyticsService = {
     });
 
     return [header, ...rows].join('\n');
+  },
+
+  /**
+   * Same records `exportAttendanceCsv` produces, rendered as a PDF instead
+   * — mirrors attendance.service.ts#exportPdf's PDFKit layout (landscape
+   * A4, manually column-positioned rows) rather than inventing a second
+   * PDF-table convention. `backend/README.md` used to flag this exact gap:
+   * "PDF export is not yet built" for `/analytics/export`.
+   */
+  async exportAttendancePdf(query: ExportAttendanceCsvQuery): Promise<Buffer> {
+    const { records, employeeById } = await fetchExportRecords(query);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(16).text('Attendance Export', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(9);
+
+      const headers = [
+        'Code',
+        'Employee',
+        'Date',
+        'Status',
+        'Check In',
+        'Check Out',
+        'Minutes',
+        'OT (min)',
+      ];
+      const colWidths = [60, 130, 70, 60, 90, 90, 60, 60];
+      const left = 40;
+
+      const drawRow = (cells: string[]) => {
+        const y = doc.y;
+        cells.forEach((cell, i) => {
+          const x = left + colWidths.slice(0, i).reduce((a, b) => a + b, 0);
+          doc.text(cell, x, y, { width: colWidths[i] });
+        });
+        doc.moveDown();
+      };
+
+      doc.font('Helvetica-Bold');
+      drawRow(headers);
+      doc.font('Helvetica');
+
+      for (const record of records) {
+        const employee = employeeById.get(String(record.employeeId));
+        drawRow([
+          employee?.employeeCode ?? 'Unknown',
+          employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown',
+          record.date.toISOString().slice(0, 10),
+          record.status,
+          record.checkInAt ? record.checkInAt.toISOString().slice(0, 16).replace('T', ' ') : '-',
+          record.checkOutAt ? record.checkOutAt.toISOString().slice(0, 16).replace('T', ' ') : '-',
+          String(record.workingMinutes),
+          String(record.overtimeMinutes),
+        ]);
+      }
+
+      doc.end();
+    });
   },
 };

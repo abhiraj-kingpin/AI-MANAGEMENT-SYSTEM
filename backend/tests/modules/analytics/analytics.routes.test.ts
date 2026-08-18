@@ -22,6 +22,7 @@ describe('analytics routes — validation and access control wiring', () => {
       '/api/v1/analytics/attendance-trend',
       '/api/v1/analytics/department-comparison',
       '/api/v1/analytics/export/csv',
+      '/api/v1/analytics/export/pdf',
       '/api/v1/analytics/ai/late-risk',
       '/api/v1/analytics/ai/absenteeism-trend',
       '/api/v1/analytics/ai/anomalies',
@@ -98,6 +99,20 @@ describe('analytics routes — validation and access control wiring', () => {
   it('rejects a CSV export where `from` is after `to`', async () => {
     const res = await request(app)
       .get('/api/v1/analytics/export/csv?from=2026-08-31&to=2026-08-01')
+      .set('Authorization', `Bearer ${tokenFor('super_admin')}`);
+    expect(res.status).toBe(422);
+  });
+
+  it('rejects a manager from the PDF export (HR/Admin only)', async () => {
+    const res = await request(app)
+      .get('/api/v1/analytics/export/pdf?from=2026-08-01&to=2026-08-31')
+      .set('Authorization', `Bearer ${tokenFor('manager', 'aaaaaaaaaaaaaaaaaaaaaaaa')}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects a PDF export missing the required from/to range (same schema as CSV)', async () => {
+    const res = await request(app)
+      .get('/api/v1/analytics/export/pdf')
       .set('Authorization', `Bearer ${tokenFor('super_admin')}`);
     expect(res.status).toBe(422);
   });

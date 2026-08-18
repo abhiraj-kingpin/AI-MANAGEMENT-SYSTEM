@@ -182,18 +182,19 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Attendance (`/attendance`)
 
-| Method | Path                                                       | Access                 | Notes                                                                                                                     |
-| ------ | ---------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/attendance/check-in`                                     | Self                   | `method: manual\|gps\|qr\|face`; `manual` is HR/Admin-only                                                                |
-| POST   | `/attendance/check-out`                                    | Self                   |                                                                                                                           |
-| POST   | `/attendance/sync`                                         | Self                   | Bulk-applies offline-queued punches, idempotent via `clientGeneratedId`                                                   |
-| POST   | `/attendance/break/start`, `/break/end`                    | Self                   |                                                                                                                           |
-| GET    | `/attendance/me?from=&to=`                                 | Self                   |                                                                                                                           |
-| GET    | `/attendance`                                              | Super Admin/HR/Manager | Paginated report, Manager team-scoped; each row includes an `employee` name/code (one batch lookup per page, not per row) |
-| GET    | `/attendance/export/excel`, `/export/pdf`                  | Super Admin/HR         | Capped at 5,000 rows                                                                                                      |
-| PATCH  | `/attendance/:id/correct`                                  | Super Admin/HR         | Direct edit, audit-logged                                                                                                 |
-| POST   | `/attendance/:id/request-correction`                       | Self                   |                                                                                                                           |
-| POST   | `/attendance/:id/approve-correction`, `/reject-correction` | Super Admin/HR/Manager | Team-scoped for Manager                                                                                                   |
+| Method | Path                                                       | Access                 | Notes                                                                                                                                           |
+| ------ | ---------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/attendance/check-in`                                     | Self                   | `method: manual\|gps\|qr\|face`; `manual` is HR/Admin-only                                                                                      |
+| POST   | `/attendance/check-out`                                    | Self                   |                                                                                                                                                 |
+| POST   | `/attendance/sync`                                         | Self                   | Bulk-applies offline-queued punches, idempotent via `clientGeneratedId`                                                                         |
+| POST   | `/attendance/break/start`, `/break/end`                    | Self                   |                                                                                                                                                 |
+| GET    | `/attendance/me?from=&to=`                                 | Self                   |                                                                                                                                                 |
+| GET    | `/attendance`                                              | Super Admin/HR/Manager | Paginated report, Manager team-scoped; each row includes an `employee` name/code (one batch lookup per page, not per row)                       |
+| GET    | `/attendance/export/excel`, `/export/pdf`                  | Super Admin/HR         | Capped at 5,000 rows                                                                                                                            |
+| PATCH  | `/attendance/:id/correct`                                  | Super Admin/HR         | Direct edit, audit-logged                                                                                                                       |
+| POST   | `/attendance/:id/request-correction`                       | Self                   |                                                                                                                                                 |
+| POST   | `/attendance/:id/approve-correction`, `/reject-correction` | Super Admin/HR/Manager | Team-scoped for Manager                                                                                                                         |
+| POST   | `/attendance/absence-sweep`                                | Super Admin/HR         | Marks every active employee with no record for a date `absent` — see [Known Simplifications & Future Work](#known-simplifications--future-work) |
 
 ### GPS / Geofencing (`/geofences`)
 
@@ -225,16 +226,17 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Leave (`/leaves`, `/leave-types`, `/holidays`)
 
-| Method   | Path                             | Access                                     | Notes                                                                                                                           |
-| -------- | -------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| POST     | `/leaves`                        | Self                                       | Overlap/balance/business-day checks before creation                                                                             |
-| GET      | `/leaves/me?status=`             | Self                                       |                                                                                                                                 |
-| GET      | `/leaves/balance`                | Self                                       | Per leave-type, current year                                                                                                    |
-| PATCH    | `/leaves/:id/cancel`             | Self                                       |                                                                                                                                 |
-| GET      | `/leaves`                        | Super Admin/HR/Manager                     | Review queue, team-scoped for Manager; each row includes `employee` name/code and `leaveTypeName` (batch-resolved, not per-row) |
-| PATCH    | `/leaves/:id/approve`, `/reject` | Super Admin/HR/Manager                     |                                                                                                                                 |
-| GET/POST | `/leave-types`                   | Read: authenticated. Write: Super Admin/HR |                                                                                                                                 |
-| GET/POST | `/holidays?year=`                | Read: authenticated. Write: Super Admin/HR |                                                                                                                                 |
+| Method   | Path                             | Access                                     | Notes                                                                                                                                                         |
+| -------- | -------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST     | `/leaves`                        | Self                                       | Overlap/balance/business-day checks before creation                                                                                                           |
+| GET      | `/leaves/me?status=`             | Self                                       |                                                                                                                                                               |
+| GET      | `/leaves/balance`                | Self                                       | Per leave-type, current year                                                                                                                                  |
+| PATCH    | `/leaves/:id/cancel`             | Self                                       |                                                                                                                                                               |
+| GET      | `/leaves`                        | Super Admin/HR/Manager                     | Review queue, team-scoped for Manager; each row includes `employee` name/code and `leaveTypeName` (batch-resolved, not per-row)                               |
+| PATCH    | `/leaves/:id/approve`, `/reject` | Super Admin/HR/Manager                     |                                                                                                                                                               |
+| GET/POST | `/leave-types`                   | Read: authenticated. Write: Super Admin/HR |                                                                                                                                                               |
+| GET/POST | `/holidays?year=`                | Read: authenticated. Write: Super Admin/HR |                                                                                                                                                               |
+| POST     | `/leaves/carry-forward`          | Super Admin/HR                             | Year-end rollover: `{fromYear?, toYear?}`, defaults to last year → this year — see [Known Simplifications & Future Work](#known-simplifications--future-work) |
 
 ### Shifts (`/shifts`)
 
@@ -270,15 +272,15 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ### Analytics (`/analytics`)
 
-| Method | Path                               | Access                 | Notes                                                                                                                                |
-| ------ | ---------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| GET    | `/analytics/dashboard`             | Super Admin/HR/Manager | Headcount + attendance/late/leave rate for one day; team-scoped for Manager, optional `departmentId` for HR/Admin                    |
-| GET    | `/analytics/attendance-trend`      | Super Admin/HR/Manager | Attendance/late rate per month, trailing `months` (1–24, default 6), against real business-day counts                                |
-| GET    | `/analytics/department-comparison` | Super Admin/HR         | Headcount + rates for every active department, one day                                                                               |
-| GET    | `/analytics/export/csv`            | Super Admin/HR         | Raw per-record attendance CSV for a `from`/`to` date range, optional `departmentId` (PDF export is not yet built)                    |
-| GET    | `/analytics/ai/late-risk`          | Super Admin/HR/Manager | Employees ranked by a real late-arrival-rate + trend score, trailing `days` (7–180, default 30); team-scoped for Manager             |
-| GET    | `/analytics/ai/absenteeism-trend`  | Super Admin/HR/Manager | Monthly unexplained-absence rate, trailing `months` (3–24, default 6), plus a one-month linear-regression forecast                   |
-| GET    | `/analytics/ai/anomalies`          | Super Admin/HR         | Rule-based sweep over `days` (1–90, default 30): implausible GPS travel, similar face embeddings across employees, overtime outliers |
+| Method | Path                                   | Access                 | Notes                                                                                                                                |
+| ------ | -------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/analytics/dashboard`                 | Super Admin/HR/Manager | Headcount + attendance/late/leave rate for one day; team-scoped for Manager, optional `departmentId` for HR/Admin                    |
+| GET    | `/analytics/attendance-trend`          | Super Admin/HR/Manager | Attendance/late rate per month, trailing `months` (1–24, default 6), against real business-day counts                                |
+| GET    | `/analytics/department-comparison`     | Super Admin/HR         | Headcount + rates for every active department, one day                                                                               |
+| GET    | `/analytics/export/csv`, `/export/pdf` | Super Admin/HR         | Raw per-record attendance export for a `from`/`to` date range, optional `departmentId` — same query, two renderings                  |
+| GET    | `/analytics/ai/late-risk`              | Super Admin/HR/Manager | Employees ranked by a real late-arrival-rate + trend score, trailing `days` (7–180, default 30); team-scoped for Manager             |
+| GET    | `/analytics/ai/absenteeism-trend`      | Super Admin/HR/Manager | Monthly unexplained-absence rate, trailing `months` (3–24, default 6), plus a one-month linear-regression forecast                   |
+| GET    | `/analytics/ai/anomalies`              | Super Admin/HR         | Rule-based sweep over `days` (1–90, default 30): implausible GPS travel, similar face embeddings across employees, overtime outliers |
 
 ### Audit (`/audit-logs`)
 
@@ -301,7 +303,7 @@ All routes are mounted under `API_PREFIX` (`/api/v1` by default). Full request/r
 
 ## Testing
 
-569 Jest tests across every module, none requiring a live database:
+588 Jest tests across every module, none requiring a live database:
 
 - **`*.service.test.ts`** — business logic and RBAC scoping, with every Mongoose model mocked (`tests/utils/mockQuery.ts` simulates a chainable, thenable Mongoose `Query`).
 - **`*.routes.test.ts`** — the real Express middleware chain (`authenticate` → `requireRole` → `validate`) via Supertest, covering everything that should reject _before_ touching the database (401/403/422).
@@ -343,7 +345,8 @@ Target topology (Render/Vercel/Atlas) is documented in [`docs/architecture/09-de
 - **Compound/unique indexes** back the hot query paths — notably `{employeeId, date}` on Attendance and `{employeeId, month}` on Payslip — see [`docs/architecture/03-database-schema.md`](../docs/architecture/03-database-schema.md). Phase 17 added two more, `{method, date}` and `{date, overtimeMinutes}`, once Phase 15's AI anomaly sweep introduced the first queries that actually need them.
 - **In-process response caching** (Phase 17): `analytics.service.ts`'s `getDashboardKpis` and `getDepartmentComparison` — the two reads a live dashboard polls most — are cached for 30s via `shared/cache/memoryCache.ts`, keyed by caller scope (a Manager's own team never shares a cache entry with another Manager's) so two different callers never see each other's data. A documented, accepted staleness window: a change landing seconds ago may not show up until the entry naturally expires. Same "real behavior, no new infrastructure" trade-off as Phase 11's job tracker and Phase 16's account lockout — the architecture doc's original plan named a shared Redis cache, but no phase has ever wired Redis into any code, so this is process-local (correct on one instance; behind a load balancer with more than one, each instance just caches independently, never incorrectly).
 - **Load-test tooling**: `npm run perf:smoke` (`scripts/perf-smoke.ts`) is a small, dependency-free, genuinely-runnable latency check against a running instance — not a throughput/concurrency benchmark (that needs a real tool like k6 or autocannon against a staging environment, which this repository doesn't run in CI).
-- **Not yet done**: connection-pool tuning and a real concurrent-load benchmark run are still open — `perf:smoke` measures sequential latency, not throughput under load.
+- **Connection pool** is explicitly configured (`MONGO_MAX_POOL_SIZE`/`MONGO_MIN_POOL_SIZE`, defaults 20/2 — see `config/database.ts`) rather than left at the Mongoose driver's defaults (100/0). Honest caveat: the actual throughput effect of this is unverified — this environment has no live MongoDB instance to run a concurrent-connection load test against, so this is a documented config change, not a measured tuning result.
+- **Not yet done**: a real concurrent-load benchmark run is still open — `perf:smoke` measures sequential latency, not throughput under load, and running one for real needs a tool like k6/autocannon against a staging environment this repository doesn't have.
 
 ## Known Simplifications & Future Work
 
@@ -364,10 +367,15 @@ Two external-service integrations are intentionally-labeled placeholders — the
 
 Other known, documented gaps:
 
-- **Leave carry-forward**: `LeaveType.carryForward`/`maxCarryForwardDays` are read by the balance math but nothing yet computes a year-end rollover automatically — needs a scheduled job.
-- **Absence detection**: `Attendance` has an `absent` status in its schema, but nothing currently creates one — that requires a scheduled "no check-in by end of day" sweep compared against each employee's expected working days.
 - **No DB transactions**: employee creation (User + Employee) and a few other multi-document writes are sequential, not transactional — acceptable on a single-node MongoDB (not a replica set) for now, revisited once running against Atlas.
-- **Only one `clientGeneratedId` is retained per attendance record**: the schema (by design, from Phase 0) stores a single idempotency key per document, not one per punch. A check-out punch's sync call overwrites the field a check-in punch's sync call set. In practice this is safe — the mobile client deletes a punch from its local queue the moment it gets back `applied`/`duplicate`, so an older punch is never resubmitted after a newer one has already landed — but it's a narrow theoretical gap worth naming rather than silently assuming away.
+- **Only one `clientGeneratedId` is retained per attendance record**: the schema (by design, from Phase 0) stores a single idempotency key per document, not one per punch. A check-out punch's sync call overwrites the field a check-in punch's sync call set. In practice this is safe — the mobile client deletes a punch from its local queue the moment it gets back `applied`/`duplicate`, so an older punch is never resubmitted after a newer one has already landed — but it's a narrow theoretical gap worth naming rather than silently assuming away. **Deliberately left unfixed for now**: the real fix (one idempotency key per punch type, not one per document) touches `attendance.service.ts`'s sync/check-in/check-out paths in several places at once, in code this project has no live MongoDB to verify a schema change against — safer to leave a documented, already-mitigated gap alone than risk a subtle regression in well-tested idempotency logic nobody can currently re-verify end-to-end.
+
+Two gaps this section used to list — **leave carry-forward** and **absence detection** — are now real, not just documented as missing:
+
+- `POST /leaves/carry-forward` (`leaveCarryForward.service.ts`) computes each active employee's unused balance for every `LeaveType` with `carryForward: true`, capped at `maxCarryForwardDays`, and writes it into next year's `LeaveBalance.carriedForward`. Idempotent (`$set`, not `$inc` — re-running the same year pair always recomputes the same number) and correctly covers employees who never took any leave that year (the ones with the most to carry forward, and previously the easiest case to silently miss since they have no persisted `LeaveBalance` row to begin with).
+- `POST /attendance/absence-sweep` (`absenceDetection.service.ts`) marks every active employee with no Attendance record for a date `absent`, skipping weekends/holidays via the same business-day math leave balances already use. Race-safe against a real concurrent check-in (`$setOnInsert` + `upsert`, same pattern `markAttendanceOnLeave` already established).
+
+Neither runs on an actual schedule (no cron/worker infrastructure exists in this codebase, same reasoning as the payroll batch job below) — both are HR/Admin-triggerable actions, the same shape as `POST /payroll/run`. A real deployment would put one or both behind `node-cron` or an external scheduler; that wiring itself is a few lines once a real deployment target exists to run it on, but isn't something this environment can verify by actually waiting a day/year for it to fire on its own.
 
 Remaining platform-level phases (a mobile offline-sync client, CI/CD, and consolidated docs) are tracked at the [repository root](../README.md).
 

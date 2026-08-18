@@ -2,7 +2,8 @@ import { actorFromRequest } from '../../shared/utils/actor';
 import { sendSuccess } from '../../shared/utils/apiResponse';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
 import { leaveService } from './leave.service';
-import type { ListLeavesQuery, MyLeavesQuery } from './leave.validators';
+import { runCarryForward } from './leaveCarryForward.service';
+import type { CarryForwardInput, ListLeavesQuery, MyLeavesQuery } from './leave.validators';
 
 export const applyLeave = asyncHandler(async (req, res) => {
   const leave = await leaveService.apply(actorFromRequest(req), req.body);
@@ -54,4 +55,12 @@ export const rejectLeave = asyncHandler(async (req, res) => {
     req.body.comment,
   );
   sendSuccess(res, { leave });
+});
+
+/** Defaults to "last calendar year into this one" — the common case for a year-end HR action. */
+export const carryForward = asyncHandler(async (req, res) => {
+  const { fromYear, toYear } = req.body as CarryForwardInput;
+  const currentYear = new Date().getUTCFullYear();
+  const result = await runCarryForward(fromYear ?? currentYear - 1, toYear ?? currentYear);
+  sendSuccess(res, result);
 });

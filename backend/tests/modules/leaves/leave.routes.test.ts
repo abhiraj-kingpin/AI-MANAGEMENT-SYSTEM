@@ -97,4 +97,34 @@ describe('leave routes — validation and access control wiring', () => {
       .send({});
     expect(res.status).toBe(422);
   });
+
+  it('POST /leaves/carry-forward rejects an unauthenticated caller', async () => {
+    const res = await request(app).post('/api/v1/leaves/carry-forward').send({});
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /leaves/carry-forward rejects a plain employee (year-end batch action is Super Admin/HR only)', async () => {
+    const res = await request(app)
+      .post('/api/v1/leaves/carry-forward')
+      .set('Authorization', `Bearer ${tokenFor('employee', 'aaaaaaaaaaaaaaaaaaaaaaaa')}`)
+      .send({});
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /leaves/carry-forward rejects a Manager (org-wide action, not team-scoped)', async () => {
+    const res = await request(app)
+      .post('/api/v1/leaves/carry-forward')
+      .set('Authorization', `Bearer ${tokenFor('manager', 'bbbbbbbbbbbbbbbbbbbbbbbb')}`)
+      .send({});
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /leaves/carry-forward rejects a non-numeric fromYear (422, not 500)', async () => {
+    const res = await request(app)
+      .post('/api/v1/leaves/carry-forward')
+      .set('Authorization', `Bearer ${tokenFor('hr', 'dddddddddddddddddddddddd')}`)
+      .send({ fromYear: 'not-a-year' });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
 });

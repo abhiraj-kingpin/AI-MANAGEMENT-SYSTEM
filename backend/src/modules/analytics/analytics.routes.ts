@@ -47,6 +47,15 @@ router.get(
   validate(exportAttendanceCsvQuerySchema),
   analyticsController.exportAttendanceCsv,
 );
+// Same records, same query contract as /export/csv — reuses its validator
+// rather than a duplicate PDF-flavored schema, since the shape (from/to/
+// departmentId) has nothing CSV-specific about it.
+router.get(
+  '/export/pdf',
+  requireRole('super_admin', 'hr'),
+  validate(exportAttendanceCsvQuerySchema),
+  analyticsController.exportAttendancePdf,
+);
 
 // Phase 15 — AI-assisted analytics. Real statistical/rule-based scoring,
 // explicitly labeled as such (see analytics.ai.service.ts), not a trained

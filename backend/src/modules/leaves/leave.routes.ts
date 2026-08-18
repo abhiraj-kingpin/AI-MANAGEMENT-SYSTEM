@@ -6,6 +6,7 @@ import * as leaveController from './leave.controller';
 import {
   applyLeaveSchema,
   approveLeaveSchema,
+  carryForwardSchema,
   listLeavesQuerySchema,
   myLeavesQuerySchema,
   rejectLeaveSchema,
@@ -40,6 +41,17 @@ router.patch(
   requireRole('super_admin', 'hr', 'manager'),
   validate(rejectLeaveSchema),
   leaveController.rejectLeave,
+);
+
+// Year-end batch action — Super Admin/HR only, org-wide, not scoped to a
+// Manager's team (matches payroll's "Run Payroll" being Super Admin/HR-only
+// for the same reason: a batch action that touches every employee, not a
+// per-request review).
+router.post(
+  '/carry-forward',
+  requireRole('super_admin', 'hr'),
+  validate(carryForwardSchema),
+  leaveController.carryForward,
 );
 
 export { router as leaveRouter };

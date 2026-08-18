@@ -4,6 +4,7 @@ import { requireRole } from '../../middlewares/rbac.middleware';
 import { validate } from '../../middlewares/validate.middleware';
 import * as attendanceController from './attendance.controller';
 import {
+  absenceSweepSchema,
   checkInSchema,
   checkOutSchema,
   correctAttendanceSchema,
@@ -52,6 +53,15 @@ router.get(
   requireRole('super_admin', 'hr'),
   validate(listAttendanceQuerySchema),
   attendanceController.exportPdf,
+);
+// Batch action, org-wide — Super Admin/HR only, same reasoning as leave's
+// carry-forward endpoint (leave.routes.ts): a sweep that touches every
+// employee isn't a per-request review a Manager should trigger.
+router.post(
+  '/absence-sweep',
+  requireRole('super_admin', 'hr'),
+  validate(absenceSweepSchema),
+  attendanceController.absenceSweep,
 );
 
 // Corrections

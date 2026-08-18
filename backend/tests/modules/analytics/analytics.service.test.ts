@@ -331,6 +331,48 @@ describe('analyticsService.exportAttendanceCsv', () => {
   });
 });
 
+describe('analyticsService.exportAttendancePdf', () => {
+  it('produces a real PDF buffer from the same records exportAttendanceCsv uses', async () => {
+    mockedEmployeeFind.mockReturnValue(
+      mockQuery([{ _id: 'e1', employeeCode: 'ENG-0001', firstName: 'Asha', lastName: 'Rao' }]),
+    );
+    mockedAttendanceFind.mockReturnValue(
+      mockQuery([
+        {
+          employeeId: 'e1',
+          date: new Date('2026-08-01T00:00:00Z'),
+          status: 'present',
+          checkInAt: new Date('2026-08-01T09:00:00Z'),
+          checkOutAt: new Date('2026-08-01T18:00:00Z'),
+          workingMinutes: 480,
+          overtimeMinutes: 0,
+        },
+      ]),
+    );
+
+    const buffer = await analyticsService.exportAttendancePdf({
+      from: new Date('2026-08-01'),
+      to: new Date('2026-08-31'),
+    });
+
+    expect(buffer.length).toBeGreaterThan(0);
+    expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
+  it('shares fetchExportRecords with the CSV export — same 5000-row cap applies', async () => {
+    mockedEmployeeFind.mockReturnValue(mockQuery([]));
+    const query = mockQuery([]);
+    mockedAttendanceFind.mockReturnValue(query);
+
+    await analyticsService.exportAttendancePdf({
+      from: new Date('2026-08-01'),
+      to: new Date('2026-08-31'),
+    });
+
+    expect(query.limit).toHaveBeenCalledWith(5000);
+  });
+});
+
 describe('analyticsService caching (Phase 17)', () => {
   it('serves a repeated getDashboardKpis call from cache without re-querying', async () => {
     mockedEmployeeFind.mockReturnValue(mockQuery(employeeRows('e1')));

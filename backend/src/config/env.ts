@@ -14,6 +14,13 @@ const envSchema = z.object({
   API_PREFIX: z.string().default('/api/v1'),
 
   MONGO_URI: z.string().min(1, 'MONGO_URI is required'),
+  // Mongoose defaults to maxPoolSize 100 / minPoolSize 0 — fine for a
+  // single small instance, but explicit rather than left implicit, and
+  // configurable per-deployment without a code change. See
+  // config/database.ts#connectDatabase and backend/README.md's Performance
+  // Notes section (this used to be flagged there as "not yet done").
+  MONGO_MAX_POOL_SIZE: z.coerce.number().int().min(1).default(20),
+  MONGO_MIN_POOL_SIZE: z.coerce.number().int().min(0).default(2),
   REDIS_URL: z.string().optional(),
 
   JWT_ACCESS_SECRET: z.string().min(1, 'JWT_ACCESS_SECRET is required'),
