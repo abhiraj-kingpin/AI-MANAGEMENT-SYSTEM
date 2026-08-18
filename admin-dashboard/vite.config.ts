@@ -22,5 +22,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
+    // `pool: 'forks'` (process isolation) instead of Vitest's default
+    // `'threads'` — the suite passed locally (Windows) every time but
+    // failed on `ci-admin.yml`'s Linux runner with no reproducible cause
+    // found locally (clean `npm ci`, `CI=true`/`GITHUB_ACTIONS=true` env,
+    // no peer-dependency mismatch, no missing platform-specific optional
+    // dependency in the lockfile — all checked, all fine). jsdom's timer
+    // handling under Vitest's worker-thread pool has documented,
+    // Linux-specific flakiness; `forks` is the standard mitigation.
+    pool: 'forks',
   },
 });
