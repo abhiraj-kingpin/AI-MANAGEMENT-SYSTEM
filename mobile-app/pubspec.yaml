@@ -60,6 +60,11 @@ dependencies:
   # exception FaceCheckInScreen already has for CameraController/CameraPreview).
   mobile_scanner: ^6.0.2
 
+  # Opens the payslip PDF path_provider already saves, instead of just
+  # reporting it via SnackBar (see PayslipsScreen) — the one plugin this
+  # pass adds.
+  open_filex: ^4.5.0
+
   # Added in its respective phase (kept here as a reference, not yet used):
   # firebase_messaging, firebase_core — Phase 12, push notifications
 

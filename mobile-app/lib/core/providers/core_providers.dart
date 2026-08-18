@@ -3,6 +3,7 @@ import 'package:ai_management_system/core/network/dio_client.dart';
 import 'package:ai_management_system/core/offline/connectivity_service.dart';
 import 'package:ai_management_system/core/offline/offline_queue_service.dart';
 import 'package:ai_management_system/core/offline/sync_service.dart';
+import 'package:ai_management_system/core/services/file_opener_service.dart';
 import 'package:ai_management_system/core/services/location_service.dart';
 import 'package:ai_management_system/core/storage/secure_storage_service.dart';
 
@@ -16,6 +17,10 @@ final dioClientProvider = Provider<DioClient>((ref) {
 
 final locationServiceProvider = Provider<LocationService>((ref) {
   return const LocationService();
+});
+
+final fileOpenerServiceProvider = Provider<FileOpenerService>((ref) {
+  return const FileOpenerService();
 });
 
 final offlineQueueServiceProvider = Provider<OfflineQueueService>((ref) {

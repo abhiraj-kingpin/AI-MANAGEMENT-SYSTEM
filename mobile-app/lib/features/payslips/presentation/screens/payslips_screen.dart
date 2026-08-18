@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ai_management_system/core/providers/core_providers.dart';
+import 'package:ai_management_system/core/services/file_opener_service.dart';
 import 'package:ai_management_system/features/payslips/domain/entities/payslip_entity.dart';
 import 'package:ai_management_system/features/payslips/presentation/providers/payslip_providers.dart';
 
@@ -18,8 +20,15 @@ class PayslipsScreen extends ConsumerWidget {
     ref.listen(payslipControllerProvider, (previous, next) {
       if (next.lastDownloadedPath != null &&
           next.lastDownloadedPath != previous?.lastDownloadedPath) {
+        final path = next.lastDownloadedPath!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Saved to ${next.lastDownloadedPath}')),
+          SnackBar(
+            content: Text('Saved to $path'),
+            action: SnackBarAction(
+              label: 'Open',
+              onPressed: () => _openPayslip(context, ref, path),
+            ),
+          ),
         );
       }
       if (next.errorMessage != null && next.errorMessage != previous?.errorMessage) {
@@ -80,4 +89,26 @@ class PayslipsScreen extends ConsumerWidget {
   }
 
   String _formatAmount(double amount) => amount.toStringAsFixed(2);
+
+  Future<void> _openPayslip(BuildContext context, WidgetRef ref, String path) async {
+    final result = await ref.read(fileOpenerServiceProvider).open(path);
+    if (result.outcome == FileOpenOutcome.opened || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_friendlyOpenError(result.outcome))),
+    );
+  }
+
+  String _friendlyOpenError(FileOpenOutcome outcome) {
+    switch (outcome) {
+      case FileOpenOutcome.noAppAvailable:
+        return 'No app on this device can open a PDF. The file is still saved.';
+      case FileOpenOutcome.fileNotFound:
+        return 'Could not find the saved file — try downloading it again.';
+      case FileOpenOutcome.permissionDenied:
+        return 'Permission denied opening the file.';
+      case FileOpenOutcome.opened:
+      case FileOpenOutcome.failed:
+        return 'Could not open the file.';
+    }
+  }
 }
