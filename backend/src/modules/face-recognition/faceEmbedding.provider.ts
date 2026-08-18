@@ -1,10 +1,20 @@
 import path from 'node:path';
 import * as ort from 'onnxruntime-node';
 import sharp from 'sharp';
+import { warpAlignedFace } from './faceAlign';
+import { detectFaces } from './faceDetector';
 
 export interface GeneratedEmbedding {
   vector: number[];
   qualityScore: number;
+}
+
+/** Thrown when `faceDetector.ts` finds no face at all in the photo — `face.service.ts#register()` catches this and discards the photo, the same as a low quality score, rather than letting it crash the whole registration request. */
+export class NoFaceDetectedError extends Error {
+  constructor() {
+    super('No face was detected in this photo.');
+    this.name = 'NoFaceDetectedError';
+  }
 }
 
 // backend/models/, not src/modules/face-recognition/models/ — the ONNX
@@ -39,37 +49,41 @@ function getSession(): Promise<ort.InferenceSession> {
  * confirmed by actually running inference against this exact file, not
  * assumed from documentation), not a hash or a hand-rolled heuristic.
  *
- * Preprocessing follows InsightFace's own documented convention: resize to
- * 112×112, RGB channel order, `(pixel - 127.5) / 128` per channel, no
- * per-channel mean/std beyond that — then NCHW-planar, not HWC-interleaved
- * (sharp's native output), which `toInputTensor` transposes.
+ * The photo is now genuinely detected-and-aligned first, not just resized
+ * whole: `detectFaces` (SCRFD, `faceDetector.ts`) finds the face and its 5
+ * landmarks, `warpAlignedFace` (`faceAlign.ts`) warps them onto
+ * InsightFace's standard reference template — the same alignment
+ * MobileFaceNet was actually trained on, closing the gap this module used
+ * to carry ("the whole photo is resized straight to the model's input, not
+ * a cropped-and-aligned face region"). Manually verified against a real
+ * (CC0-licensed, not committed to this repo) photo before shipping: a
+ * single correctly-positioned detection, anatomically plausible landmarks
+ * (eyes level, nose between and below them, mouth corners below that) —
+ * not just "runs without crashing."
  *
- * What this honestly does NOT do: detect or align the face first. The
- * whole uploaded photo is resized straight to the model's 112×112 input,
- * not a cropped-and-aligned face region — InsightFace's own models are
- * trained on aligned crops, so accuracy on an unaligned full photo is
- * materially worse than a production pipeline that detects+aligns first.
- * The same `buffalo_s` pack bundles a real face detector (`det_500m.onnx`,
- * SCRFD), deliberately not added in this pass: decoding SCRFD's raw
- * anchor-based output correctly needs real implementation work (anchor
- * generation per stride, score thresholding, NMS) this environment has no
- * way to verify against real photos with known face locations — shipping
- * unverified detection-decoding logic risked being worse than being
- * explicit about the gap instead.
- *
- * What this also can't verify: that the embeddings it produces are
+ * What this still can't verify: that the embeddings it produces are
  * actually *discriminative* for real human faces — this environment has no
- * photos of real people with known identities to test recognition accuracy
- * against. What IS verified: this is the genuine, official InsightFace
- * release (checksum-matched against the source archive), it runs real
- * inference (not a stub — confirmed via `onnxruntime-node`, not assumed),
- * and the output is deterministic and correctly shaped for every
- * downstream consumer (`face.service.ts`'s cosine-similarity matching,
- * `shared/utils/vectorMath.ts`).
+ * dataset of real people with known identities to test recognition
+ * accuracy against. What IS verified: this is the genuine, official
+ * InsightFace release (checksum-matched), every stage (detection,
+ * alignment, embedding) runs real inference/real geometry (not stubs), and
+ * the output is deterministic and correctly shaped for every downstream
+ * consumer (`face.service.ts`'s cosine-similarity matching).
  */
 export async function generateFaceEmbedding(imageBuffer: Buffer): Promise<GeneratedEmbedding> {
+  const detections = await detectFaces(imageBuffer);
+  if (detections.length === 0) {
+    throw new NoFaceDetectedError();
+  }
+  // Highest-confidence detection — a registration photo is expected to
+  // contain exactly one clear face; if more than one face appears (someone
+  // else walks through frame, a poster in the background), the most
+  // confident detection is assumed to be the intended subject rather than
+  // rejecting the whole photo.
+  const best = detections.reduce((a, b) => (b.score > a.score ? b : a));
+
   const session = await getSession();
-  const tensor = await toInputTensor(imageBuffer);
+  const tensor = await toAlignedInputTensor(imageBuffer, best.keypoints);
   const results = await session.run({ [INPUT_NAME]: tensor });
   const raw = Array.from(results[OUTPUT_NAME].data as Float32Array);
 
@@ -79,22 +93,31 @@ export async function generateFaceEmbedding(imageBuffer: Buffer): Promise<Genera
   };
 }
 
-async function toInputTensor(imageBuffer: Buffer): Promise<ort.Tensor> {
-  const { data } = await sharp(imageBuffer)
-    .resize(INPUT_SIZE, INPUT_SIZE, { fit: 'cover' })
+async function toAlignedInputTensor(
+  imageBuffer: Buffer,
+  keypoints: Parameters<typeof warpAlignedFace>[1],
+): Promise<ort.Tensor> {
+  const { data, info } = await sharp(imageBuffer)
     .removeAlpha()
     .toColourspace('srgb')
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  // sharp's raw() output is interleaved HWC (row-major, RGB) — transpose to
-  // the model's planar NCHW while applying InsightFace's normalization.
+  // 112×112×3 RGB, already aligned — see faceAlign.ts.
+  const aligned = warpAlignedFace(
+    { data, width: info.width, height: info.height, channels: info.channels },
+    keypoints,
+    INPUT_SIZE,
+  );
+
+  // Planar NCHW, InsightFace's documented (pixel-127.5)/128 normalization
+  // — same convention faceDetector.ts's own preprocessing uses.
   const pixelCount = INPUT_SIZE * INPUT_SIZE;
   const chw = new Float32Array(3 * pixelCount);
   for (let i = 0; i < pixelCount; i++) {
-    chw[i] = (data[i * 3] - 127.5) / 128; // R plane
-    chw[pixelCount + i] = (data[i * 3 + 1] - 127.5) / 128; // G plane
-    chw[2 * pixelCount + i] = (data[i * 3 + 2] - 127.5) / 128; // B plane
+    chw[i] = (aligned[i * 3] - 127.5) / 128;
+    chw[pixelCount + i] = (aligned[i * 3 + 1] - 127.5) / 128;
+    chw[2 * pixelCount + i] = (aligned[i * 3 + 2] - 127.5) / 128;
   }
 
   return new ort.Tensor('float32', chw, [1, 3, INPUT_SIZE, INPUT_SIZE]);
@@ -107,11 +130,10 @@ function l2Normalize(vector: number[]): number[] {
 
 /**
  * Unchanged from the previous placeholder's heuristic — a real quality
- * assessment (blur/sharpness, brightness, face-size-in-frame) needs the
- * face-detection step this pass deliberately doesn't add (see the module
- * doc comment above). Keeps the "discard low-quality registration photos"
- * branch in face.service.ts exercisable; still has no relationship to
- * actual photo quality.
+ * assessment (blur/sharpness, brightness) beyond "is a face even in this
+ * photo" (which is now real, via `detectFaces`) hasn't been added. Keeps
+ * the "discard low-quality registration photos" branch in face.service.ts
+ * exercisable; still has no relationship to actual photo quality.
  */
 function estimatePlaceholderQualityScore(buffer: Buffer): number {
   const kb = buffer.byteLength / 1024;

@@ -5,7 +5,7 @@ import { AppError } from '../../shared/errors/AppError';
 import { uploadBuffer } from '../../shared/services/fileUpload.service';
 import type { ActorContext } from '../../shared/types/actorContext';
 import { maxCosineSimilarity } from '../../shared/utils/vectorMath';
-import { generateFaceEmbedding } from './faceEmbedding.provider';
+import { generateFaceEmbedding, NoFaceDetectedError } from './faceEmbedding.provider';
 import { FaceEmbedding } from './faceEmbedding.model';
 import type {
   FaceRegisterResultDTO,
@@ -15,8 +15,12 @@ import type {
 
 const MIN_REGISTRATION_IMAGES = 3;
 const MAX_REGISTRATION_IMAGES = 5;
-// Placeholder threshold paired with the placeholder quality score in
-// faceEmbedding.provider.ts — both need real values once real ML lands.
+// The embedding itself is real now (faceEmbedding.provider.ts's
+// MobileFaceNet model), but qualityScore still comes from its unchanged
+// byte-size heuristic — a real quality assessment (blur/sharpness,
+// brightness) beyond "is a face even present" (which detectFaces now
+// checks for real) hasn't been added. This threshold stays a placeholder
+// paired with that placeholder score.
 const MIN_QUALITY_SCORE = 0.2;
 
 /** Self, or HR/Admin acting on someone else's face data. */
@@ -73,7 +77,21 @@ export const faceService = {
     const newEmbeddingIds: Types.ObjectId[] = [];
 
     for (const image of images) {
-      const { vector, qualityScore } = await generateFaceEmbedding(image);
+      let vector: number[];
+      let qualityScore: number;
+      try {
+        ({ vector, qualityScore } = await generateFaceEmbedding(image));
+      } catch (error) {
+        // A photo with no detectable face (someone's back, a blurry non-
+        // face frame, an empty room) is discarded the same as a
+        // low-quality one — a real, expected outcome now that detection
+        // is real, not a request-crashing error.
+        if (error instanceof NoFaceDetectedError) {
+          discarded += 1;
+          continue;
+        }
+        throw error;
+      }
 
       if (qualityScore < MIN_QUALITY_SCORE) {
         discarded += 1;

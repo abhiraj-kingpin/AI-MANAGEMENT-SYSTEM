@@ -14,11 +14,18 @@ jest.mock('../../../src/shared/services/fileUpload.service', () => ({
   uploadBuffer: jest.fn().mockResolvedValue({ url: 'https://cdn/face.jpg', publicId: 'x' }),
 }));
 
-jest.mock('../../../src/modules/face-recognition/faceEmbedding.provider', () => ({
-  generateFaceEmbedding: jest.fn(),
-}));
+jest.mock('../../../src/modules/face-recognition/faceEmbedding.provider', () => {
+  const actual = jest.requireActual('../../../src/modules/face-recognition/faceEmbedding.provider');
+  // NoFaceDetectedError is the real class (not mocked) — face.service.ts's
+  // `error instanceof NoFaceDetectedError` check needs the actual
+  // constructor to work, the same reason mockedGenerateEmbedding below can
+  // still `mockRejectedValueOnce(new actual.NoFaceDetectedError())` and
+  // have the service correctly recognize it.
+  return { ...actual, generateFaceEmbedding: jest.fn() };
+});
 
 import { faceService } from '../../../src/modules/face-recognition/face.service';
+import { NoFaceDetectedError } from '../../../src/modules/face-recognition/faceEmbedding.provider';
 import { FaceEmbedding } from '../../../src/modules/face-recognition/faceEmbedding.model';
 import { generateFaceEmbedding } from '../../../src/modules/face-recognition/faceEmbedding.provider';
 import type { ActorContext } from '../../../src/shared/types/actorContext';
@@ -81,6 +88,36 @@ describe('faceService.register', () => {
     await expect(faceService.register(threeImages, undefined, self)).rejects.toMatchObject({
       code: 'FACE_QUALITY_TOO_LOW',
     });
+  });
+
+  it('discards a photo with no detectable face but keeps the rest (does not crash the whole request)', async () => {
+    mockedGenerateEmbedding
+      .mockRejectedValueOnce(new NoFaceDetectedError())
+      .mockResolvedValueOnce(goodEmbedding(2))
+      .mockResolvedValueOnce(goodEmbedding(3));
+    mockedCreate.mockImplementation((data: Record<string, unknown>) =>
+      Promise.resolve({ _id: `id-${Math.random()}`, ...data }),
+    );
+
+    const result = await faceService.register(threeImages, undefined, self);
+
+    expect(result).toEqual({ status: 'registered', embeddingCount: 2, discardedCount: 1 });
+  });
+
+  it('rejects with the same FACE_QUALITY_TOO_LOW code when every image has no detectable face', async () => {
+    mockedGenerateEmbedding.mockRejectedValue(new NoFaceDetectedError());
+
+    await expect(faceService.register(threeImages, undefined, self)).rejects.toMatchObject({
+      code: 'FACE_QUALITY_TOO_LOW',
+    });
+  });
+
+  it('propagates a genuinely unexpected error instead of silently discarding it', async () => {
+    mockedGenerateEmbedding.mockRejectedValue(new Error('ONNX runtime crashed'));
+
+    await expect(faceService.register(threeImages, undefined, self)).rejects.toThrow(
+      'ONNX runtime crashed',
+    );
   });
 
   it('rejects fewer than 3 or more than 5 images', async () => {
