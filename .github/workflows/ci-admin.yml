@@ -23,7 +23,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Bumped from '20': Vitest 4.1.11's dependency chain pulls in a
+          # version of undici whose CacheStorage calls
+          # webidl.util.markAsUncloneable, a Node internal that doesn't
+          # exist on Node 20 — "TypeError: webidl.util.markAsUncloneable is
+          # not a function", crashing every forks-pool worker before any
+          # test file ran (a ~1s failure, not a real assertion failure).
+          # Found only by adding a temporary CI step that routed npm test's
+          # captured output through ::error:: annotations, since this
+          # environment can't download Actions job logs directly (403) or
+          # execute the client-rendered log viewer page — and completely
+          # invisible locally, since this machine runs Node 24. '22' is
+          # current Node LTS and has no such gap.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: admin-dashboard/package-lock.json
 
@@ -37,25 +49,5 @@ jobs:
       # one), the axios-error-message extraction every mutation in the app
       # relies on, and the reduced-motion count-up hook's deterministic
       # branches. See admin-dashboard/README.md's Status section.
-      # TEMPORARY diagnostic (to be removed): npm test fails in ~1s on this
-      # runner with no reproduction found locally on 3 separate attempts
-      # (clean npm ci, CI env vars set, forks pool) — a failure that fast
-      # smells like a startup/config crash, not a real assertion failure.
-      # This environment's GitHub API access can't download job logs
-      # (403 — insufficient permissions for unauthenticated requests) and
-      # the log viewer is a client-rendered page WebFetch can't execute, so
-      # routing the real output through ::error:: annotations (which the
-      # API *can* return) is the only way left to see what's actually
-      # failing.
-      - name: Run tests (with diagnostic output capture)
-        run: |
-          set +e
-          npm test > test-output.log 2>&1
-          status=$?
-          cat test-output.log
-          if [ $status -ne 0 ]; then
-            echo "::error::npm test exited $status. Last part of output below:"
-            tail -c 3500 test-output.log | while IFS= read -r line; do echo "::error::$line"; done
-            exit $status
-          fi
+      - run: npm test
       - run: npm run build
