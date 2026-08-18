@@ -37,5 +37,25 @@ jobs:
       # one), the axios-error-message extraction every mutation in the app
       # relies on, and the reduced-motion count-up hook's deterministic
       # branches. See admin-dashboard/README.md's Status section.
-      - run: npm test
+      # TEMPORARY diagnostic (to be removed): npm test fails in ~1s on this
+      # runner with no reproduction found locally on 3 separate attempts
+      # (clean npm ci, CI env vars set, forks pool) — a failure that fast
+      # smells like a startup/config crash, not a real assertion failure.
+      # This environment's GitHub API access can't download job logs
+      # (403 — insufficient permissions for unauthenticated requests) and
+      # the log viewer is a client-rendered page WebFetch can't execute, so
+      # routing the real output through ::error:: annotations (which the
+      # API *can* return) is the only way left to see what's actually
+      # failing.
+      - name: Run tests (with diagnostic output capture)
+        run: |
+          set +e
+          npm test > test-output.log 2>&1
+          status=$?
+          cat test-output.log
+          if [ $status -ne 0 ]; then
+            echo "::error::npm test exited $status. Last part of output below:"
+            tail -c 3500 test-output.log | while IFS= read -r line; do echo "::error::$line"; done
+            exit $status
+          fi
       - run: npm run build
