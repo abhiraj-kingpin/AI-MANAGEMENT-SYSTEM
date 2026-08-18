@@ -31,10 +31,11 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
+      # Vitest + React Testing Library — covers real, non-presentational
+      # logic: RBAC gating (`hasRole`, and Sidebar's actual role-based nav
+      # visibility, rendered against the real store rather than a mocked
+      # one), the axios-error-message extraction every mutation in the app
+      # relies on, and the reduced-motion count-up hook's deterministic
+      # branches. See admin-dashboard/README.md's Status section.
+      - run: npm test
       - run: npm run build
-
-      # No `npm test` step here, deliberately — admin-dashboard has no test
-      # suite yet (see admin-dashboard/README.md's Status section). Running
-      # a script that doesn't exist, or one that runs nothing, would just be
-      # a green checkmark that means nothing; this workflow only claims what
-      # it actually checks.

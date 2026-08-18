@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -13,5 +14,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+  },
+  // `globals: true` matches how the backend's Jest suite is written (no
+  // explicit `import { describe, it, expect } from ...` there either) —
+  // same test-writing convention across both suites rather than diverging.
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    globals: true,
   },
 });
