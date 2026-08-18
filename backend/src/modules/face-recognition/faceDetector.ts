@@ -46,7 +46,14 @@ export interface Detection {
 
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
 function getSession(): Promise<ort.InferenceSession> {
-  sessionPromise ??= ort.InferenceSession.create(MODEL_PATH);
+  // Explicit single-threaded, sequential SessionOptions — see
+  // faceEmbedding.provider.ts's getSession() for why (same reasoning,
+  // same fix, applies to both models identically).
+  sessionPromise ??= ort.InferenceSession.create(MODEL_PATH, {
+    executionMode: 'sequential',
+    intraOpNumThreads: 1,
+    interOpNumThreads: 1,
+  });
   return sessionPromise;
 }
 

@@ -32,9 +32,25 @@ const OUTPUT_NAME = '516';
 // Lazily created, cached across calls — loading and parsing a 13.6MB ONNX
 // model is real work; every registration after the first reuses the same
 // session instead of reloading the file.
+//
+// Explicit single-threaded, sequential SessionOptions: CI's Linux runner
+// was hard-aborting (SIGABRT) inside onnxruntime-node's own native init
+// path the moment either this or faceDetector.ts's session was first
+// created — 608/608 tests passed locally throughout, on both Node 20 and
+// 22, so it wasn't a Node-version issue. onnxruntime-node has multiple
+// open upstream reports of non-deterministic native crashes tied to its
+// internal thread pool during session init on Linux (e.g.
+// microsoft/onnxruntime#23794, #20084) — this is the standard mitigation
+// for that class of bug: don't let it size/manage its own thread pool at
+// all. These are small CPU models on a request path that's already
+// nowhere near latency-sensitive enough to need ORT's own parallelism.
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
 function getSession(): Promise<ort.InferenceSession> {
-  sessionPromise ??= ort.InferenceSession.create(MODEL_PATH);
+  sessionPromise ??= ort.InferenceSession.create(MODEL_PATH, {
+    executionMode: 'sequential',
+    intraOpNumThreads: 1,
+    interOpNumThreads: 1,
+  });
   return sessionPromise;
 }
 
