@@ -29,7 +29,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Was '20'. npm test was aborting with SIGABRT (exit 134) inside
+          # onnxruntime-node's native init path (initOrt/session-handler
+          # construction, backend.js:136) as soon as the face-recognition
+          # tests loaded their first real model — 608/608 passed locally
+          # the whole time, on Node 24. Same class of bug as the ci-admin.yml
+          # fix: Node 20 is too old for a native dependency, this time
+          # onnxruntime-node@1.27 rather than Vitest's undici. Bumping to
+          # match that fix.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
@@ -42,31 +50,7 @@ jobs:
       # at .env.test (dummy values, committed — see that file) instead of a
       # real .env. No live MongoDB, no secrets: every test in this suite
       # mocks its own models (see README.md#testing).
-      #
-      # TEMPORARY DIAGNOSTIC: `npm test` is exiting 134 (SIGABRT) on this
-      # runner only (608/608 pass locally). The normal annotations API only
-      # surfaces GitHub's own "exit code 134" note, not the actual npm/jest
-      # output, so this re-emits the real stdout+stderr as ::error:: lines
-      # to get it into the annotations API. Remove once root-caused.
-      - name: npm test (diagnostic)
-        run: |
-          set +e
-          npm test > test-output.log 2>&1
-          EXIT_CODE=$?
-          echo "npm test exit code: $EXIT_CODE"
-          cat test-output.log
-          # GitHub's ::error:: workflow command only creates ~9-10
-          # annotations per step, first-come-first-served. A plain tail
-          # got us the native abort's stack trace (frames 1-4, in
-          # onnxruntime-node's initOrt/session-handler init path) but cut
-          # off before showing which test file was running or whether
-          # there's a native error message above it. Grep for the
-          # informative lines across the WHOLE log instead, keeping the
-          # last ~9 matches so it's still weighted toward the crash point.
-          grep -E "PASS|FAIL|RUNS|^[0-9]+: |Aborted|exit code|Fatal|terminate|what\(\)|abi::|Segmentation|malloc|corrupted|double free" test-output.log | tail -n 9 | while IFS= read -r line; do
-            echo "::error::${line}"
-          done
-          exit $EXIT_CODE
+      - run: npm test
 
       - run: npm run build
 

@@ -8,28 +8,35 @@
 # not verified end-to-end here. sharp (already a dependency) ships both
 # glibc and musl binaries, so it's unaffected either way; bcryptjs is pure
 # JS. -slim is still meaningfully smaller than the full node:20 image.
-
-# --- deps: install once, reused by the build stage ---
-FROM node:20-slim AS deps
+#
+# Then bumped 20 -> 22 across every stage: CI (ci-backend.yml, same base
+# OS family as this image) caught onnxruntime-node@1.27 aborting with
+# SIGABRT (exit 134) inside its native init path on Node 20, as soon as
+# the face-recognition code touched a real model — passed the whole time
+# in local dev, which runs Node 24. Never actually verified end-to-end by
+# running this image (no Docker here — see above), but the Node-version
+# fix is the same one that resolved the identical native-crash symptom in
+# CI, on the same node:*-slim base family.
+FROM node:22-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
 # --- build: compile TypeScript ---
-FROM node:20-slim AS build
+FROM node:22-slim AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
 # --- production deps only ---
-FROM node:20-slim AS prod-deps
+FROM node:22-slim AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 # --- runtime: minimal final image ---
-FROM node:20-slim AS runtime
+FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN groupadd --system app && useradd --system --gid app app
