@@ -1,6 +1,6 @@
 {
   "name": "@ai-management-system/backend",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "private": true,
   "description": "AI Management System REST API — Express + TypeScript + MongoDB",
   "main": "dist/server.js",
@@ -35,8 +35,10 @@
     "mongoose": "^8.5.0",
     "morgan": "^1.10.0",
     "multer": "^2.2.0",
+    "onnxruntime-node": "^1.27.0",
     "pdfkit": "^0.19.1",
     "qrcode": "^1.5.4",
+    "sharp": "^0.35.3",
     "winston": "^3.13.0",
     "zod": "^3.23.8"
   },

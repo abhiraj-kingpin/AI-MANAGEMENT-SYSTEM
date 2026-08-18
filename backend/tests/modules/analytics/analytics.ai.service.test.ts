@@ -324,6 +324,32 @@ describe('aiAnalyticsService.getAnomalies', () => {
     expect(result).toEqual([]);
   });
 
+  it('skips (does not crash on) a pair of embeddings from different embedding spaces', async () => {
+    // A real, reachable state now that three embedding spaces coexist:
+    // 512-d from the real MobileFaceNet model, 67-d from mobile's on-device
+    // geometric placeholder, and anything else from a pre-real-model
+    // registration. cosineSimilarity throws on a length mismatch (correctly
+    // — vectors from different spaces aren't comparable), so this sweep
+    // must skip mismatched pairs rather than let one crash the whole
+    // request for every other employee.
+    const e1 = idOf('1');
+    const e2 = idOf('2');
+    mockedFaceEmbeddingFind.mockReturnValue(
+      mockQuery([
+        { employeeId: e1, vector: Array(512).fill(0.5) },
+        { employeeId: e2, vector: Array(67).fill(0.5) },
+      ]),
+    );
+    mockedEmployeeFind.mockReturnValue(
+      mockQuery([
+        { _id: e1, firstName: 'Asha', lastName: 'Rao' },
+        { _id: e2, firstName: 'Bilal', lastName: 'Khan' },
+      ]),
+    );
+
+    await expect(aiAnalyticsService.getAnomalies({ days: 30 })).resolves.toEqual([]);
+  });
+
   it('flags an employee whose overtime is a statistical outlier against everyone else', async () => {
     const outlier = idOf('9');
     mockedAttendanceAggregate.mockResolvedValue([

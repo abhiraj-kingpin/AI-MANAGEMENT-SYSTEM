@@ -2,7 +2,12 @@ import { type Document, Schema, type Types, model } from 'mongoose';
 
 export interface IFaceEmbedding extends Document {
   employeeId: Types.ObjectId;
-  vector: number[]; // 128-d (ML Kit) or 512-d (TFLite FaceNet-style model)
+  // 512-d for the server-side path (faceEmbedding.provider.ts's real
+  // MobileFaceNet model) or 67-d for mobile's own on-device geometric
+  // placeholder (POST /face/register-embeddings) — the 64-1024 validator
+  // below accepts either, deliberately, since this one field serves both
+  // registration paths.
+  vector: number[];
   // Undefined for an embedding computed entirely on-device and submitted
   // via POST /face/register-embeddings — by design, per
   // docs/architecture/06-tech-stack-justification.md's "on-device keeps

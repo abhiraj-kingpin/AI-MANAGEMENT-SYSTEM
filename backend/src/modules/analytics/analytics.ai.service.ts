@@ -125,6 +125,23 @@ async function detectLocationAnomalies(days: number): Promise<AnomalyDTO[]> {
   return anomalies;
 }
 
+/**
+ * The right caveat depends on which embedding space this specific pair is
+ * in — vector length is the only signal available here, but it's a
+ * reliable one: 512-d only ever comes from the real MobileFaceNet model,
+ * 67-d only from mobile's on-device geometric placeholder, anything else
+ * from a registration made before the real model existed.
+ */
+function duplicateFaceCaveat(vectorLength: number): string {
+  if (vectorLength === 512) {
+    return 'Both embeddings are from the real MobileFaceNet model (faceEmbedding.provider.ts) — a high score here is a genuine facial-similarity signal, not confirmed shared identity on its own.';
+  }
+  if (vectorLength === 67) {
+    return "Both embeddings are mobile's on-device geometric placeholder (features/face/domain/embedding/geometric_embedding_generator.dart), not a trained facial model — a match here means similar face-landmark geometry, not confirmed shared identity.";
+  }
+  return "Both embeddings predate the real MobileFaceNet model — faceEmbedding.provider.ts's earlier placeholder hashed image bytes rather than running a trained facial model, so a match here means two similar-looking source photos, not confirmed shared identity.";
+}
+
 async function detectDuplicateFaces(): Promise<AnomalyDTO[]> {
   const embeddings = await FaceEmbedding.find({ isActive: true }).select('employeeId vector');
   if (embeddings.length < 2) return [];
@@ -147,6 +164,16 @@ async function detectDuplicateFaces(): Promise<AnomalyDTO[]> {
       const pairKey = [employeeIdA, employeeIdB].sort().join(':');
       if (flaggedPairs.has(pairKey)) continue;
 
+      // This system now has three possible embedding spaces in play (512-d
+      // from faceEmbedding.provider.ts's real MobileFaceNet model, 67-d
+      // from mobile's on-device geometric placeholder, 128-d from any
+      // registration made before the real model existed) — cosineSimilarity
+      // throws on a length mismatch (shared/utils/vectorMath.ts), correctly,
+      // since vectors from different embedding spaces aren't comparable at
+      // all. Skip rather than let one mixed-method pair crash the whole
+      // sweep for every other employee.
+      if (a.vector.length !== b.vector.length) continue;
+
       const similarity = cosineSimilarity(a.vector, b.vector);
       if (similarity < DUPLICATE_FACE_SIMILARITY_THRESHOLD) continue;
       flaggedPairs.add(pairKey);
@@ -158,7 +185,7 @@ async function detectDuplicateFaces(): Promise<AnomalyDTO[]> {
         employeeName: nameById.get(employeeIdA) ?? 'Unknown',
         relatedEmployeeId: employeeIdB,
         relatedEmployeeName: nameById.get(employeeIdB) ?? 'Unknown',
-        detail: `Face embeddings ${(similarity * 100).toFixed(1)}% similar across two different employee profiles — review for a possible duplicate registration. Note: faceEmbedding.provider.ts's documented placeholder hashes image bytes rather than running a trained facial model, so a match here means two similar-looking source photos, not confirmed shared identity.`,
+        detail: `Face embeddings ${(similarity * 100).toFixed(1)}% similar across two different employee profiles — review for a possible duplicate registration. ${duplicateFaceCaveat(a.vector.length)}`,
         detectedAt: new Date(),
       });
     }
