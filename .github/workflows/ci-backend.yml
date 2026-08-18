@@ -55,12 +55,15 @@ jobs:
           EXIT_CODE=$?
           echo "npm test exit code: $EXIT_CODE"
           cat test-output.log
-          # GitHub's ::error:: workflow command only creates ~10 annotations
-          # per step, first-come-first-served — a prior attempt emitted the
-          # log top-down and only ever surfaced the first few PASS lines,
-          # never reaching the actual crash. The crash point is at the end
-          # of the log, so emit the tail instead.
-          tail -n 8 test-output.log | while IFS= read -r line; do
+          # GitHub's ::error:: workflow command only creates ~9-10
+          # annotations per step, first-come-first-served. A plain tail
+          # got us the native abort's stack trace (frames 1-4, in
+          # onnxruntime-node's initOrt/session-handler init path) but cut
+          # off before showing which test file was running or whether
+          # there's a native error message above it. Grep for the
+          # informative lines across the WHOLE log instead, keeping the
+          # last ~9 matches so it's still weighted toward the crash point.
+          grep -E "PASS|FAIL|RUNS|^[0-9]+: |Aborted|exit code|Fatal|terminate|what\(\)|abi::|Segmentation|malloc|corrupted|double free" test-output.log | tail -n 9 | while IFS= read -r line; do
             echo "::error::${line}"
           done
           exit $EXIT_CODE
