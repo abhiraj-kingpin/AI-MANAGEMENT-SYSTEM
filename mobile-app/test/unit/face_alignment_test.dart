@@ -47,7 +47,7 @@ void main() {
     test('recovers the inverse of a known rotation applied around the centroid', () {
       const dst = referenceKeypoints112;
       final center = meanPoint(dst);
-      final appliedAngle = math.pi / 2;
+      const appliedAngle = math.pi / 2;
 
       final src = dst.map((p) {
         final cx = p.x - center.x;
