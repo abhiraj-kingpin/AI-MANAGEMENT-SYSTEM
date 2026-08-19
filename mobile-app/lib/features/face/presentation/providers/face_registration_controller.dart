@@ -19,7 +19,9 @@ import 'package:ai_management_system/features/face/presentation/providers/face_r
 /// registration photo isn't asserting "a live person is present right
 /// now" the way a check-in is.
 ///
-/// ⚠️ [FaceEmbeddingGenerator] is UNVERIFIED — see its own doc comment.
+/// [FaceEmbeddingGenerator] was written blind and confirmed by
+/// `ci-mobile.yml` — see its own doc comment for what that found and what's
+/// still genuinely unverified (real-world accuracy on a device).
 class FaceRegistrationController extends StateNotifier<FaceRegistrationState> {
   static const _maxFrames = 5; // mirrors backend's MAX_REGISTRATION_IMAGES
   static const _minFrames = 3; // mirrors backend's MIN_REGISTRATION_IMAGES

@@ -25,7 +25,9 @@ typedef OnFaceVerified = void Function({
 /// (via [onVerified]) owns everything about the actual check-in's
 /// loading/success/error state.
 ///
-/// ⚠️ [FaceEmbeddingGenerator] is UNVERIFIED — see its own doc comment.
+/// [FaceEmbeddingGenerator] was written blind and confirmed by
+/// `ci-mobile.yml` — see its own doc comment for what that found and what's
+/// still genuinely unverified (real-world accuracy on a device).
 /// This controller's own change (moving embedding generation from "once,
 /// at the end, from geometry alone" to "per-frame, from real pixels,
 /// immediately") is a structural consequence of that, not a change made

@@ -3,9 +3,12 @@ import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import 'package:ai_management_system/features/face/domain/entities/point2d.dart';
 
-/// ⚠️ UNVERIFIED — see `mobile_face_net_embedding_generator.dart`'s doc
-/// comment for why (no Dart/Flutter SDK in the environment that wrote this,
-/// so nothing here has ever been compiled or run).
+/// Written with no Dart/Flutter SDK available, then confirmed by
+/// `ci-mobile.yml`'s real Flutter toolchain — see
+/// `mobile_face_net_embedding_generator.dart`'s doc comment for the full
+/// story (what that first real run found and fixed) and what's still
+/// genuinely unverified beyond compiling and passing known-answer tests
+/// (real-world accuracy on an actual face).
 ///
 /// A line-for-line port of the backend's already-proven
 /// `backend/src/modules/face-recognition/faceAlign.ts` — same reference
@@ -14,8 +17,8 @@ import 'package:ai_management_system/features/face/domain/entities/point2d.dart'
 /// same correctness argument that file's doc comment and
 /// `faceAlign.test.ts`'s known-answer tests already established (identity,
 /// a known 2x scale, a known 90-degree rotation, a known translation — all
-/// ported to `test/unit/face_alignment_test.dart`, though "ported" here
-/// also means "never run", for the same reason).
+/// ported to `test/unit/face_alignment_test.dart`, now passing there too,
+/// confirmed by `ci-mobile.yml`).
 
 /// InsightFace's standard 112x112 face-alignment reference template
 /// ("arcface_dst") — see the backend's `faceAlign.ts` for provenance

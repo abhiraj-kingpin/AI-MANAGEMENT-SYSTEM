@@ -5,13 +5,12 @@ import 'package:image/image.dart' as img;
 import 'package:ai_management_system/features/face/domain/embedding/face_alignment.dart';
 import 'package:ai_management_system/features/face/domain/entities/point2d.dart';
 
-/// ⚠️ UNVERIFIED — ported from the backend's already-passing
-/// `faceAlign.test.ts` (same known-answer cases: identity, a known 2x
-/// scale, a known 90-degree rotation, a known translation, plus the
-/// rejection cases and the two `warpAlignedFace` round-trip tests), but
-/// never actually run — this environment has no Dart/Flutter SDK. Written
-/// so a real Flutter environment can run it and get the same verification
-/// the backend port already has, not to claim it's already been done here.
+/// Ported from the backend's already-passing `faceAlign.test.ts` (same
+/// known-answer cases: identity, a known 2x scale, a known 90-degree
+/// rotation, a known translation, plus the rejection cases and the two
+/// `warpAlignedFace` round-trip tests) — written with no Dart/Flutter SDK
+/// available to run it against, then confirmed passing (50/50, this suite
+/// included) by `ci-mobile.yml`'s real Flutter toolchain.
 void main() {
   Point2D meanPoint(List<Point2D> points) {
     var x = 0.0, y = 0.0;

@@ -10,40 +10,59 @@ import 'package:ai_management_system/features/face/domain/embedding/geometric_em
 import 'package:ai_management_system/features/face/domain/entities/detected_face.dart';
 import 'package:ai_management_system/features/face/domain/entities/point2d.dart';
 
-/// ⚠️ UNVERIFIED — written to close a documented gap (see
+/// Written to close a documented gap (see
 /// `geometric_embedding_generator.dart`'s doc comment, and this project's
 /// backend `faceEmbedding.provider.ts`/`faceAlign.ts`, both of which this
-/// mirrors), but this environment has no Dart/Flutter SDK at all — not
-/// `flutter analyze`, not `flutter test`, not a device or emulator. Nothing
-/// in this file, `face_alignment.dart`, or their pubspec/asset changes has
-/// ever been compiled, let alone run. That's a materially different
-/// verification standard than every other change in this codebase, which
-/// was typechecked, linted, and actually executed before being called
-/// done — flagged explicitly here, in the README, and in the CHANGELOG
-/// rather than left implicit, per this project's standing rule that a
-/// placeholder or an unverified change is documented, never silently
-/// passed off as equivalent to tested code.
+/// mirrors) with no Dart/Flutter SDK available at all — not `flutter
+/// analyze`, not `flutter test`, not a device or emulator — so nothing in
+/// this file, `face_alignment.dart`, or their pubspec/asset changes had
+/// been compiled or run by the time they were first pushed. That was a
+/// materially different verification standard than every other change in
+/// this codebase, which was typechecked, linted, and actually executed
+/// before being called done — flagged explicitly at the time in this
+/// comment, the README, and the CHANGELOG rather than left implicit, per
+/// this project's standing rule that a placeholder or an unverified change
+/// is documented, never silently passed off as equivalent to tested code.
 ///
-/// What real confidence this DOES rest on, despite that: the alignment
-/// math (`face_alignment.dart`) is a direct port of the backend's
-/// `faceAlign.ts`, itself independently verified by 9 known-answer unit
-/// tests; the preprocessing/packing below mirrors
-/// `faceEmbedding.provider.ts#toAlignedInputTensor` line for line (same
-/// `(pixel-127.5)/128` normalization, same NCHW packing order); the model
-/// file is the exact same `w600k_mbf.onnx` (InsightFace `buffalo_s`, MIT
-/// license, checksum-recorded in the backend's own README) already proven
-/// to produce correctly-shaped, deterministic 512-dim embeddings server-
-/// side; and the `onnxruntime` Flutter plugin's API calls below (asset
-/// loading, `OrtSession.fromBuffer`, `OrtValueTensor.createTensorWithDataList`,
-/// `runAsync`, and the fact that a non-scalar output's `.value` comes back
-/// `reshape()`d to the tensor's own dimensions rather than flat) were
-/// confirmed by reading that plugin's own README and source on GitHub
-/// directly, not guessed from memory or by analogy with the Node binding.
-/// What's NOT confirmed: that any of this actually compiles, that
-/// `google_mlkit_face_detection`'s landmark positions are accurate enough
-/// in practice for this alignment step to converge well, or that the
-/// native ONNX runtime this plugin bundles actually initializes correctly
-/// on a real device.
+/// **Since confirmed by `ci-mobile.yml`** (a real Flutter 3.24.0
+/// toolchain): the first push genuinely failed `flutter analyze` (a
+/// private type leaked through `SimilarityTransform`'s public API, a
+/// redundant import, several `final`s that should have been `const`) —
+/// fixed from the real analyzer output across two more pushes, the same
+/// evidence-driven discipline this repo's whole CI history follows, not
+/// guessed. Now: `flutter analyze` clean, `flutter test` 50/50 (including
+/// `face_alignment_test.dart`'s 9 known-answer tests, actually passing now,
+/// not just ported), `flutter build apk --debug` builds successfully — the
+/// `onnxruntime` plugin's native Android build resolved cleanly against
+/// this project's current Gradle/AGP/Kotlin/compileSdk configuration
+/// (see mobile-app/README.md's Face Check-In / QR Check-In sections for
+/// how contentious that configuration has been for *other* plugins here).
+///
+/// What real confidence the alignment/preprocessing logic itself rested on
+/// even before that: the alignment math (`face_alignment.dart`) is a
+/// direct port of the backend's `faceAlign.ts`, itself independently
+/// verified by 9 known-answer unit tests; the preprocessing/packing below
+/// mirrors `faceEmbedding.provider.ts#toAlignedInputTensor` line for line
+/// (same `(pixel-127.5)/128` normalization, same NCHW packing order); the
+/// model file is the exact same `w600k_mbf.onnx` (InsightFace `buffalo_s`,
+/// MIT license, checksum-recorded in the backend's own README) already
+/// proven to produce correctly-shaped, deterministic 512-dim embeddings
+/// server-side; and the `onnxruntime` Flutter plugin's API calls below
+/// (asset loading, `OrtSession.fromBuffer`,
+/// `OrtValueTensor.createTensorWithDataList`, `runAsync`, and the fact that
+/// a non-scalar output's `.value` comes back `reshape()`d to the tensor's
+/// own dimensions rather than flat) were confirmed by reading that
+/// plugin's own README and source on GitHub directly, not guessed from
+/// memory or by analogy with the Node binding.
+///
+/// **What's still genuinely NOT confirmed**, because a compile-and-unit-test
+/// CI pass can't reach it: that `google_mlkit_face_detection`'s landmark
+/// positions are accurate enough in practice for this alignment step to
+/// converge well on a real face, that the native ONNX runtime this plugin
+/// bundles actually initializes correctly on a real device (as opposed to
+/// GitHub's CI runner), and real-world face-matching accuracy generally —
+/// this environment has no dataset of real people to measure that against,
+/// same limitation the backend has for its own embedding.
 ///
 /// Real ML failing to initialize on a given device (unsupported ABI, the
 /// plugin's native library missing, anything) falls back to

@@ -27,23 +27,7 @@ jobs:
           channel: 'stable'
 
       - run: flutter pub get
-
-      # TEMPORARY DIAGNOSTIC: flutter analyze is failing on the new
-      # face-embedding pass (written with no local Flutter SDK — see
-      # mobile-app/README.md#status). The normal annotations API only
-      # surfaces "exit code 1", not the actual analyzer output, so this
-      # re-emits it as ::error:: lines. Remove once root-caused.
-      - name: flutter analyze (diagnostic)
-        run: |
-          set +e
-          flutter analyze > analyze-output.log 2>&1
-          EXIT_CODE=$?
-          cat analyze-output.log
-          while IFS= read -r line; do
-            echo "::error::${line}"
-          done < analyze-output.log
-          exit $EXIT_CODE
-
+      - run: flutter analyze
       - run: flutter test
 
       # A debug (unsigned) build, not `--release` — no signing keystore is

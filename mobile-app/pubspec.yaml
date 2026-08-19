@@ -53,11 +53,11 @@ dependencies:
   # Real on-device face embedding — the same w600k_mbf.onnx (InsightFace
   # buffalo_s, MIT license) MobileFaceNet model the backend runs, via ONNX
   # Runtime's own Flutter binding (FFI over the native onnxruntime C API),
-  # not TFLite. See
+  # not TFLite. Written with no Flutter/Dart SDK available, then confirmed
+  # by ci-mobile.yml (flutter analyze/test/build apk all passing — see
   # features/face/domain/embedding/mobile_face_net_embedding_generator.dart's
-  # doc comment — this whole addition is UNVERIFIED, this environment has
-  # no Flutter/Dart SDK to compile or run it against. `image` decodes the
-  # captured JPEG frame into pixel data for alignment/preprocessing
+  # doc comment for the full story). `image` decodes the captured JPEG
+  # frame into pixel data for alignment/preprocessing
   # (`features/face/domain/embedding/face_alignment.dart`); the geometric
   # placeholder that used to be the only option is kept as
   # `GeometricEmbeddingGenerator`, now a same-device fallback rather than
