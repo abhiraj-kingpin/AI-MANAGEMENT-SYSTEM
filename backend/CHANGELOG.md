@@ -4,6 +4,18 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [v1.1.11] — Minimal Model Governance: Model Cards + a Real Integrity Check
+
+The last of six honestly-scoped ML gaps from this session's own prioritized list, closed in order: real face detection/alignment (`v1.1.7`), real on-device mobile ML (mobile CHANGELOG entry), real accuracy measurement (`v1.1.9`), real anti-spoofing (`v1.1.9`), real unsupervised ML in analytics (`v1.1.10`), and now minimal model-governance documentation.
+
+**`models/MODEL_CARDS.md`** — one model card per real ML component this backend loads at runtime (MobileFaceNet, SCRFD, MiniFASNet-V2, and the Isolation Forest algorithm), loosely following the structure [Mitchell et al.'s "Model Cards for Model Reporting"](https://arxiv.org/abs/1810.03993) established: purpose, architecture, source, license, checksum, input/output contract, intended use, what's actually been evaluated, and — just as important — what honestly hasn't. Not new information invented for this entry: every fact in it (the LFW accuracy numbers, the checksums, the provenance chains) was already established and verified in earlier version entries in this file; this consolidates it into one governance-shaped reference instead of leaving it scattered across per-version prose.
+
+**`models/manifest.json`** — the machine-readable counterpart: filename, SHA-256, size, source, license, and which version added each model, for all three `.onnx` files. Unlike the markdown card, this one is actually checked, not just written down: **`tests/shared/modelManifest.test.ts`** re-hashes every listed file against the manifest on every test run, confirms no `.onnx` file exists in `backend/models/` without a matching manifest entry, and confirms no manifest entry points at a file that no longer exists. A model file silently swapped, corrupted, or added without documentation is now a real, automatically-failing test — not something that could go unnoticed until someone happened to read the docs.
+
+**Deliberately NOT built, and why**: a model registry, versioned artifact storage, or automated retraining pipeline — none of those have real infrastructure behind them here (no object storage, no scheduled job runner beyond what's already an acknowledged gap elsewhere in this repo, e.g. the payroll batch queue's in-memory stand-in). "Minimal" is the honest word for what this is: real provenance, real integrity verification, real honesty about evaluation gaps — not the full MLOps stack a production ML team would eventually want.
+
+**Verified**: 629 Jest tests (up from 623 — 6 new in `modelManifest.test.ts`). `tsc`/`eslint`/`prettier` clean.
+
 ## [v1.1.10] — Real Unsupervised ML in Anomaly Detection (Isolation Forest)
 
 Closes the last explicitly-named gap in this project's own "AI-Assisted Analytics" documentation: `getAnomalies` had three honest, transparent rule-based checks (implausible GPS speed, embedding similarity, overtime z-scores) but no actual trained model anywhere in it, and the README said so plainly rather than pretending otherwise. `shared/ml/isolationForest.ts` adds a real one.
