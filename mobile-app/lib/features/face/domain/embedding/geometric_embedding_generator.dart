@@ -5,25 +5,25 @@ import 'package:ai_management_system/features/face/domain/entities/point2d.dart'
 
 /// ⚠️ NOT a trained face-recognition model.
 ///
-/// The backend's own `faceEmbedding.provider.ts` already carries an
-/// equivalent, explicitly-labeled placeholder for the exact same reason
-/// (server-side registration): no GPU, no way to bundle/verify a real
-/// `.tflite` FaceNet/MobileFaceNet model in this environment. This is that
-/// same tradeoff made again on the client — `tflite_flutter` was
-/// deliberately not added this pass. A real project would replace this
-/// function with on-device TFLite inference and change nothing else: every
-/// caller (registration, check-in) only depends on "a fixed-length
-/// `List<double>` such that the same person's vectors land close together
-/// under cosine similarity", which this honestly does NOT reliably achieve
-/// — it's a deterministic function of a *detected face's geometry* (unlike
-/// the backend's byte-hash placeholder, which has zero relationship to the
-/// image content at all), so it's somewhat more meaningful, but geometric
-/// landmark positions shift with head angle, expression, and lighting-driven
-/// detection jitter far more than a learned embedding would tolerate. It
-/// exists so the rest of the pipeline (liveness gating, the
-/// register/verify/check-in API contract, RBAC, quality filtering) is
-/// fully real and exercisable end-to-end, exactly like the backend
-/// placeholder's own doc comment describes.
+/// Originally the *only* embedding option this app had (no GPU, no way to
+/// bundle/verify a real model in this environment, at the time). Now used
+/// as `FaceEmbeddingGenerator`'s fallback — the real model
+/// (`mobile_face_net_embedding_generator.dart`, MobileFaceNet via ONNX
+/// Runtime) is the primary path, and this exists so a device where that
+/// real path can't initialize (unsupported ABI, native library missing)
+/// degrades to *something* still real-ish rather than breaking face
+/// check-in/registration outright — see that file's doc comment for the
+/// full reasoning, including why the fallback decision is never made
+/// per-frame. This class and its own tests are unchanged from when it was
+/// the only option: every caller (registration, check-in) only depends on
+/// "a fixed-length `List<double>` such that the same person's vectors land
+/// close together under cosine similarity", which this honestly does NOT
+/// reliably achieve as well as a trained model would — it's a deterministic
+/// function of a *detected face's geometry* (unlike the backend's old
+/// byte-hash placeholder, which had zero relationship to the image content
+/// at all), so it's somewhat more meaningful, but geometric landmark
+/// positions shift with head angle, expression, and lighting-driven
+/// detection jitter far more than a learned embedding would tolerate.
 ///
 /// Produces a fixed-length (67) vector so registration and check-in
 /// embeddings are always comparable regardless of which frame produced

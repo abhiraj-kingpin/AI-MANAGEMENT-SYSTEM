@@ -2,15 +2,15 @@ import 'package:camera/camera.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ai_management_system/core/services/camera_service.dart';
 import 'package:ai_management_system/core/services/face_detection_service.dart';
-import 'package:ai_management_system/features/face/domain/embedding/geometric_embedding_generator.dart';
+import 'package:ai_management_system/features/face/domain/embedding/mobile_face_net_embedding_generator.dart';
 import 'package:ai_management_system/features/face/domain/usecases/get_face_registration_status_usecase.dart';
 import 'package:ai_management_system/features/face/domain/usecases/register_face_embeddings_usecase.dart';
 import 'package:ai_management_system/features/face/presentation/providers/face_registration_state.dart';
 
 /// Orchestrates face *registration*: capture up to [_maxFrames] still
 /// frames, keep the ones with exactly one clearly-detected face, generate
-/// one embedding per kept frame via `GeometricEmbeddingGenerator` — the
-/// same generator `FaceCheckInController` uses for check-in, which is the
+/// one embedding per kept frame via `FaceEmbeddingGenerator` — the same
+/// generator `FaceCheckInController` uses for check-in, which is the
 /// entire point of this screen existing (see `face.service.ts`'s
 /// `registerWithEmbeddings` on the backend: registering through this path
 /// instead of photo upload is what lets check-in's embeddings actually
@@ -18,6 +18,8 @@ import 'package:ai_management_system/features/face/presentation/providers/face_r
 /// `registerFaceEmbeddingsSchema` on the backend doesn't require it, and a
 /// registration photo isn't asserting "a live person is present right
 /// now" the way a check-in is.
+///
+/// ⚠️ [FaceEmbeddingGenerator] is UNVERIFIED — see its own doc comment.
 class FaceRegistrationController extends StateNotifier<FaceRegistrationState> {
   static const _maxFrames = 5; // mirrors backend's MAX_REGISTRATION_IMAGES
   static const _minFrames = 3; // mirrors backend's MIN_REGISTRATION_IMAGES
@@ -27,19 +29,19 @@ class FaceRegistrationController extends StateNotifier<FaceRegistrationState> {
   final FaceDetectionService _faceDetectionService;
   final RegisterFaceEmbeddingsUseCase _registerUseCase;
   final GetFaceRegistrationStatusUseCase _statusUseCase;
-  final GeometricEmbeddingGenerator _embeddingGenerator;
+  final FaceEmbeddingGenerator _embeddingGenerator;
 
   FaceRegistrationController({
     required CameraService cameraService,
     required FaceDetectionService faceDetectionService,
     required RegisterFaceEmbeddingsUseCase registerUseCase,
     required GetFaceRegistrationStatusUseCase statusUseCase,
-    GeometricEmbeddingGenerator embeddingGenerator = const GeometricEmbeddingGenerator(),
+    FaceEmbeddingGenerator? embeddingGenerator,
   })  : _cameraService = cameraService,
         _faceDetectionService = faceDetectionService,
         _registerUseCase = registerUseCase,
         _statusUseCase = statusUseCase,
-        _embeddingGenerator = embeddingGenerator,
+        _embeddingGenerator = embeddingGenerator ?? FaceEmbeddingGenerator(),
         super(const FaceRegistrationState()) {
     _loadStatus();
   }
@@ -73,6 +75,11 @@ class FaceRegistrationController extends StateNotifier<FaceRegistrationState> {
       return;
     }
 
+    // Decided once, up front — every frame captured below sees the same
+    // real-vs-fallback decision (see FaceEmbeddingGenerator's doc comment
+    // on why that must never vary within one registration attempt).
+    await _embeddingGenerator.initialize();
+
     state = state.copyWith(
       stage: FaceRegistrationStage.capturing,
       cameraController: controller,
@@ -87,7 +94,7 @@ class FaceRegistrationController extends StateNotifier<FaceRegistrationState> {
         final path = await _cameraService.capture();
         final faces = await _faceDetectionService.detectFromFilePath(path);
         if (faces.length == 1) {
-          embeddings.add(_embeddingGenerator.generate(faces.single));
+          embeddings.add(await _embeddingGenerator.generate(path, faces.single));
           state = state.copyWith(capturedCount: embeddings.length);
         }
         // Zero or multiple faces: skip this frame, same reasoning as
@@ -139,6 +146,7 @@ class FaceRegistrationController extends StateNotifier<FaceRegistrationState> {
   void dispose() {
     _cameraService.dispose();
     _faceDetectionService.dispose();
+    _embeddingGenerator.dispose();
     super.dispose();
   }
 }

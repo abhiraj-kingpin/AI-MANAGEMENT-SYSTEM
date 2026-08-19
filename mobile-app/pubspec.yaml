@@ -46,12 +46,24 @@ dependencies:
 
   # Phase 8 — face check-in: camera capture + on-device face detection for
   # a real liveness check (see core/services/camera_service.dart,
-  # features/face/). No `tflite_flutter` yet — see
-  # features/face/data/geometric_embedding_generator.dart's doc comment for
-  # why the embedding step is a documented geometric placeholder, not a
-  # trained model.
+  # features/face/).
   camera: ^0.11.0+2
   google_mlkit_face_detection: ^0.12.0
+
+  # Real on-device face embedding — the same w600k_mbf.onnx (InsightFace
+  # buffalo_s, MIT license) MobileFaceNet model the backend runs, via ONNX
+  # Runtime's own Flutter binding (FFI over the native onnxruntime C API),
+  # not TFLite. See
+  # features/face/domain/embedding/mobile_face_net_embedding_generator.dart's
+  # doc comment — this whole addition is UNVERIFIED, this environment has
+  # no Flutter/Dart SDK to compile or run it against. `image` decodes the
+  # captured JPEG frame into pixel data for alignment/preprocessing
+  # (`features/face/domain/embedding/face_alignment.dart`); the geometric
+  # placeholder that used to be the only option is kept as
+  # `GeometricEmbeddingGenerator`, now a same-device fallback rather than
+  # the only path (see FaceEmbeddingGenerator).
+  onnxruntime: ^1.4.1
+  image: ^4.9.1
 
   # Phase 7 — QR check-in: scans the same token the backend encodes into
   # the QR image it generates (see core/services/... — QrCheckInScreen
@@ -77,3 +89,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    # w600k_mbf.onnx (13.6MB) — same file as backend/models/w600k_mbf.onnx,
+    # same provenance/checksum (see that directory and
+    # features/face/domain/embedding/mobile_face_net_embedding_generator.dart).
+    # Listed as a file, not a directory, deliberately: an asset directory
+    # entry bundles everything under it, and this is the only file in
+    # assets/models/.
+    - assets/models/w600k_mbf.onnx

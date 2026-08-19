@@ -4,7 +4,7 @@ import 'package:ai_management_system/features/face/domain/entities/face_registra
 
 abstract class FaceRepository {
   /// Registers using embeddings computed on-device (see
-  /// `GeometricEmbeddingGenerator`) — 3 to 5 of them, mirroring the
+  /// `FaceEmbeddingGenerator`) — 3 to 5 of them, mirroring the
   /// backend's `MIN_REGISTRATION_IMAGES`/`MAX_REGISTRATION_IMAGES`.
   Future<Result<FaceRegisterResultEntity>> registerEmbeddings(List<List<double>> embeddings);
 
