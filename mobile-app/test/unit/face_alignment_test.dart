@@ -35,7 +35,7 @@ void main() {
     });
 
     test('recovers a pure 2x scale (src scaled down from dst, from the origin)', () {
-      final dst = referenceKeypoints112;
+      const dst = referenceKeypoints112;
       final src = dst.map((p) => Point2D(p.x * 0.5, p.y * 0.5)).toList();
 
       final transform = estimateSimilarityTransform(src, dst);
@@ -45,7 +45,7 @@ void main() {
     });
 
     test('recovers the inverse of a known rotation applied around the centroid', () {
-      final dst = referenceKeypoints112;
+      const dst = referenceKeypoints112;
       final center = meanPoint(dst);
       final appliedAngle = math.pi / 2;
 
@@ -65,7 +65,7 @@ void main() {
     });
 
     test('recovers a pure translation', () {
-      final dst = referenceKeypoints112;
+      const dst = referenceKeypoints112;
       final src = dst.map((p) => Point2D(p.x + 10, p.y - 20)).toList();
 
       final transform = estimateSimilarityTransform(src, dst);
@@ -137,7 +137,7 @@ void main() {
 
       final output = warpAlignedFace(source, landmarks, size: 112);
 
-      final centerIdx = (56 * 112 + 56) * 3;
+      const centerIdx = (56 * 112 + 56) * 3;
       expect(output[centerIdx].toDouble(), closeTo(200, 1));
       expect(output[centerIdx + 1].toDouble(), closeTo(100, 1));
       expect(output[centerIdx + 2].toDouble(), closeTo(50, 1));

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -167,7 +166,7 @@ class FaceEmbeddingGenerator {
   /// over all 5 points, not an exact match) tolerates it, the same way it
   /// tolerates ordinary detector landmark noise on the backend.
   List<Point2D> _insightFaceOrderedLandmarks(DetectedFace face) {
-    final ordered = [
+    const ordered = [
       FaceLandmarkName.leftEye,
       FaceLandmarkName.rightEye,
       FaceLandmarkName.noseBase,
@@ -192,7 +191,7 @@ class FaceEmbeddingGenerator {
   /// packing loop. [aligned] is `_inputSize*_inputSize*3` interleaved RGB
   /// bytes, exactly what `face_alignment.dart#warpAlignedFace` returns.
   Float32List _toNchwNormalized(Uint8List aligned) {
-    final pixelCount = _inputSize * _inputSize;
+    const pixelCount = _inputSize * _inputSize;
     final chw = Float32List(3 * pixelCount);
     for (var i = 0; i < pixelCount; i++) {
       chw[i] = (aligned[i * 3] - 127.5) / 128;

@@ -28,16 +28,19 @@ const List<Point2D> referenceKeypoints112 = [
   Point2D(70.7299, 92.2041),
 ];
 
-class _Complex {
+/// A complex number — used here purely as a 2D rotation+scale
+/// representation (`re`/`im` rather than `x`/`y`, matching the backend
+/// `faceAlign.ts`'s own complex-plane formulation this is ported from).
+class Complex {
   final double re;
   final double im;
-  const _Complex(this.re, this.im);
+  const Complex(this.re, this.im);
 }
 
 class SimilarityTransform {
   /// Forward transform: dst ~= a*src + b, in complex-number form.
-  final _Complex a;
-  final _Complex b;
+  final Complex a;
+  final Complex b;
 
   const SimilarityTransform(this.a, this.b);
 }
@@ -95,7 +98,7 @@ SimilarityTransform estimateSimilarityTransform(List<Point2D> src, List<Point2D>
   final bRe = dstMean.x - (aRe * srcMean.x - aIm * srcMean.y);
   final bIm = dstMean.y - (aIm * srcMean.x + aRe * srcMean.y);
 
-  return SimilarityTransform(_Complex(aRe, aIm), _Complex(bRe, bIm));
+  return SimilarityTransform(Complex(aRe, aIm), Complex(bRe, bIm));
 }
 
 /// One RGB pixel, as three 0-255 byte values.
