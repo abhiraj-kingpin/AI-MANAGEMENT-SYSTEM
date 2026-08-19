@@ -12,6 +12,7 @@ import {
   generateFaceEmbedding,
   NoFaceDetectedError,
 } from '../../../src/modules/face-recognition/faceEmbedding.provider';
+import { detectLiveness } from '../../../src/modules/face-recognition/livenessDetector';
 
 const { detectFaces } = faceDetectorModule;
 
@@ -289,6 +290,83 @@ describe('generateFaceEmbedding (real MobileFaceNet provider)', () => {
       const onlyStrong = await generateFaceEmbedding(image);
 
       expect(whenBothPresent.vector).toEqual(onlyStrong.vector);
+    },
+    MODEL_TEST_TIMEOUT,
+  );
+});
+
+/**
+ * Real MiniFASNet-V2 inference, same rigor and same honest limits as the
+ * two suites above: no labeled real-vs-spoof dataset exists in this
+ * environment (LFW, used to calibrate `FACE_MATCH_THRESHOLD` for real in
+ * `scripts/lfw-eval.ts`, is entirely genuine photos), so what's verifiable
+ * here is shape/range correctness, determinism, and that the crop-box
+ * clamping logic (a direct port of upstream's `_get_new_box`) doesn't
+ * crash on edge cases — not that the model actually distinguishes a real
+ * face from a printed one, which the upstream project's own published
+ * accuracy on its own held-out test set is the evidence for, not this
+ * repo's tests.
+ */
+describe('detectLiveness (real MiniFASNet-V2 anti-spoofing)', () => {
+  /** A face-plausible bounding box roughly centered in a `width`×`height` image — not a real detected face, just a stand-in bbox exercising the real crop+resize+inference path. */
+  function centeredBbox(width: number, height: number): FaceBoundingBox {
+    const size = Math.min(width, height) * 0.6;
+    const cx = width / 2;
+    const cy = height / 2;
+    return { x1: cx - size / 2, y1: cy - size / 2, x2: cx + size / 2, y2: cy + size / 2 };
+  }
+
+  it(
+    'returns a valid 3-class softmax (each in [0,1], summing to ~1) and a consistent liveScore',
+    async () => {
+      const image = await flatImage(320, 240, { r: 140, g: 120, b: 100 });
+      const result = await detectLiveness(image, centeredBbox(320, 240));
+
+      const { live, printAttack, replayAttack } = result.scores;
+      for (const p of [live, printAttack, replayAttack]) {
+        expect(p).toBeGreaterThanOrEqual(0);
+        expect(p).toBeLessThanOrEqual(1);
+      }
+      expect(live + printAttack + replayAttack).toBeCloseTo(1, 5);
+      expect(result.liveScore).toBeCloseTo(1 - (printAttack + replayAttack), 10);
+      expect(result.isLive).toBe(result.liveScore >= 0.5);
+    },
+    MODEL_TEST_TIMEOUT,
+  );
+
+  it(
+    'is deterministic — the same image and bbox always produce the same result',
+    async () => {
+      const image = await flatImage(300, 300, { r: 90, g: 110, b: 130 });
+      const bbox = centeredBbox(300, 300);
+
+      const a = await detectLiveness(image, bbox);
+      const b = await detectLiveness(image, bbox);
+
+      expect(a.scores).toEqual(b.scores);
+    },
+    MODEL_TEST_TIMEOUT,
+  );
+
+  it(
+    'does not crash when the bounding box extends past the image edges (exercises _get_new_box clamping)',
+    async () => {
+      const image = await flatImage(200, 200, { r: 50, g: 60, b: 70 });
+      // A bbox whose 2.7x-scaled crop margin would extend well outside
+      // the image on every side — the real case getCropBox's four
+      // clamping branches exist for.
+      const edgeBbox: FaceBoundingBox = { x1: -20, y1: -20, x2: 220, y2: 220 };
+
+      await expect(detectLiveness(image, edgeBbox)).resolves.toBeDefined();
+    },
+    MODEL_TEST_TIMEOUT,
+  );
+
+  it(
+    'does not crash on a wide, non-square image',
+    async () => {
+      const image = await flatImage(800, 200, { r: 40, g: 40, b: 40 });
+      await expect(detectLiveness(image, centeredBbox(800, 200))).resolves.toBeDefined();
     },
     MODEL_TEST_TIMEOUT,
   );

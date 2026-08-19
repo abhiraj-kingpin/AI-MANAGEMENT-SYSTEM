@@ -4,6 +4,39 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [v1.1.9] — Real Accuracy Measurement (LFW) Fixes a Broken Threshold, Plus Real Anti-Spoofing
+
+Two additions, both closing gaps this project's own README has flagged since `v1.1.6`: face recognition had no measured accuracy, and no defense against a printed-photo or screen-replay registration.
+
+**`scripts/lfw-eval.ts`** — a real, runnable evaluation script (`npm run eval:lfw`) that runs this backend's actual `generateFaceEmbedding`/`cosineSimilarity` pipeline against LFW (Labeled Faces in the Wild), the standard academic face-verification benchmark, using its own standard `pairsDevTest.txt` split (500 same-person + 500 different-person pairs, a fixed published split, not randomly sampled). The dataset itself (real people's photos, even a long-standing ethically-established benchmark) is deliberately never committed to this repo — same reasoning as the one CC0 portrait used to manually verify SCRFD detection in `v1.1.7` — the script reads it from a local, gitignored directory instead, with download URLs and checksums in its own doc comment (verified against `scikit-learn`'s own `_lfw.py`, the same mirror `sklearn.datasets.fetch_lfw_pairs` uses).
+
+**Real run results** (989/1000 pairs processed; 11 skipped for no detectable face in at least one image — a real, expected SCRFD failure rate, not swept under the rug):
+
+| threshold              | accuracy                    | FAR       | FRR    |
+| ---------------------- | --------------------------- | --------- | ------ |
+| 0.10                   | 94.24%                      | 6.04%     | 5.49%  |
+| 0.20                   | 96.66%                      | 0.60%     | 6.10%  |
+| **0.24**               | **96.97%** (empirical best) | **0.00%** | 6.10%  |
+| 0.30                   | 96.76%                      | 0.00%     | 6.50%  |
+| 0.50                   | 91.61%                      | 0.00%     | 16.87% |
+| 0.70                   | 60.57%                      | 0.00%     | 79.27% |
+| **0.85** (old default) | **51.16%**                  | 0.00%     | 98.17% |
+| 0.90                   | 50.35%                      | 0.00%     | 99.80% |
+
+Mean same-person similarity: 0.588. Mean different-person similarity: 0.003.
+
+**The finding that actually matters**: `FACE_MATCH_THRESHOLD`'s default (0.85, an unmeasured guess from before this codebase had a real embedding model at all) scores 51.16% on this benchmark — statistically indistinguishable from a coin flip. It would have rejected the overwhelming majority of genuine check-ins (98.17% false-reject rate) in real use. This had been sitting in `config/env.ts` undetected because nothing before this pass ever measured it against real labeled data. Fixed to `0.3` — inside the threshold range (0.24–0.85) where measured false-accept rate was exactly 0%, with deliberate headroom above the razor's-edge empirical optimum (0.24) rather than sitting exactly on it, since a single finite benchmark's exact peak is more likely to be slightly optimistic than a point a little further into the flat, still-0%-FAR region. See `config/env.ts`'s own comment for the same reasoning, shorter.
+
+**What this does and doesn't prove**: real, honest evidence that the detect→align→embed→cosine-match pipeline is genuinely discriminative for real faces (this was previously unverifiable — no dataset of real people existed in this environment at all). Not a substitute for measuring this specific deployment's own employees under this specific deployment's own camera conditions — LFW is mostly well-lit, front-facing, professional photos of public figures, a real but imperfect proxy.
+
+**`livenessDetector.ts`** — real single-image presentation-attack detection (PAD), wired into `face.service.ts#register()`'s per-photo loop (a registration photo that fails this check is discarded the same way a low-quality or faceless one already is, not silently accepted). Model: MiniFASNet-V2 (`minifasnet_v2.onnx`, 1.7MB), an ONNX export (Apache 2.0, same license as the upstream) of `minivision-ai/Silent-Face-Anti-Spoofing`'s `2.7_80x80_MiniFASNetV2.pth`, downloaded from `garciafido/minifasnet-v2-anti-spoofing-onnx` on Hugging Face — provenance verified via checksum (both the ONNX file and, per that repo's model card, the original upstream `.pth` it was losslessly converted from) before use, not assumed. Preprocessing (the 2.7×-margin crop-around-bbox-center) is a direct, variable-for-variable port of upstream's own `CropImage._get_new_box`/`crop` (`src/generate_patches.py`) — fetched and read before writing this repo's version, the same discipline `faceDetector.ts`'s anchor decoding and `faceAlign.ts`'s reference template already followed, given how easily a silently-wrong crop formula produces a plausible-but-meaningless liveness score. One documented approximation: the crop-to-80×80 resize is this repo's own from-scratch bilinear implementation (reusing `faceAlign.ts`'s already-tested `bilinearSample`) using OpenCV's documented half-pixel-center coordinate mapping for `INTER_LINEAR`, not verified byte-for-byte against a real `cv2.resize` call (no OpenCV/Python in this environment) — the same class of gap `faceAlign.ts`'s own warp had before it shipped.
+
+This is a different, complementary signal from the mobile app's existing blink-based liveness check (`BlinkLivenessChecker`): that one is temporal (a real eye-open→closed→open sequence across several frames, catches a static photo trivially, but could in principle be fooled by a video replay that itself shows blinking) and runs client-side at check-in; this one is single-image texture/reflection/moiré analysis with no notion of motion at all, and runs server-side at registration. Neither replaces the other, and this one does NOT run at check-in (the backend's `verify()` only ever receives a pre-computed embedding vector from the client, never a raw image — mobile's blink check remains the only check-in-time liveness signal).
+
+No labeled real-vs-spoof dataset exists in this environment either (LFW, used above, is entirely genuine photos — it has no print/replay-attack examples), so `LIVE_THRESHOLD` (0.5, the natural "which class wins" cut for a 3-class softmax) is real but unverified the same way `FACE_MATCH_THRESHOLD` used to be — documented as such in `livenessDetector.ts`'s own comment rather than left silent.
+
+**Verified**: 614 Jest tests (up from 608 — 4 new: `detectLiveness`'s own real-inference suite, merged into `faceRecognitionModels.test.ts` rather than a separate file, for the exact same reason that file's own doc comment already explains — a fourth Jest file independently touching `onnxruntime-node` would reintroduce `v1.1.8`'s SIGABRT bug; plus 2 new tests in `face.service.test.ts` for the discard-on-failed-liveness path, mocked there the same way `generateFaceEmbedding` already was). `tsc`, `eslint`, `prettier` all clean. `scripts/lfw-eval.ts` was actually run against the real dataset, twice (the second run added a fuller threshold sweep and cached raw per-pair results so a future threshold reconsideration never needs to re-run the ~15-minute real-inference pass) — the numbers above are real output, not illustrative.
+
 ## [v1.1.8] — CI Caught a Real Crash in v1.1.7: Two Jest Files, One Native ONNX Runtime Singleton
 
 `v1.1.7`'s 608 tests all passed locally, repeatedly — but `npm test` aborted on CI with exit code 134 (SIGABRT), a native crash, not a normal assertion failure. `docker-build` never even ran as a result.

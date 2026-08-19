@@ -24,10 +24,23 @@ jest.mock('../../../src/modules/face-recognition/faceEmbedding.provider', () => 
   return { ...actual, generateFaceEmbedding: jest.fn() };
 });
 
+// Whole module mocked (nothing else from it is needed real here, unlike
+// faceEmbedding.provider.ts's NoFaceDetectedError) — a real detectLiveness
+// call would run actual ONNX inference in a THIRD Jest module registry
+// this file doesn't have the realGlobalsNodeEnv custom environment for,
+// reintroducing the exact SIGABRT class of bug faceRecognitionModels.test.ts's
+// own doc comment describes (two separate Jest files each independently
+// touching onnxruntime-node for real). Real, unmocked liveness inference
+// is exercised in that merged file instead.
+jest.mock('../../../src/modules/face-recognition/livenessDetector', () => ({
+  detectLiveness: jest.fn(),
+}));
+
 import { faceService } from '../../../src/modules/face-recognition/face.service';
 import { NoFaceDetectedError } from '../../../src/modules/face-recognition/faceEmbedding.provider';
 import { FaceEmbedding } from '../../../src/modules/face-recognition/faceEmbedding.model';
 import { generateFaceEmbedding } from '../../../src/modules/face-recognition/faceEmbedding.provider';
+import { detectLiveness } from '../../../src/modules/face-recognition/livenessDetector';
 import type { ActorContext } from '../../../src/shared/types/actorContext';
 
 const mockedCreate = FaceEmbedding.create as unknown as jest.Mock;
@@ -35,19 +48,35 @@ const mockedFind = FaceEmbedding.find as unknown as jest.Mock;
 const mockedUpdateMany = FaceEmbedding.updateMany as unknown as jest.Mock;
 const mockedDeleteMany = FaceEmbedding.deleteMany as unknown as jest.Mock;
 const mockedGenerateEmbedding = generateFaceEmbedding as unknown as jest.Mock;
+const mockedDetectLiveness = detectLiveness as unknown as jest.Mock;
 
 const self: ActorContext = { id: 'user-1', role: 'employee', employeeId: 'emp-1' };
 const otherEmployee: ActorContext = { id: 'user-2', role: 'employee', employeeId: 'emp-2' };
 const hr: ActorContext = { id: 'user-hr', role: 'hr', employeeId: 'emp-hr' };
 
+const fakeBbox = { x1: 0, y1: 0, x2: 100, y2: 100 };
+
 function goodEmbedding(seed: number) {
-  return { vector: Array(128).fill(seed), qualityScore: 0.8 };
+  return { vector: Array(128).fill(seed), qualityScore: 0.8, bbox: fakeBbox };
+}
+
+function liveResult() {
+  return {
+    isLive: true,
+    liveScore: 0.9,
+    scores: { live: 0.9, printAttack: 0.05, replayAttack: 0.05 },
+  };
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockedUpdateMany.mockResolvedValue({});
   mockedDeleteMany.mockResolvedValue({});
+  // Every existing test in this file predates liveness detection and
+  // doesn't care about it — default every photo to passing, so only the
+  // tests specifically about the liveness-discard path below need to
+  // override this.
+  mockedDetectLiveness.mockResolvedValue(liveResult());
 });
 
 describe('faceService.register', () => {
@@ -70,7 +99,7 @@ describe('faceService.register', () => {
 
   it('discards low-quality images but keeps the rest', async () => {
     mockedGenerateEmbedding
-      .mockResolvedValueOnce({ vector: Array(128).fill(1), qualityScore: 0.05 }) // discarded
+      .mockResolvedValueOnce({ vector: Array(128).fill(1), qualityScore: 0.05, bbox: fakeBbox }) // discarded
       .mockResolvedValueOnce(goodEmbedding(2))
       .mockResolvedValueOnce(goodEmbedding(3));
     mockedCreate.mockImplementation((data: Record<string, unknown>) =>
@@ -83,7 +112,46 @@ describe('faceService.register', () => {
   });
 
   it('rejects when every image is discarded for low quality', async () => {
-    mockedGenerateEmbedding.mockResolvedValue({ vector: Array(128).fill(1), qualityScore: 0.01 });
+    mockedGenerateEmbedding.mockResolvedValue({
+      vector: Array(128).fill(1),
+      qualityScore: 0.01,
+      bbox: fakeBbox,
+    });
+
+    await expect(faceService.register(threeImages, undefined, self)).rejects.toMatchObject({
+      code: 'FACE_QUALITY_TOO_LOW',
+    });
+  });
+
+  it('discards a photo that fails liveness detection but keeps the rest', async () => {
+    mockedGenerateEmbedding
+      .mockResolvedValueOnce(goodEmbedding(1))
+      .mockResolvedValueOnce(goodEmbedding(2))
+      .mockResolvedValueOnce(goodEmbedding(3));
+    mockedDetectLiveness
+      .mockResolvedValueOnce({
+        isLive: false,
+        liveScore: 0.1,
+        scores: { live: 0.1, printAttack: 0.8, replayAttack: 0.1 },
+      })
+      .mockResolvedValueOnce(liveResult())
+      .mockResolvedValueOnce(liveResult());
+    mockedCreate.mockImplementation((data: Record<string, unknown>) =>
+      Promise.resolve({ _id: `id-${Math.random()}`, ...data }),
+    );
+
+    const result = await faceService.register(threeImages, undefined, self);
+
+    expect(result).toEqual({ status: 'registered', embeddingCount: 2, discardedCount: 1 });
+  });
+
+  it('rejects with the same FACE_QUALITY_TOO_LOW code when every image fails liveness detection', async () => {
+    mockedGenerateEmbedding.mockResolvedValue(goodEmbedding(1));
+    mockedDetectLiveness.mockResolvedValue({
+      isLive: false,
+      liveScore: 0.05,
+      scores: { live: 0.05, printAttack: 0.9, replayAttack: 0.05 },
+    });
 
     await expect(faceService.register(threeImages, undefined, self)).rejects.toMatchObject({
       code: 'FACE_QUALITY_TOO_LOW',

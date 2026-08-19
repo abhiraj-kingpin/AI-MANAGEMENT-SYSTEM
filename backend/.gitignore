@@ -5,3 +5,10 @@ coverage
 .env.local
 *.log
 .DS_Store
+
+# scripts/lfw-eval.ts's inputs/outputs — the LFW dataset itself is never
+# committed (real people's photos, even a long-standing academic
+# benchmark — see that script's own doc comment), nor is a raw results
+# dump from a single run (written up by hand in README/CHANGELOG instead).
+lfw-data/
+lfw-eval-results.json

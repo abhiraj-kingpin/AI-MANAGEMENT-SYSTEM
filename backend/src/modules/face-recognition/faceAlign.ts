@@ -154,8 +154,14 @@ export function warpAlignedFace(
   return output;
 }
 
-/** Black border for out-of-bounds samples — matches cv2.warpAffine's default `borderValue=0.0`. */
-function bilinearSample(source: RawImage, x: number, y: number): [number, number, number] {
+/**
+ * Black border for out-of-bounds samples — matches cv2.warpAffine's
+ * default `borderValue=0.0`. Exported (not just used internally by
+ * `warpAlignedFace`) so `livenessDetector.ts`'s own crop+resize step can
+ * reuse the same tested bilinear-sampling primitive instead of a second,
+ * separately-written copy of the same math.
+ */
+export function bilinearSample(source: RawImage, x: number, y: number): [number, number, number] {
   const { data, width, height, channels } = source;
   if (x < 0 || y < 0 || x > width - 1 || y > height - 1) return [0, 0, 0];
 

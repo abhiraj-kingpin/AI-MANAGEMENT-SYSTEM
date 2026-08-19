@@ -7,6 +7,7 @@ import type { ActorContext } from '../../shared/types/actorContext';
 import { maxCosineSimilarity } from '../../shared/utils/vectorMath';
 import { generateFaceEmbedding, NoFaceDetectedError } from './faceEmbedding.provider';
 import { FaceEmbedding } from './faceEmbedding.model';
+import { detectLiveness } from './livenessDetector';
 import type {
   FaceRegisterResultDTO,
   FaceRegistrationStatusDTO,
@@ -79,8 +80,9 @@ export const faceService = {
     for (const image of images) {
       let vector: number[];
       let qualityScore: number;
+      let bbox: Awaited<ReturnType<typeof generateFaceEmbedding>>['bbox'];
       try {
-        ({ vector, qualityScore } = await generateFaceEmbedding(image));
+        ({ vector, qualityScore, bbox } = await generateFaceEmbedding(image));
       } catch (error) {
         // A photo with no detectable face (someone's back, a blurry non-
         // face frame, an empty room) is discarded the same as a
@@ -95,6 +97,23 @@ export const faceService = {
 
       if (qualityScore < MIN_QUALITY_SCORE) {
         discarded += 1;
+        continue;
+      }
+
+      // Real presentation-attack detection (livenessDetector.ts,
+      // MiniFASNet-V2) — a printed photo or a screen replay of someone
+      // else's face is discarded the same way a low-quality or faceless
+      // photo already is, rather than being registered as a legitimate
+      // reference embedding. Failure here is treated the same as any
+      // other per-photo problem: this one photo is skipped, the rest of
+      // the batch still has a chance to produce enough kept embeddings.
+      const liveness = await detectLiveness(image, bbox);
+      if (!liveness.isLive) {
+        discarded += 1;
+        logger.warn(`Discarded a registration photo that failed liveness detection`, {
+          employeeId,
+          liveScore: liveness.liveScore,
+        });
         continue;
       }
 

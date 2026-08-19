@@ -50,7 +50,20 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
 
-  FACE_MATCH_THRESHOLD: z.coerce.number().min(0).max(1).default(0.85),
+  // Was 0.85 — an unmeasured guess from before this codebase had a real
+  // embedding model at all. scripts/lfw-eval.ts's real run against LFW's
+  // pairsDevTest.txt (989 processed pairs) found 0.85 performs at 51.16%
+  // accuracy — statistically indistinguishable from a coin flip on a
+  // balanced set, i.e. the old default was silently, badly broken. Same-
+  // person pairs' mean cosine similarity was 0.5878; different-person
+  // pairs' was 0.0030. 0.3 sits inside the threshold range (0.24-0.85)
+  // where measured false-accept rate was exactly 0% on this benchmark,
+  // with a comfortable margin above the empirical accuracy-maximizing
+  // point (0.24, 96.97% accuracy) rather than sitting exactly on it — see
+  // backend/CHANGELOG.md's corresponding entry for the full threshold
+  // sweep table and the real caveats (LFW's mostly-frontal, well-lit
+  // celebrity photos aren't a perfect stand-in for a phone check-in).
+  FACE_MATCH_THRESHOLD: z.coerce.number().min(0).max(1).default(0.3),
   QR_DEFAULT_VALID_MINUTES: z.coerce.number().default(5),
 
   SENTRY_DSN: z.string().optional(),

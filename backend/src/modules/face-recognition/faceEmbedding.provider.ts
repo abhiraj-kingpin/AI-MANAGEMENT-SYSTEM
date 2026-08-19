@@ -2,11 +2,13 @@ import path from 'node:path';
 import * as ort from 'onnxruntime-node';
 import sharp from 'sharp';
 import { warpAlignedFace } from './faceAlign';
-import { detectFaces } from './faceDetector';
+import { detectFaces, type FaceBoundingBox } from './faceDetector';
 
 export interface GeneratedEmbedding {
   vector: number[];
   qualityScore: number;
+  /** The detected face actually used (the highest-scoring one, if more than one was found) — exposed so a caller can run a second real pass (e.g. `livenessDetector.ts`) against the exact same detection without re-running `detectFaces` itself. */
+  bbox: FaceBoundingBox;
 }
 
 /** Thrown when `faceDetector.ts` finds no face at all in the photo — `face.service.ts#register()` catches this and discards the photo, the same as a low quality score, rather than letting it crash the whole registration request. */
@@ -77,10 +79,20 @@ function getSession(): Promise<ort.InferenceSession> {
  * (eyes level, nose between and below them, mouth corners below that) —
  * not just "runs without crashing."
  *
- * What this still can't verify: that the embeddings it produces are
- * actually *discriminative* for real human faces — this environment has no
- * dataset of real people with known identities to test recognition
- * accuracy against. What IS verified: this is the genuine, official
+ * Whether the embeddings it produces are actually *discriminative* for
+ * real human faces is no longer unverifiable, as of `v1.1.9`:
+ * `scripts/lfw-eval.ts` runs this exact function against LFW's standard
+ * `pairsDevTest.txt` verification split and found real separation (989
+ * processed pairs, mean same-person similarity 0.588 vs. mean
+ * different-person similarity 0.003, 96.97% accuracy at the empirically
+ * best threshold) — see that script's own doc comment and the `v1.1.9`
+ * CHANGELOG entry for the full numbers, including the real, previously-
+ * undiscovered problem it caught (`FACE_MATCH_THRESHOLD`'s old default
+ * scored only 51.16%, essentially chance). What's still NOT verified:
+ * this specific deployment's own employees under this specific
+ * deployment's actual camera conditions — LFW is a real but imperfect
+ * proxy (mostly well-lit, front-facing public-figure photos). What else
+ * IS independently verified regardless: this is the genuine, official
  * InsightFace release (checksum-matched), every stage (detection,
  * alignment, embedding) runs real inference/real geometry (not stubs), and
  * the output is deterministic and correctly shaped for every downstream
@@ -106,6 +118,7 @@ export async function generateFaceEmbedding(imageBuffer: Buffer): Promise<Genera
   return {
     vector: l2Normalize(raw),
     qualityScore: estimatePlaceholderQualityScore(imageBuffer),
+    bbox: best.bbox,
   };
 }
 
