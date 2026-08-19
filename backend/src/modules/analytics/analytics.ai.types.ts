@@ -25,7 +25,8 @@ export interface AbsenteeismForecastDTO {
   method: 'linear-regression';
 }
 
-export type AnomalyType = 'location_anomaly' | 'duplicate_face' | 'overtime_outlier';
+export type AnomalyType =
+  'location_anomaly' | 'duplicate_face' | 'overtime_outlier' | 'attendance_pattern_anomaly';
 export type AnomalySeverity = 'low' | 'medium' | 'high';
 
 export interface AnomalyDTO {

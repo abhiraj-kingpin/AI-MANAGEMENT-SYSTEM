@@ -389,7 +389,110 @@ describe('aiAnalyticsService.getAnomalies', () => {
     expect(result).toEqual([]);
   });
 
-  it('merges anomalies from all three detectors in one response', async () => {
+  // getAnomalies runs four detectors concurrently via Promise.all, and two
+  // of them (detectOvertimeOutliers, detectAttendancePatternAnomalies)
+  // both call Attendance.aggregate — sharing one mocked function.
+  // Promise.all evaluates its array left-to-right, and each async
+  // function body runs synchronously up to its own first await, so the
+  // call order to mockedAttendanceAggregate is deterministic:
+  // detectOvertimeOutliers's call always lands first, this detector's
+  // second. mockResolvedValueOnce/mockResolvedValueOnce (not a single
+  // shared mockResolvedValue) is what lets a test control both
+  // independently — every test above this comment gets away with a
+  // single shared mockResolvedValue only because their overtime-outlier
+  // row counts (<=4) are all below MIN_EMPLOYEES_FOR_PATTERN_ANALYSIS (5),
+  // so this detector's own early-return guard saves them from ever
+  // reading those mismatched-shape rows as if they were its own features.
+  describe('attendance_pattern_anomaly (real isolation-forest detector)', () => {
+    function patternRow(
+      id: string,
+      overrides: Partial<{
+        avgCheckInMinute: number;
+        stdDevCheckInMinute: number;
+        lateCount: number;
+        totalDays: number;
+        avgOvertimeMinutes: number;
+      }> = {},
+    ) {
+      return {
+        _id: id,
+        avgCheckInMinute: 540, // 09:00
+        stdDevCheckInMinute: 5,
+        lateCount: 0,
+        totalDays: 20,
+        avgOvertimeMinutes: 10,
+        ...overrides,
+      };
+    }
+
+    it("flags an employee whose attendance pattern is isolated from everyone else's", async () => {
+      const outlier = idOf('9');
+      const rows = [
+        patternRow(idOf('1')),
+        patternRow(idOf('2')),
+        patternRow(idOf('3')),
+        patternRow(idOf('4')),
+        // Wildly different on every dimension at once — very late average
+        // check-in, erratic timing, late every day, huge overtime — the
+        // kind of joint-multi-dimensional outlier a single z-score check
+        // would have to be run four separate times to even have a chance
+        // of catching, and this catches in one pass.
+        patternRow(outlier, {
+          avgCheckInMinute: 780, // 13:00
+          stdDevCheckInMinute: 120,
+          lateCount: 18,
+          totalDays: 20,
+          avgOvertimeMinutes: 200,
+        }),
+      ];
+      mockedAttendanceAggregate.mockResolvedValueOnce([]).mockResolvedValueOnce(rows);
+      mockedEmployeeFind.mockReturnValue(
+        mockQuery([
+          { _id: idOf('1'), firstName: 'A', lastName: 'One' },
+          { _id: idOf('2'), firstName: 'B', lastName: 'Two' },
+          { _id: idOf('3'), firstName: 'C', lastName: 'Three' },
+          { _id: idOf('4'), firstName: 'D', lastName: 'Four' },
+          { _id: outlier, firstName: 'E', lastName: 'Outlier' },
+        ]),
+      );
+
+      const result = await aiAnalyticsService.getAnomalies({ days: 30 });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        type: 'attendance_pattern_anomaly',
+        employeeId: outlier,
+        employeeName: 'E Outlier',
+      });
+      expect(result[0].detail).toContain('isolation-forest');
+    });
+
+    it('never runs the isolation forest at all with fewer than 5 employees with attendance data', async () => {
+      const rows = [patternRow(idOf('1')), patternRow(idOf('2')), patternRow(idOf('3'))];
+      mockedAttendanceAggregate.mockResolvedValueOnce([]).mockResolvedValueOnce(rows);
+
+      const result = await aiAnalyticsService.getAnomalies({ days: 30 });
+
+      expect(result).toEqual([]);
+    });
+
+    it('does not flag anyone when every employee has an unremarkable, similar pattern', async () => {
+      const rows = [
+        patternRow(idOf('1'), { avgCheckInMinute: 538 }),
+        patternRow(idOf('2'), { avgCheckInMinute: 541 }),
+        patternRow(idOf('3'), { avgCheckInMinute: 539 }),
+        patternRow(idOf('4'), { avgCheckInMinute: 542 }),
+        patternRow(idOf('5'), { avgCheckInMinute: 540 }),
+      ];
+      mockedAttendanceAggregate.mockResolvedValueOnce([]).mockResolvedValueOnce(rows);
+
+      const result = await aiAnalyticsService.getAnomalies({ days: 30 });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  it('merges anomalies from all three (of four) rule-based/statistical detectors in one response', async () => {
     const gpsEmployee = idOf('1');
     mockedAttendanceFind.mockReturnValue(
       mockQuery([

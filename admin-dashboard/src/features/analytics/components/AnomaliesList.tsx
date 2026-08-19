@@ -11,14 +11,20 @@ const TYPE_LABEL: Record<AnomalyType, string> = {
   location_anomaly: 'Location Anomaly',
   duplicate_face: 'Duplicate Face',
   overtime_outlier: 'Overtime Outlier',
+  attendance_pattern_anomaly: 'Attendance Pattern (ML)',
 };
 
 /**
  * A flat list, not a table — each row's `detail` is a full sentence
  * (the backend already renders the real numbers behind the flag into
  * human-readable text), which doesn't fit fixed table columns well.
- * `duplicate_face` rows carry the same caveat the backend's own docs
- * already state for it — see the note under the list.
+ * `duplicate_face` rows carry a caveat under the list too — which of
+ * three possible embedding spaces (real MobileFaceNet, mobile's on-device
+ * geometric placeholder, or a legacy pre-model hash) a given pair was
+ * compared in varies per pair now, not a single blanket answer, so each
+ * flag's own `detail` text (backend's `duplicateFaceCaveat`,
+ * `analytics.ai.service.ts`) already says which one it is — this note is
+ * a pointer to read that, not a restatement of a single fixed caveat.
  */
 export function AnomaliesList({ anomalies }: { anomalies: Anomaly[] }) {
   if (anomalies.length === 0) {
@@ -58,9 +64,10 @@ export function AnomaliesList({ anomalies }: { anomalies: Anomaly[] }) {
       ))}
       {hasDuplicateFace && (
         <p className="mt-1 text-[12px] text-text-faint">
-          Duplicate Face flags compare placeholder embeddings (hashed image bytes, not real facial
-          features — see backend/README.md#known-simplifications--future-work). A flagged pair means
-          similar-looking source photos, not confirmed shared identity.
+          Duplicate Face flags: a high score is a genuine facial-similarity signal only when both
+          sides are real MobileFaceNet embeddings — read each flag's own detail text above, which
+          says which embedding type that specific pair actually compared (see
+          backend/README.md#known-simplifications--future-work for the full picture).
         </p>
       )}
     </div>

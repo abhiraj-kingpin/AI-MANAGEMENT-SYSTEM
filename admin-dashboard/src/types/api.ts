@@ -494,7 +494,8 @@ export interface AbsenteeismForecast {
   method: 'linear-regression';
 }
 
-export type AnomalyType = 'location_anomaly' | 'duplicate_face' | 'overtime_outlier';
+export type AnomalyType =
+  'location_anomaly' | 'duplicate_face' | 'overtime_outlier' | 'attendance_pattern_anomaly';
 export type AnomalySeverity = 'low' | 'medium' | 'high';
 
 /** `GET /analytics/ai/anomalies` — Super Admin/HR only, same gating as `DepartmentComparison` (no "my team" reading of an org-wide investigative sweep). */
