@@ -4,6 +4,24 @@ All notable backend development history, in build order. The [README](README.md)
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Test counts are cumulative (`npm test`, no live MongoDB required for any of them).
 
+## [v1.1.12] — Fix: Production Container Crashed on Startup (EACCES writing logs/)
+
+Caught from a real Render deploy, not a test — the first deploy after Root Directory was corrected to `backend` built successfully but the container crashed immediately on boot:
+
+```
+Error: EACCES: permission denied, mkdir 'logs'
+    at Object.mkdirSync (node:fs:1370:26)
+    at File._createLogDirIfNotExist (/app/node_modules/winston/lib/winston/transports/file.js:791:10)
+    ...
+    at Object.<anonymous> (/app/dist/config/logger.js:26:24)
+```
+
+**Root cause**: `config/logger.ts` added a `winston.transports.File` writing to a relative `logs/error.log` path whenever `isProduction` was true. The Dockerfile's runtime stage runs as a non-root `USER app` with no write access to create new directories under `/app`, so the very first log line — before the server could even start listening — threw `EACCES` and killed the process. Nothing in local dev or CI catches this: `npm run build` and the full test suite both pass regardless, since neither runs the compiled server as the actual non-root production user against the actual read-only-ish filesystem layout.
+
+**Fix**: removed the production file transport entirely rather than working around it (e.g. pre-creating/chowning a `logs/` directory in the Dockerfile). A local log file is close to pointless on Render's ephemeral filesystem anyway — it's wiped on every restart or redeploy — while stdout is what Render (and most container platforms) already capture and display, and every log line here was already being written to stdout via the `Console` transport regardless. Console-only logging in production is the correct call for this deployment target, not a stopgap.
+
+**Verified**: `tsc`/`eslint` clean, full Jest suite still green (65 suites / 631 tests, unchanged — this was never something the suite could have caught), production `vite`/`tsc` build clean, and — since the bug only ever showed up outside all of those — actually ran the compiled `dist/server.js` locally with `NODE_ENV=production` and confirmed clean startup ("MongoDB connected", listening, no `EACCES`, no `logs/` directory created) before calling it fixed.
+
 ## [v1.1.11] — Minimal Model Governance: Model Cards + a Real Integrity Check
 
 The last of six honestly-scoped ML gaps from this session's own prioritized list, closed in order: real face detection/alignment (`v1.1.7`), real on-device mobile ML (mobile CHANGELOG entry), real accuracy measurement (`v1.1.9`), real anti-spoofing (`v1.1.9`), real unsupervised ML in analytics (`v1.1.10`), and now minimal model-governance documentation.
