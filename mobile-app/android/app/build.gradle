@@ -53,7 +53,7 @@ android {
         // android/build.gradle) can stay declared at 21 — the merger only
         // requires the *app's* effective minSdk to be >= every library's,
         // and 23 already is.
-        minSdk = 23
+        minSdkVersion = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

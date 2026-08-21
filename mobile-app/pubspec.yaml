@@ -84,6 +84,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  # Dev-only: generates the real per-platform launcher icon files (mipmap/
+  # Assets.xcassets) from assets/images/logo.png via `dart run
+  # flutter_launcher_icons` — not a runtime dependency of the app itself.
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
