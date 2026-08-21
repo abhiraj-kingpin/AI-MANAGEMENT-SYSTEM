@@ -48,6 +48,7 @@ interface FakeUserOverrides {
   mustChangePassword?: boolean;
   failedLoginAttempts?: number;
   lockedUntil?: Date | null;
+  accountClaimed?: boolean;
 }
 
 function createFakeUser(overrides: FakeUserOverrides = {}) {
@@ -65,6 +66,10 @@ function createFakeUser(overrides: FakeUserOverrides = {}) {
     lastLoginAt: null as Date | null,
     failedLoginAttempts: 0,
     lockedUntil: null as Date | null,
+    // True by default — matches the User model's own schema default, so
+    // every existing test below (none of which mention claiming) exercises
+    // the already-activated path exactly as before.
+    accountClaimed: true,
     comparePassword: jest.fn((candidate: string) =>
       Promise.resolve(candidate === 'correct-password'),
     ),
@@ -129,6 +134,21 @@ describe('authService.login', () => {
     await expect(authService.login('nobody@acme.com', 'x')).rejects.toMatchObject({
       code: 'INVALID_CREDENTIALS',
     });
+  });
+
+  it('rejects an unclaimed account with a distinct code, even given the correct-looking password', async () => {
+    const fakeUser = createFakeUser({ accountClaimed: false });
+    mockedUserFindOne.mockReturnValue(mockQuery(fakeUser));
+
+    await expect(authService.login('jane@acme.com', 'correct-password')).rejects.toMatchObject({
+      code: 'ACCOUNT_NOT_CLAIMED',
+      statusCode: 401,
+    });
+    // Never even reaches the password check — no comparePassword call, no
+    // failed-attempt bump for an account that was never usable to begin
+    // with.
+    expect(fakeUser.comparePassword).not.toHaveBeenCalled();
+    expect(fakeUser.save).not.toHaveBeenCalled();
   });
 
   it('increments the failed-attempt counter on a wrong password without locking under the threshold', async () => {
@@ -198,6 +218,46 @@ describe('authService.login', () => {
 
     expect(fakeUser.failedLoginAttempts).toBe(0);
     expect(fakeUser.lockedUntil).toBeNull();
+  });
+});
+
+describe('authService.claimAccount', () => {
+  it('activates an unclaimed account: sets the real password, flips accountClaimed, and logs the employee straight in', async () => {
+    const fakeUser = createFakeUser({
+      accountClaimed: false,
+      passwordHash: 'hashed:whatever-hr-never-saw',
+    });
+    mockedUserFindOne.mockReturnValue(mockQuery(fakeUser));
+    mockedEmployeeFindOne.mockReturnValue(mockQuery(fakeEmployee));
+
+    const result = await authService.claimAccount('jane@acme.com', 'my-new-password');
+
+    expect(fakeUser.accountClaimed).toBe(true);
+    expect(fakeUser.passwordHash).toBe('hashed:my-new-password');
+    expect(fakeUser.save).toHaveBeenCalledTimes(1);
+    expect(result.employee?.employeeCode).toBe('EMP-0001');
+    expect(result.accessToken).toEqual(expect.any(String));
+    expect(result.refreshToken).toEqual(expect.any(String));
+  });
+
+  it('rejects an email with no matching account — never silently creates one', async () => {
+    mockedUserFindOne.mockReturnValue(mockQuery(null));
+
+    await expect(authService.claimAccount('nobody@acme.com', 'x')).rejects.toMatchObject({
+      code: 'ACCOUNT_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
+  it('rejects an already-claimed account instead of silently overwriting its real password', async () => {
+    const fakeUser = createFakeUser({ accountClaimed: true });
+    mockedUserFindOne.mockReturnValue(mockQuery(fakeUser));
+
+    await expect(authService.claimAccount('jane@acme.com', 'x')).rejects.toMatchObject({
+      code: 'ALREADY_CLAIMED',
+      statusCode: 409,
+    });
+    expect(fakeUser.save).not.toHaveBeenCalled();
   });
 });
 

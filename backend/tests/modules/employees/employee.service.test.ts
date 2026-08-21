@@ -38,15 +38,10 @@ jest.mock('../../../src/shared/services/fileUpload.service', () => ({
   uploadBuffer: jest.fn(),
 }));
 
-jest.mock('../../../src/modules/notifications/email.service', () => ({
-  sendWelcomeEmail: jest.fn(() => Promise.resolve()),
-}));
-
 import { Department } from '../../../src/modules/departments/department.model';
 import { EmployeeDocument } from '../../../src/modules/employees/document.model';
 import { Employee } from '../../../src/modules/employees/employee.model';
 import { employeeService } from '../../../src/modules/employees/employee.service';
-import { sendWelcomeEmail } from '../../../src/modules/notifications/email.service';
 import { nextSequence } from '../../../src/shared/counter/counter.service';
 import type { ActorContext } from '../../../src/shared/types/actorContext';
 import { uploadBuffer } from '../../../src/shared/services/fileUpload.service';
@@ -66,7 +61,6 @@ const mockedUserCreate = User.create as unknown as jest.Mock;
 const mockedUserFindByIdAndUpdate = User.findByIdAndUpdate as unknown as jest.Mock;
 const mockedNextSequence = nextSequence as unknown as jest.Mock;
 const mockedUploadBuffer = uploadBuffer as unknown as jest.Mock;
-const mockedSendWelcomeEmail = sendWelcomeEmail as unknown as jest.Mock;
 
 const superAdmin: ActorContext = { id: 'user-admin', role: 'super_admin' };
 const hr: ActorContext = { id: 'user-hr', role: 'hr' };
@@ -116,7 +110,7 @@ describe('employeeService.createEmployee', () => {
     dateOfJoining: new Date('2026-01-01'),
   };
 
-  it('creates the user + employee and sends a welcome email on success', async () => {
+  it('creates the user + employee with the account left unclaimed (no usable password set here)', async () => {
     mockedDepartmentFindOne.mockReturnValue(mockQuery({ code: 'ENG' }));
     mockedUserFindOne.mockReturnValue(mockQuery(null));
     mockedNextSequence.mockResolvedValue(1);
@@ -130,9 +124,11 @@ describe('employeeService.createEmployee', () => {
 
     expect(dto.employeeCode).toBe('ENG-0001');
     expect(dto.email).toBe('jane@acme.com');
-    expect(mockedSendWelcomeEmail).toHaveBeenCalledWith(
-      'new@acme.com',
-      expect.objectContaining({ employeeCode: 'ENG-0001' }),
+    // The employee sets their own real password via POST /auth/claim-account
+    // (see auth.service.test.ts#claimAccount) — this call site no longer
+    // generates or sends one.
+    expect(mockedUserCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ accountClaimed: false }),
     );
     expect(mockedEmployeeCreate).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', employeeCode: 'ENG-0001' }),

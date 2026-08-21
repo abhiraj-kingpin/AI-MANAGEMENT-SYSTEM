@@ -7,7 +7,6 @@ import { assertRoleAssignable } from '../../shared/utils/roleAssignment';
 import { escapeRegExp } from '../../shared/utils/regex';
 import { generateRandomToken } from '../../shared/utils/tokens';
 import { Department } from '../departments/department.model';
-import { sendWelcomeEmail } from '../notifications/email.service';
 import { User } from '../users/user.model';
 import { type EmployeeDocumentType, EmployeeDocument } from './document.model';
 import { Employee } from './employee.model';
@@ -101,13 +100,19 @@ export const employeeService = {
     const seq = await nextSequence(department.code);
     const employeeCode = `${department.code}-${String(seq).padStart(4, '0')}`;
 
-    const temporaryPassword = generateRandomToken(9);
-    const passwordHash = await User.hashPassword(temporaryPassword);
+    // No usable password is ever set here — `accountClaimed: false` blocks
+    // login regardless of what this hash is (see auth.service.ts#login),
+    // so it only needs to satisfy the schema's `required: true`, never to
+    // be guessed or communicated. The employee sets their real password
+    // themselves via POST /auth/claim-account, with this same email — see
+    // User model's `accountClaimed` doc comment for why this replaced the
+    // old generate-and-email-a-temporary-password flow.
+    const passwordHash = await User.hashPassword(generateRandomToken(24));
     const user = await User.create({
       email: input.email,
       passwordHash,
       role,
-      mustChangePassword: true,
+      accountClaimed: false,
     });
 
     const employee = await Employee.create({
@@ -123,8 +128,6 @@ export const employeeService = {
       emergencyContact: input.emergencyContact,
       address: input.address,
     });
-
-    await sendWelcomeEmail(user.email, { employeeCode, temporaryPassword });
 
     const populated = await Employee.findById(employee.id).populate(POPULATE_OPTIONS);
     return toDTO(populated);

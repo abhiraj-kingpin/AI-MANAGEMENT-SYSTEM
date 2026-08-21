@@ -6,6 +6,7 @@ import { validate } from '../../middlewares/validate.middleware';
 import * as authController from './auth.controller';
 import {
   changePasswordSchema,
+  claimAccountSchema,
   forgotPasswordSchema,
   loginSchema,
   refreshSchema,
@@ -40,6 +41,18 @@ router.post(
   authController.register,
 );
 router.post('/login', bruteForceGuard, validate(loginSchema), authController.login);
+// Public, unlike /register above — the self-service counterpart new
+// employees actually use, gated by already having an HR-created,
+// not-yet-claimed account (see auth.service.ts#claimAccount and the User
+// model's `accountClaimed` doc comment) rather than by role. Same
+// brute-force guard as /login since it's another unauthenticated,
+// credential-bearing endpoint.
+router.post(
+  '/claim-account',
+  bruteForceGuard,
+  validate(claimAccountSchema),
+  authController.claimAccount,
+);
 router.post('/refresh', validate(refreshSchema), authController.refresh);
 router.post('/logout', authenticate, authController.logout);
 router.post(

@@ -125,6 +125,24 @@ export const authService = {
     const user = await User.findOne({ email }).select('+passwordHash');
     assertNotLocked(user);
 
+    // Checked before the password comparison, not folded into the generic
+    // INVALID_CREDENTIALS branch below: an unclaimed account's passwordHash
+    // is a random value nobody was ever given (see the User model's
+    // `accountClaimed` doc comment), so comparePassword would always fail
+    // here regardless of what was typed — but "wrong password" is the
+    // wrong thing to tell someone who's never had a password at all. This
+    // does mean a caller learns "this email exists but isn't activated yet"
+    // rather than a fully generic failure; the same enumeration trade-off
+    // this file already makes for account lockout (see assertNotLocked's
+    // own doc comment) for the same reason — clearer UX beats a marginal
+    // security gain against a targeted attacker.
+    if (user && !user.accountClaimed) {
+      throw AppError.unauthorized(
+        "This account hasn't been set up yet. Register with your work email to set a password.",
+        'ACCOUNT_NOT_CLAIMED',
+      );
+    }
+
     if (!user || !user.isActive || !(await user.comparePassword(password))) {
       if (user) await registerFailedLogin(user);
       throw AppError.unauthorized('Email or password is incorrect.', 'INVALID_CREDENTIALS');
@@ -135,6 +153,43 @@ export const authService = {
 
     user.failedLoginAttempts = 0;
     user.lockedUntil = null;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    return { ...session, user: toAuthUserDTO(user), employee };
+  },
+
+  /**
+   * The self-service counterpart to `register` above (which stays
+   * HR/Admin-only) — this is the public, unauthenticated endpoint a new
+   * employee actually uses. It only ever *activates* an account HR already
+   * created (see employee.service.ts#createEmployee's `accountClaimed:
+   * false`); it never creates a User or Employee record itself, so there's
+   * no way to register into this app without already being a known
+   * employee record — that boundary is the whole point of the design (see
+   * this endpoint's own rate limiter in auth.routes.ts, same bruteForceGuard
+   * as login).
+   */
+  async claimAccount(email: string, password: string): Promise<LoginResultDTO> {
+    const user = await User.findOne({ email });
+    if (!user) {
+      throw AppError.notFound(
+        'No pending account found for this email. Ask HR to add you as an employee first.',
+        'ACCOUNT_NOT_FOUND',
+      );
+    }
+    if (user.accountClaimed) {
+      throw AppError.conflict(
+        'This account is already active — sign in instead.',
+        'ALREADY_CLAIMED',
+      );
+    }
+
+    user.passwordHash = await User.hashPassword(password);
+    user.accountClaimed = true;
+
+    const employee = await findEmployeeSummary(user.id as string);
+    const session = issueSession(user, employee?.id);
     user.lastLoginAt = new Date();
     await user.save();
 

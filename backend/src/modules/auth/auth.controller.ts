@@ -40,6 +40,15 @@ export const register = asyncHandler(async (req, res) => {
   sendSuccess(res, { user }, 201);
 });
 
+export const claimAccount = asyncHandler(async (req, res) => {
+  const { refreshTokenExpiresAt, ...result } = await authService.claimAccount(
+    req.body.email,
+    req.body.password,
+  );
+  setRefreshCookie(res, result.refreshToken, refreshTokenExpiresAt);
+  sendSuccess(res, { ...result, refreshTokenExpiresAt }, 201);
+});
+
 export const login = asyncHandler(async (req, res) => {
   const { refreshTokenExpiresAt, ...result } = await authService.login(
     req.body.email,

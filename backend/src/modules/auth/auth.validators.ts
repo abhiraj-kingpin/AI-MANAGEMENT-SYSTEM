@@ -12,6 +12,13 @@ export const registerSchema = z.object({
   }),
 });
 
+export const claimAccountSchema = z.object({
+  body: z.object({
+    email: z.string().email(),
+    password,
+  }),
+});
+
 export const loginSchema = z.object({
   body: z.object({
     email: z.string().email(),

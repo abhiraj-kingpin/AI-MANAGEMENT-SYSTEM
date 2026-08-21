@@ -16,6 +16,19 @@ export interface IUser extends Document {
   passwordResetExpiresAt: Date | null;
   lastLoginAt: Date | null;
   mustChangePassword: boolean;
+  // Set false only by employee.service.ts#createEmployee — HR creating an
+  // employee record no longer hands them a working password at all (the
+  // old flow generated one and "sent" it via sendWelcomeEmail, which never
+  // actually reached anyone: email.service.ts's own doc comment says
+  // outright that it's a dev-only console.log placeholder with no real
+  // SMTP wired in). An unclaimed account's passwordHash is a random,
+  // never-communicated value — login blocks on `!accountClaimed` (see
+  // auth.service.ts#login) well before any password comparison would even
+  // run. The employee sets their real password themselves via
+  // POST /auth/claim-account, using the same work email HR entered.
+  // Defaults true so every other creation path (super_admin/hr's own
+  // POST /auth/register, every existing seeded/test user) is unaffected.
+  accountClaimed: boolean;
   // Account lockout (Phase 16) — see auth.service.ts. The original plan
   // (docs/architecture/07-authentication-flow.md §7) named Redis as the
   // failed-attempt counter store; no phase has ever wired Redis into any
@@ -60,6 +73,7 @@ const userSchema = new Schema<IUser, IUserModel>(
     passwordResetExpiresAt: { type: Date, select: false, default: null },
     lastLoginAt: { type: Date, default: null },
     mustChangePassword: { type: Boolean, default: false },
+    accountClaimed: { type: Boolean, default: true },
     failedLoginAttempts: { type: Number, default: 0 },
     lockedUntil: { type: Date, default: null },
     deviceTokens: { type: [String], default: [] },
