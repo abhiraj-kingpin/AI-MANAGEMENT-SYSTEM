@@ -22,6 +22,7 @@ DetectedFace _fakeFace({
     landmarks: landmarks,
     leftEyeOpenProbability: leftEyeOpen,
     rightEyeOpenProbability: rightEyeOpen,
+    headEulerAngleY: 0,
   );
 }
 
@@ -39,7 +40,8 @@ void main() {
   const generator = GeometricEmbeddingGenerator();
 
   group('GeometricEmbeddingGenerator.generate', () {
-    test('always produces a fixed-length vector matching backend requirements', () {
+    test('always produces a fixed-length vector matching backend requirements',
+        () {
       final vector = generator.generate(_fakeFace());
 
       expect(vector.length, GeometricEmbeddingGenerator.dimensions);
@@ -48,16 +50,22 @@ void main() {
       expect(vector.length, lessThanOrEqualTo(1024));
     });
 
-    test('is L2-normalized (unit vector), matching the backend placeholder convention', () {
+    test(
+        'is L2-normalized (unit vector), matching the backend placeholder convention',
+        () {
       final vector = generator.generate(
-        _fakeFace(landmarkOverrides: {FaceLandmarkName.noseBase: const Point2D(210, 260)}),
+        _fakeFace(landmarkOverrides: {
+          FaceLandmarkName.noseBase: const Point2D(210, 260)
+        }),
       );
 
       final normSquared = vector.fold<double>(0, (sum, v) => sum + v * v);
       expect(normSquared, closeTo(1.0, 1e-9));
     });
 
-    test('a missing landmark defaults to the bounding box center rather than throwing', () {
+    test(
+        'a missing landmark defaults to the bounding box center rather than throwing',
+        () {
       final vector = generator.generate(
         _fakeFace(landmarkOverrides: {FaceLandmarkName.leftEar: null}),
       );
@@ -65,7 +73,9 @@ void main() {
       expect(vector.length, GeometricEmbeddingGenerator.dimensions);
     });
 
-    test('the same detected geometry always produces the same vector (deterministic)', () {
+    test(
+        'the same detected geometry always produces the same vector (deterministic)',
+        () {
       final face = _fakeFace(
         landmarkOverrides: {FaceLandmarkName.noseBase: const Point2D(200, 220)},
         leftEyeOpen: 0.9,
@@ -75,7 +85,8 @@ void main() {
       expect(generator.generate(face), generator.generate(face));
     });
 
-    test('two visibly different face geometries are not near-identical vectors', () {
+    test('two visibly different face geometries are not near-identical vectors',
+        () {
       final faceA = _fakeFace(
         landmarkOverrides: {FaceLandmarkName.noseBase: const Point2D(150, 150)},
       );
@@ -83,7 +94,8 @@ void main() {
         landmarkOverrides: {FaceLandmarkName.noseBase: const Point2D(280, 290)},
       );
 
-      final similarity = _cosineSimilarity(generator.generate(faceA), generator.generate(faceB));
+      final similarity = _cosineSimilarity(
+          generator.generate(faceA), generator.generate(faceB));
       expect(similarity, lessThan(0.999));
     });
   });

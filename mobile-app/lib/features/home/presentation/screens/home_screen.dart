@@ -23,7 +23,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Management System'),
+        title: const Text('WorkPulse AI'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -32,12 +32,18 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Padding(
+      // A plain Column here overflowed (visibly, with the debug-mode
+      // "bottom overflowed" banner) any time the six cards' combined
+      // height exceeded the viewport — landscape orientation, a small
+      // screen, or a larger accessibility text scale. SingleChildScrollView
+      // is the same fix LoginScreen already uses for its own column.
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Welcome 👋', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Welcome 👋',
+                style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 4),
             Text('Signed in as ${user?.email ?? ''} (${user?.role ?? ''})'),
             const SizedBox(height: 24),

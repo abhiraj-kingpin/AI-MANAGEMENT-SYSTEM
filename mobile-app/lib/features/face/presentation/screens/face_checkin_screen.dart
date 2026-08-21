@@ -1,10 +1,14 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:ai_management_system/features/attendance/presentation/providers/attendance_providers.dart';
+import 'package:ai_management_system/features/attendance/presentation/providers/attendance_state.dart';
 import 'package:ai_management_system/features/face/presentation/providers/face_checkin_providers.dart';
 import 'package:ai_management_system/features/face/presentation/providers/face_checkin_state.dart';
 import 'package:ai_management_system/shared/widgets/primary_button.dart';
+
+final _timeFormat = DateFormat.jm();
 
 class FaceCheckInScreen extends ConsumerStatefulWidget {
   const FaceCheckInScreen({super.key});
@@ -19,12 +23,20 @@ class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
     final state = ref.watch(faceCheckInControllerProvider);
     final attendanceState = ref.watch(attendanceControllerProvider);
 
-    // The face capture pipeline (this screen) and the actual check-in
-    // submission (AttendanceController) are two separate controllers —
-    // once capture hands off a verified embedding, this screen just
-    // reflects AttendanceController's own submission state instead of
-    // inventing a parallel "submitting" state of its own.
-    final isSubmitting = state.stage == FaceCaptureStage.done && attendanceState.isActionInProgress;
+    // The three-pose capture pipeline (this screen) and the actual
+    // check-in submission (AttendanceController) are two separate
+    // controllers — once the third pose hands off a verified embedding,
+    // this screen just reflects AttendanceController's own submission
+    // state instead of inventing a parallel "submitting" state of its own.
+    final isSubmitting = state.stage == FaceCaptureStage.done &&
+        attendanceState.isActionInProgress;
+    // Capture succeeding is not the same thing as the check-in itself
+    // succeeding — the server can still reject it (outside every geofence,
+    // already checked in today, …) after a perfectly good face match.
+    final submissionOutcome = state.stage == FaceCaptureStage.done &&
+            !attendanceState.isActionInProgress
+        ? _outcomeFor(attendanceState)
+        : _Outcome.pending;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Face Check-In')),
@@ -33,9 +45,22 @@ class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: _buildPreview(state)),
+            if (state.stage != FaceCaptureStage.idle &&
+                submissionOutcome != _Outcome.success) ...[
+              _StepIndicator(pose: state.pose),
+              const SizedBox(height: 12),
+            ],
+            Expanded(
+              child: submissionOutcome == _Outcome.success
+                  ? _buildSuccess(context, attendanceState)
+                  : _buildPreview(state),
+            ),
             const SizedBox(height: 16),
-            Text(_statusText(state, isSubmitting), textAlign: TextAlign.center),
+            Text(
+              _statusText(
+                  state, isSubmitting, submissionOutcome, attendanceState),
+              textAlign: TextAlign.center,
+            ),
             if (state.errorMessage != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -44,18 +69,82 @@ class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
+            // The check-in's own failure — distinct from a capture
+            // failure above; both are real and both need to be visible.
+            if (submissionOutcome == _Outcome.failure &&
+                attendanceState.errorMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                attendanceState.errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
             const SizedBox(height: 20),
-            PrimaryButton(
-              label: state.stage == FaceCaptureStage.idle ? 'Start' : 'Retry',
-              isLoading: state.stage != FaceCaptureStage.idle && !isSubmitting,
-              onPressed: (state.stage == FaceCaptureStage.idle || state.errorMessage != null) &&
-                      !isSubmitting
-                  ? () => ref.read(faceCheckInControllerProvider.notifier).start()
-                  : null,
-            ),
+            if (submissionOutcome == _Outcome.success)
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Done'),
+              )
+            else
+              PrimaryButton(
+                label: _buttonLabel(state, submissionOutcome),
+                isLoading: state.stage == FaceCaptureStage.initializingCamera ||
+                    state.stage == FaceCaptureStage.processingCapture ||
+                    state.stage == FaceCaptureStage.verifying ||
+                    isSubmitting,
+                onPressed: _onPressed(state, submissionOutcome, isSubmitting),
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  String _buttonLabel(FaceCheckInState state, _Outcome outcome) {
+    if (outcome == _Outcome.failure) return 'Start Over';
+    if (state.stage == FaceCaptureStage.idle) return 'Start';
+    return 'Capture';
+  }
+
+  VoidCallback? _onPressed(
+      FaceCheckInState state, _Outcome outcome, bool isSubmitting) {
+    if (isSubmitting) return null;
+    if (state.stage == FaceCaptureStage.idle || outcome == _Outcome.failure) {
+      return () => ref.read(faceCheckInControllerProvider.notifier).start();
+    }
+    if (state.stage == FaceCaptureStage.awaitingCapture) {
+      return () =>
+          ref.read(faceCheckInControllerProvider.notifier).captureCurrentPose();
+    }
+    return null; // busy (initializing/processing/verifying) — button shows a spinner instead
+  }
+
+  _Outcome _outcomeFor(AttendanceState attendanceState) {
+    if (attendanceState.errorMessage != null) return _Outcome.failure;
+    // An OfflineQueuedFailure surfaces as infoMessage, not errorMessage
+    // (see AttendanceController) — it's not a failure, but it's also not
+    // yet a confirmed server-side check-in, so it gets its own status text
+    // rather than being folded into success.
+    if (attendanceState.infoMessage != null) return _Outcome.queued;
+    return _Outcome.success;
+  }
+
+  Widget _buildSuccess(BuildContext context, AttendanceState attendanceState) {
+    final checkInAt = attendanceState.today?.checkInAt;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.check_circle,
+            size: 96, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(height: 16),
+        Text(
+          checkInAt != null
+              ? 'Checked in at ${_timeFormat.format(checkInAt.toLocal())}'
+              : 'Checked in',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+      ],
     );
   }
 
@@ -76,19 +165,77 @@ class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
     );
   }
 
-  String _statusText(FaceCheckInState state, bool isSubmitting) {
-    if (isSubmitting) return 'Checking in…';
+  String _statusText(
+    FaceCheckInState state,
+    bool isSubmitting,
+    _Outcome outcome,
+    AttendanceState attendanceState,
+  ) {
+    if (isSubmitting) return 'Verified — checking in…';
+    if (state.stage == FaceCaptureStage.done) {
+      switch (outcome) {
+        case _Outcome.success:
+          return "You're checked in.";
+        case _Outcome.queued:
+          return attendanceState.infoMessage ??
+              "Saved for sync once you're back online.";
+        case _Outcome.failure:
+          return "Verified, but the check-in itself didn't go through:";
+        case _Outcome.pending:
+          break;
+      }
+    }
     switch (state.stage) {
       case FaceCaptureStage.idle:
-        return "Look at the camera and tap Start. You'll be asked to blink naturally.";
+        return "You'll take three quick photos: one looking straight ahead, then one "
+            'turned to each side — this proves a real face is here, not a photo held '
+            'up to the camera.';
       case FaceCaptureStage.initializingCamera:
         return 'Starting camera…';
-      case FaceCaptureStage.capturing:
-        return 'Hold steady and blink naturally… (${state.frameIndex}/${state.totalFrames})';
+      case FaceCaptureStage.awaitingCapture:
+        return switch (state.pose) {
+          FacePose.front => 'Look straight at the camera, then tap Capture.',
+          FacePose.left => 'Now turn your head to one side, then tap Capture.',
+          FacePose.right =>
+            'Now turn your head to the other side, then tap Capture.',
+        };
+      case FaceCaptureStage.processingCapture:
+        return 'Checking that photo…';
       case FaceCaptureStage.verifying:
         return 'Verifying…';
       case FaceCaptureStage.done:
-        return 'Face verified.';
+        return 'Verified.';
     }
+  }
+}
+
+enum _Outcome { pending, success, queued, failure }
+
+class _StepIndicator extends StatelessWidget {
+  final FacePose pose;
+  const _StepIndicator({required this.pose});
+
+  @override
+  Widget build(BuildContext context) {
+    const poses = FacePose.values;
+    final currentIndex = poses.indexOf(pose);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < poses.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i <= currentIndex
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }

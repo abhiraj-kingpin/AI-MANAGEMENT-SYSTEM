@@ -44,6 +44,16 @@ class DetectedFace {
   final double? leftEyeOpenProbability;
   final double? rightEyeOpenProbability;
 
+  /// ML Kit's own head-rotation estimate, in degrees — passed through for
+  /// completeness, but **not** what check-in's liveness check actually
+  /// uses (see `estimateYawProxy`'s doc comment): ML Kit only guarantees
+  /// this is populated in `.accurate` performance mode, and switching to
+  /// `.accurate` mode to get it measurably hurt plain face detection on
+  /// real hardware, which mattered far more than having a real-degrees
+  /// reading. Commonly null under `.fast` mode, which
+  /// `FaceDetectionService` uses.
+  final double? headEulerAngleY;
+
   const DetectedFace({
     required this.boundingBoxLeft,
     required this.boundingBoxTop,
@@ -52,5 +62,6 @@ class DetectedFace {
     required this.landmarks,
     required this.leftEyeOpenProbability,
     required this.rightEyeOpenProbability,
+    required this.headEulerAngleY,
   });
 }

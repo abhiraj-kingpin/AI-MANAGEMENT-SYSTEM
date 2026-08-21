@@ -1,4 +1,5 @@
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart' as mlkit;
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart'
+    as mlkit;
 import 'package:ai_management_system/features/face/domain/entities/detected_face.dart';
 import 'package:ai_management_system/features/face/domain/entities/point2d.dart';
 
@@ -12,9 +13,20 @@ class FaceDetectionService {
   FaceDetectionService()
       : _detector = mlkit.FaceDetector(
           options: mlkit.FaceDetectorOptions(
-            enableClassification: true, // eye-open probabilities, for liveness
-            enableLandmarks: true, // for the geometric embedding
-            performanceMode: mlkit.FaceDetectorMode.accurate,
+            enableClassification: true, // eye-open probabilities
+            enableLandmarks:
+                true, // for the geometric embedding + head-turn proxy
+            // `.fast`, not `.accurate`. `.accurate` was tried specifically
+            // to get a reliable `Face.headEulerAngleY` for check-in's
+            // head-turn liveness check, but cost more than speed on real
+            // hardware: basic face detection itself got *less* reliable
+            // under `.accurate` mode — a real face in full view sometimes
+            // came back as zero faces detected, something `.fast` mode
+            // didn't do. Check-in no longer needs `headEulerAngleY` at all
+            // — see `estimateYawProxy`, which computes an equivalent turn
+            // signal from landmarks instead, and landmarks are reported
+            // the same regardless of performanceMode.
+            performanceMode: mlkit.FaceDetectorMode.fast,
           ),
         );
 
@@ -55,12 +67,14 @@ class FaceDetectionService {
       landmarks: landmarks,
       leftEyeOpenProbability: face.leftEyeOpenProbability,
       rightEyeOpenProbability: face.rightEyeOpenProbability,
+      headEulerAngleY: face.headEulerAngleY,
     );
   }
 
   Point2D? _toPoint2D(mlkit.FaceLandmark? landmark) {
     if (landmark == null) return null;
-    return Point2D(landmark.position.x.toDouble(), landmark.position.y.toDouble());
+    return Point2D(
+        landmark.position.x.toDouble(), landmark.position.y.toDouble());
   }
 
   Future<void> dispose() => _detector.close();

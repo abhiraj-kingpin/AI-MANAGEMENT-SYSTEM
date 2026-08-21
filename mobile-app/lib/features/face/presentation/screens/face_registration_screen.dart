@@ -11,8 +11,8 @@ class FaceRegistrationScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(faceRegistrationControllerProvider);
-    final isBusy =
-        state.stage != FaceRegistrationStage.idle && state.stage != FaceRegistrationStage.done;
+    final isBusy = state.stage != FaceRegistrationStage.idle &&
+        state.stage != FaceRegistrationStage.done;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Face Registration')),
@@ -23,7 +23,19 @@ class FaceRegistrationScreen extends ConsumerWidget {
           children: [
             _buildStatusBanner(context, state),
             const SizedBox(height: 16),
-            Expanded(child: _buildPreview(state)),
+            // On success, the camera preview is replaced by a clear
+            // checkmark rather than left showing a now-frozen last frame —
+            // a static camera image with small text below it (the previous
+            // behavior) reads as "nothing happened" even though the save
+            // already succeeded, which is exactly what led to registering
+            // twice in a row (confirmed via the backend's own request log:
+            // two separate successful `POST /face/register-embeddings`
+            // calls 15 seconds apart for the same employee).
+            Expanded(
+              child: state.stage == FaceRegistrationStage.done
+                  ? _buildSuccess(context, state)
+                  : _buildPreview(state),
+            ),
             const SizedBox(height: 16),
             Text(_statusText(state), textAlign: TextAlign.center),
             if (state.errorMessage != null) ...[
@@ -34,21 +46,16 @@ class FaceRegistrationScreen extends ConsumerWidget {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
-            if (state.successMessage != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                state.successMessage!,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Theme.of(context).colorScheme.primary),
-              ),
-            ],
             const SizedBox(height: 20),
             PrimaryButton(
-              label: state.status?.isRegistered == true ? 'Re-register' : 'Start',
+              label:
+                  state.status?.isRegistered == true ? 'Re-register' : 'Start',
               isLoading: isBusy,
               onPressed: isBusy
                   ? null
-                  : () => ref.read(faceRegistrationControllerProvider.notifier).startCapture(),
+                  : () => ref
+                      .read(faceRegistrationControllerProvider.notifier)
+                      .startCapture(),
             ),
           ],
         ),
@@ -74,6 +81,22 @@ class FaceRegistrationScreen extends ConsumerWidget {
     return Text(
       'Registered (${status.embeddingCount} reference photo(s)) — last updated $when.',
       textAlign: TextAlign.center,
+    );
+  }
+
+  Widget _buildSuccess(BuildContext context, FaceRegistrationState state) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.check_circle,
+            size: 96, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(height: 16),
+        Text(
+          state.successMessage ?? 'Face registered.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+      ],
     );
   }
 
@@ -106,7 +129,7 @@ class FaceRegistrationScreen extends ConsumerWidget {
       case FaceRegistrationStage.submitting:
         return 'Saving your face data…';
       case FaceRegistrationStage.done:
-        return 'Done.';
+        return 'You can retake this anytime with "Re-register" above.';
     }
   }
 }
