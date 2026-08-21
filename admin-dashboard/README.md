@@ -49,20 +49,24 @@ Full target structure: [../docs/architecture/05-folder-structure.md](../docs/arc
 
 ## Design System
 
-A single dark "control room" theme — pure black, a drifting blue mesh glow, glass panels, pill controls — defined once as Tailwind v4 `@theme` tokens in [`src/index.css`](src/index.css) so every component derives its colors/radii/fonts from one source instead of hand-typing them:
+"Cosmoq" theme — a warm-orange/cool-blue dual accent over a near-black ground, glass panels, pill controls — defined once as Tailwind v4 `@theme` tokens in [`src/index.css`](src/index.css) so every component derives its colors/radii/fonts from one source instead of hand-typing them. Replaced the app's original single-blue "control room" theme (see `CHANGELOG.md` for when/why).
 
-| Token                                                    | Value                      | Utility examples                                                                        |
-| -------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
-| `--color-bg`                                             | `#000000`                  | `bg-bg`                                                                                 |
-| `--color-accent` / `--color-accent-light`                | `#2d5cff` / `#6f8fff`      | `bg-accent`, `text-accent-light`, `from-accent to-accent-light`                         |
-| `--color-text` / `--color-text-dim`                      | `#ffffff` / `#8d8f98`      | `text-text`, `text-text-dim`                                                            |
-| `--color-success` / `--color-warning` / `--color-danger` | muted teal / amber / coral | `text-success bg-success/10`, etc. — semantic state, kept separate from the blue accent |
-| `--radius-pill` / `--radius-card`                        | `100px` / `20px`           | `rounded-pill`, `rounded-card`                                                          |
-| `--font-sans` / `--font-mono`                            | Manrope / JetBrains Mono   | default body font / `font-mono` for data, labels, timestamps                            |
+| Token                                                    | Value                        | Utility examples                                                                                            |
+| --------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `--color-bg` / `--color-bg-raised`                        | `#020204` / `#050507`        | `bg-bg`, `bg-bg-raised` (the landing hero's elevated panel)                                                   |
+| `--color-accent` / `--color-accent-light`                 | `#ff8a3d` / `#ffb072`        | `bg-accent`, `text-accent-light`, orange half of the brand pair                                                |
+| `--color-accent-2` / `--color-accent-2-light`              | `#3d8bff` / `#7db8ff`        | `bg-accent-2`, blue half of the brand pair                                                                     |
+| `--gradient-brand` (plain CSS var, not a Tailwind color)  | `135deg, accent → accent-2`  | `.brand-gradient` — reserved for the elements that carry brand identity itself: logo mark, primary buttons, active nav row, topbar avatar, the dashboard's headline chart line, the "Overview" eyebrow shimmer |
+| `--color-text` / `--color-text-dim`                        | `#ffffff` / `#8d8f98`        | `text-text`, `text-text-dim`                                                                                  |
+| `--color-success` / `--color-warning` / `--color-danger`   | muted teal / amber / coral   | `text-success bg-success/10`, etc. — semantic state, kept separate from the brand accent                       |
+| `--radius-pill` / `--radius-card`                          | `100px` / `20px`             | `rounded-pill`, `rounded-card`                                                                                 |
+| `--font-sans` / `--font-mono`                              | Inter / Space Mono            | default body font / `font-mono` for data, labels, timestamps                                                    |
 
-Component layer (`shared/ui/`): `Button` (primary = gradient pill with a shine-sweep hover + magnetic cursor-follow; ghost = glass pill), `Card` (translucent, blurred, soft-lit border), `Chip` (status pills), `Reveal` (scroll-triggered fade-up, staggerable via an `index` prop), `StatCard` (count-up number + sparkline, with an honest "not available yet" state for metrics that have no backing endpoint — see `DashboardPage`, which never fabricates a number: all four KPIs — headcount, attendance rate, late arrivals, on leave — are now real and live-fetched from `GET /employees`/`GET /analytics/dashboard`; a role that can't view them (a plain employee) sees "HR/Admin only" rather than a guessed number).
+Component layer (`shared/ui/`): `Logo` (brain-and-circuit line icon on a `brand-gradient` badge), `icons.tsx` (the nav/topbar icon set — inline SVG line-icons, replacing the Unicode glyphs the app launched with), `Button` (primary = `brand-gradient` pill with a hover lift + glow, replacing the old diagonal shine-sweep, still magnetic cursor-follow; ghost = glass pill), `Card` (translucent, blurred, soft-lit border), `Chip` (status pills), `Reveal` (scroll-triggered fade-up, staggerable via an `index` prop — also what drives the landing hero's entrance, since an element already in the viewport on mount reveals immediately), `StatCard` (count-up number + sparkline + a per-metric hover glow — orange/blue/amber/slate — with an honest "not available yet" state for metrics that have no backing endpoint — see `DashboardPage`, which never fabricates a number: all four KPIs — headcount, attendance rate, late arrivals, on leave — are real and live-fetched from `GET /employees`/`GET /analytics/dashboard`; a role that can't view them (a plain employee) sees "HR/Admin only" rather than a guessed number).
 
-Every animation (mesh drift, scroll-reveal, count-up, magnetic hover, shine-sweep) checks `prefers-reduced-motion` via `shared/hooks/usePrefersReducedMotion.ts` and either skips or jumps straight to the end state.
+`features/landing/components/LandingHero.tsx` is the full-screen entrance shown once per session before the dashboard — see `AppShell.tsx` for the `hero → animating → dashboard` state machine (wheel/arrow-key/click triggered, one-shot, not persisted) that gates it.
+
+Every animation (mesh drift, scroll-reveal, count-up, magnetic hover, chart draw-in, the landing hero's rays/shimmer) checks `prefers-reduced-motion` via `shared/hooks/usePrefersReducedMotion.ts` and either skips or jumps straight to the end state.
 
 ### Auth
 

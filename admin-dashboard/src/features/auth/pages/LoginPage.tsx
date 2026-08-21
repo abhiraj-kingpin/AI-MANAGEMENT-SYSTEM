@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react';
 import { Atmosphere } from '@/app/layout/Atmosphere';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { Logo } from '@/shared/ui/Logo';
 import { useLogin } from '@/features/auth/hooks/useLogin';
 import { apiErrorMessage } from '@/shared/lib/apiError';
 
@@ -20,9 +21,7 @@ export function LoginPage() {
       <Atmosphere />
       <Card className="relative w-full max-w-[400px] px-9 py-10">
         <div className="mb-7 flex items-center gap-2.5">
-          <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-accent to-accent-light text-[15px] font-extrabold shadow-[0_6px_18px_-6px_rgba(45,92,255,0.8)]">
-            AI
-          </div>
+          <Logo size={34} />
           <span className="text-[17px] font-extrabold tracking-tight">AI Management System</span>
         </div>
 

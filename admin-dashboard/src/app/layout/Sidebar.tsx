@@ -1,17 +1,31 @@
+import { type ComponentType, type SVGProps } from 'react';
 import { NavLink } from 'react-router-dom';
+import { Logo } from '@/shared/ui/Logo';
+import {
+  AiInsightsIcon,
+  AttendanceIcon,
+  DashboardIcon,
+  EmployeesIcon,
+  GeofencesIcon,
+  LeaveIcon,
+  NotificationsIcon,
+  PayrollIcon,
+  QrCodesIcon,
+  ShiftsIcon,
+} from '@/shared/ui/icons';
 import { useAuthStore } from '@/stores/authStore';
 import type { Role } from '@/types/api';
 
 interface NavItem {
   to: string;
   label: string;
-  icon: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   end: boolean;
   roles?: Role[];
 }
 
 const liveItems: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: '◆', end: true },
+  { to: '/', label: 'Dashboard', icon: DashboardIcon, end: true },
   // GET /analytics/ai/late-risk and /ai/absenteeism-trend are Super
   // Admin/HR/Manager-only server-side (same scoping as Attendance below);
   // the anomalies section inside the page is gated further, to Super
@@ -19,7 +33,7 @@ const liveItems: NavItem[] = [
   {
     to: '/ai-insights',
     label: 'AI Insights',
-    icon: '✦',
+    icon: AiInsightsIcon,
     end: false,
     roles: ['super_admin', 'hr', 'manager'],
   },
@@ -29,7 +43,7 @@ const liveItems: NavItem[] = [
   {
     to: '/employees',
     label: 'Employees',
-    icon: '◇',
+    icon: EmployeesIcon,
     end: false,
     roles: ['super_admin', 'hr', 'manager'],
   },
@@ -38,7 +52,7 @@ const liveItems: NavItem[] = [
   {
     to: '/attendance',
     label: 'Attendance',
-    icon: '◷',
+    icon: AttendanceIcon,
     end: false,
     roles: ['super_admin', 'hr', 'manager'],
   },
@@ -46,18 +60,18 @@ const liveItems: NavItem[] = [
   // unlike Employees/Attendance, this screen isn't role-gated: an `employee`
   // sees only the self-service section, while the review queue inside the
   // same page is itself gated by role (see LeavePage's `canReview`).
-  { to: '/leaves', label: 'Leave', icon: '▤', end: false },
+  { to: '/leaves', label: 'Leave', icon: LeaveIcon, end: false },
   // Same shape as Leave: GET /shifts/me is open to every role (a "My Shift"
   // card), while shift definitions/assignment inside the same page are
   // gated to Super Admin/HR (see ShiftsPage's `canManage`).
-  { to: '/shifts', label: 'Shifts', icon: '◫', end: false },
+  { to: '/shifts', label: 'Shifts', icon: ShiftsIcon, end: false },
   // Same shape again: GET /payslips/me is open to every role (a "My
   // Payslips" section), while salaries and the HR payslip queue inside the
   // same page are gated to Super Admin/HR (see PayrollPage's `canManage`).
-  { to: '/payroll', label: 'Payroll', icon: '◈', end: false },
+  { to: '/payroll', label: 'Payroll', icon: PayrollIcon, end: false },
   // GET /notifications/me is every role's own feed; only the Broadcast
   // button inside the page is gated to Super Admin/HR.
-  { to: '/notifications', label: 'Notifications', icon: '◎', end: false },
+  { to: '/notifications', label: 'Notifications', icon: NotificationsIcon, end: false },
 ];
 
 // Setup/configuration screens, kept visually separate from the day-to-day
@@ -70,14 +84,14 @@ const configItems: NavItem[] = [
   {
     to: '/geofences',
     label: 'Geofences',
-    icon: '◍',
+    icon: GeofencesIcon,
     end: false,
     roles: ['super_admin', 'hr'],
   },
   {
     to: '/qr-codes',
     label: 'QR Codes',
-    icon: '▣',
+    icon: QrCodesIcon,
     end: false,
     roles: ['super_admin', 'hr'],
   },
@@ -92,9 +106,7 @@ export function Sidebar() {
   return (
     <aside className="hidden w-[248px] shrink-0 flex-col gap-6 border-r border-border bg-white/[0.015] p-4 sm:flex">
       <div className="flex items-center gap-2.5 px-2">
-        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[9px] bg-gradient-to-br from-accent to-accent-light text-[13px] font-extrabold">
-          AI
-        </div>
+        <Logo size={30} />
         <span className="truncate text-[15px] font-extrabold">AI Management System</span>
       </div>
 
@@ -119,6 +131,7 @@ export function Sidebar() {
 }
 
 function SidebarLink({ item }: { item: NavItem }) {
+  const ItemIcon = item.icon;
   return (
     <NavLink
       to={item.to}
@@ -126,12 +139,23 @@ function SidebarLink({ item }: { item: NavItem }) {
       className={({ isActive }) =>
         `relative flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-semibold transition-colors ${
           isActive
-            ? 'bg-gradient-to-r from-accent/20 to-accent/5 text-white before:absolute before:-left-4 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-accent before:to-accent-light before:shadow-[0_0_12px_1px_rgba(111,143,255,0.7)]'
+            ? 'text-white shadow-[0_6px_20px_-8px_rgba(255,138,61,0.5)] before:absolute before:-left-4 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-[image:var(--gradient-brand)] before:shadow-[0_0_12px_1px_rgba(255,138,61,0.55)]'
             : 'text-text-dim hover:bg-white/[0.04] hover:text-text'
         }`
       }
+      style={({ isActive }) =>
+        isActive
+          ? // A low-alpha wash of the brand gradient, not a solid fill —
+            // bright orange→blue at full strength would overpower a 248px-
+            // wide nav rail. A plain Tailwind bg utility can't scale an
+            // `[image:...]` gradient's opacity, so this is set directly.
+            { backgroundImage: 'linear-gradient(90deg, rgba(255,138,61,.22), rgba(61,139,255,.1))' }
+          : undefined
+      }
     >
-      <span className="w-[18px] text-center text-[15px]">{item.icon}</span>
+      <span className="w-[18px] text-center">
+        <ItemIcon className="mx-auto" />
+      </span>
       {item.label}
     </NavLink>
   );

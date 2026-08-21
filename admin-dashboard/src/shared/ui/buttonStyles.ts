@@ -1,13 +1,16 @@
 export type ButtonVariant = 'primary' | 'ghost';
 
+// A hover lift + stronger glow, not the old diagonal light-sweep
+// (`.btn-shine`, retired from index.css) — kept understated rather than
+// busy, per the design handoff's interaction spec.
 const BASE =
-  'relative inline-flex items-center justify-center gap-2 rounded-pill px-6 py-3 text-sm font-bold transition-transform duration-300 ease-out disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-light';
+  'relative inline-flex items-center justify-center gap-2 rounded-pill px-6 py-3 text-sm font-bold transition-[transform,box-shadow,background-color,border-color] duration-300 ease-out hover:-translate-y-[2px] disabled:pointer-events-none disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-light';
 
-// `.btn-shine` (index.css) is the sweep-on-hover pseudo-element — arbitrary
-// box-shadow values below are the exact glow spec, not approximated.
+// Arbitrary box-shadow values are the exact glow spec (orange, matching the
+// primary variant's brand-gradient fill), not approximated.
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'btn-shine overflow-hidden text-white bg-gradient-to-br from-accent to-accent-light shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_8px_24px_-8px_rgba(45,92,255,0.7)] hover:shadow-[0_1px_0_rgba(255,255,255,0.3)_inset,0_14px_30px_-8px_rgba(45,92,255,0.85)]',
+    'text-white brand-gradient shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_8px_26px_-8px_rgba(255,138,61,0.55)] hover:shadow-[0_1px_0_rgba(255,255,255,0.3)_inset,0_12px_34px_-8px_rgba(255,138,61,0.7)]',
   ghost:
     'text-text bg-white/[0.04] border border-border backdrop-blur-md hover:bg-white/[0.07] hover:border-border-strong',
 };

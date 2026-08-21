@@ -1,31 +1,49 @@
 @import 'tailwindcss';
 
 /*
- * Design system: a single dark "control room" theme — deliberate, not a
- * gap. Pure black + a drifting blue mesh glow, glass panels, pill controls.
- * Tokens live here as Tailwind v4 `@theme` values so every utility class
- * (bg-accent, text-text-dim, rounded-pill, ...) derives from one source —
- * no color/radius/font gets hand-typed a second time in a component.
+ * Design system: "Cosmoq" theme — a warm-orange/cool-blue dual accent over
+ * a near-black ground, replacing the single-blue "control room" theme this
+ * app launched with. Tokens live here as Tailwind v4 `@theme` values so
+ * every utility class (bg-accent, text-text-dim, rounded-pill, ...) derives
+ * from one source — no color/radius/font gets hand-typed a second time in a
+ * component. See admin-dashboard's design handoff for the full old→new
+ * token table this file implements.
  */
 @theme {
-  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, 'SFMono-Regular', monospace;
 
-  --color-bg: #000000;
-  --color-accent: #2d5cff;
-  --color-accent-light: #6f8fff;
+  --color-bg: #020204;
+  /* The landing hero's elevated panel and any other surface that needs to
+     read as "raised" off the page background rather than a glass card. */
+  --color-bg-raised: #050507;
+
+  /* Dual brand accent — orange (primary) and blue (secondary) — rather than
+     the single blue this app used before. Most of the app still reads
+     through one accent at a time (a warning stays amber, a link stays
+     orange); the *pair* is reserved for the handful of elements that are
+     meant to carry the brand identity itself — see --gradient-brand below. */
+  --color-accent: #ff8a3d;
+  --color-accent-light: #ffb072;
+  --color-accent-2: #3d8bff;
+  --color-accent-2-light: #7db8ff;
+
   --color-text: #ffffff;
   --color-text-dim: #8d8f98;
   --color-text-faint: #55575f;
 
-  /* Glass surfaces — tinted from accent-light, not a neutral grey, so the
-     "neutral" reads as chosen rather than inherited from a default. */
-  --color-surface: rgb(111 143 255 / 0.055);
-  --color-surface-strong: rgb(111 143 255 / 0.1);
-  --color-border: rgb(111 143 255 / 0.16);
-  --color-border-strong: rgb(111 143 255 / 0.3);
+  /* Glass surfaces — neutral white, not accent-tinted, now that "the
+     accent" is two colors rather than one: a surface tinted toward either
+     would read as favoring that color everywhere, even where nothing
+     brand-related is happening. Color instead comes from borders/glow that
+     individual elements opt into on hover (see StatCard's per-metric glow,
+     Button's primary variant). */
+  --color-surface: rgb(255 255 255 / 0.035);
+  --color-surface-strong: rgb(255 255 255 / 0.07);
+  --color-border: rgb(255 255 255 / 0.08);
+  --color-border-strong: rgb(255 255 255 / 0.16);
 
-  /* Semantic state — separate from the blue accent so status reads at a
+  /* Semantic state — separate from the brand accent so status reads at a
      glance without competing with it (present/late/on-leave, trend arrows). */
   --color-success: #35d4a4;
   --color-warning: #f2b155;
@@ -35,6 +53,20 @@
   --radius-card: 20px;
 
   --ease-out-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  /* Not a Tailwind color token (it's a two-stop gradient, not a single
+     value, so it can't become a `bg-brand` utility the way the flat colors
+     above do) — a plain CSS custom property instead, consumed via
+     `.brand-gradient` below and by the few SVG gradients that need the same
+     two stops (AttendanceTrendChart's line, LandingHero's rays). Reserved
+     for the elements that are meant to carry the brand identity itself: the
+     logo mark, primary buttons, the active nav row, the topbar avatar, the
+     dashboard's headline chart line, and the "Overview" eyebrow shimmer.
+     Everywhere else either accent (orange) or accent-2 (blue) alone is
+     used, not this pair. */
+  --gradient-brand: linear-gradient(135deg, #ff8a3d, #3d8bff);
 }
 
 html,
@@ -54,6 +86,51 @@ body {
 ::selection {
   background: var(--color-accent);
   color: #fff;
+}
+
+/* Native <select> dropdown popups don't reliably pick up this app's dark
+   theme on their own — `color-scheme: dark` on <body> hints the browser,
+   but in practice the popup's background can stay native light while the
+   option text still inherits var(--color-text) (white) from the styled
+   <select> itself, leaving every non-hovered option nearly invisible
+   (white-on-white) — only the browser's own forced hover-highlight row
+   stayed legible. Set explicitly rather than relying on that inheritance. */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #0a0e1a;
+  color: var(--color-text);
+}
+
+.brand-gradient {
+  background-image: var(--gradient-brand);
+}
+
+/* The "Overview" eyebrow's animated gradient-text sweep — the one place in
+   the app where the dual brand accent moves rather than just sitting on a
+   surface. Frozen under reduced motion below. */
+.text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-accent),
+    var(--color-accent-2),
+    var(--color-accent)
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-text 5s linear infinite;
+}
+@keyframes shimmer-text {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
 }
 
 /* ---------- Atmosphere: fixed mesh-glow behind every screen ---------- */
@@ -85,24 +162,6 @@ body {
   }
 }
 
-/* ---------- Buttons: primary (gradient + shine-sweep) / ghost (glass) ---------- */
-.btn-shine::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    120deg,
-    transparent 30%,
-    rgb(255 255 255 / 0.45) 48%,
-    transparent 66%
-  );
-  transform: translateX(-120%);
-  transition: transform 0.7s var(--ease-out-smooth);
-}
-.btn-shine:hover::after {
-  transform: translateX(120%);
-}
-
 /* ---------- Glass card border highlight ---------- */
 .card-edge::before {
   content: '';
@@ -117,6 +176,24 @@ body {
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
+}
+
+/* ---------- StatCard: per-metric hover glow ---------- */
+/* Each StatCard sets --stat-border/--stat-shadow inline (see StatCard.tsx's
+   STAT_ACCENTS map) so one card's hover reads in its own color — orange for
+   Headcount, blue for Attendance, amber for Late Arrivals, slate for On
+   Leave — rather than every card lighting up the same accent regardless of
+   what it's reporting. */
+.stat-glow {
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.stat-glow:hover {
+  transform: translateY(-4px);
+  border-color: var(--stat-border, var(--color-border-strong));
+  box-shadow: var(--stat-shadow, none);
 }
 
 /* ---------- Scroll reveal ---------- */
@@ -136,6 +213,66 @@ body {
   filter: blur(0);
 }
 
+/* ---------- Attendance Trend chart: draw-in line + endpoint dot ---------- */
+.chart-draw {
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: dash-draw 1.6s var(--ease-out-smooth) 0.3s forwards;
+}
+@keyframes dash-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.chart-area {
+  opacity: 0;
+  animation: area-fade 1s ease 1.4s forwards;
+}
+@keyframes area-fade {
+  to {
+    opacity: 1;
+  }
+}
+.chart-dot {
+  animation:
+    dot-pop 0.5s ease 1.9s both,
+    glow-pulse 2.4s ease-in-out 2.4s infinite;
+}
+@keyframes dot-pop {
+  0% {
+    r: 0;
+    opacity: 0;
+  }
+  60% {
+    r: 6px;
+    opacity: 1;
+  }
+  100% {
+    r: 3px;
+    opacity: 1;
+  }
+}
+
+/* ---------- Shared pulse, used by the landing hero's rays/badge/glow ---------- */
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes bounce-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(7px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mesh-drift {
     animation: none !important;
@@ -145,5 +282,21 @@ body {
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
+  }
+  .text-shimmer {
+    animation: none !important;
+    background-position: 0% 50%;
+  }
+  .chart-draw {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  .chart-area {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  .chart-dot,
+  .landing-pulse {
+    animation: none !important;
   }
 }

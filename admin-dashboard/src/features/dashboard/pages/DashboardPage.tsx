@@ -48,7 +48,7 @@ export function DashboardPage() {
     <div className="flex flex-col gap-6">
       <Reveal className="flex items-end justify-between">
         <div>
-          <p className="mb-1.5 font-mono text-[11.5px] tracking-[0.14em] text-accent-light uppercase">
+          <p className="text-shimmer mb-1.5 font-mono text-[11.5px] font-bold tracking-[0.14em] uppercase">
             Overview
           </p>
           <h1 className="text-[26px] font-extrabold text-balance">
@@ -70,7 +70,7 @@ export function DashboardPage() {
                   value: headcount,
                   trend: { direction: 'up', label: 'live' },
                   spark: [headcount, headcount, headcount, headcount, headcount, headcount],
-                  sparkColor: 'accent',
+                  accent: 'orange',
                 }
           }
           pendingNote={pendingNote}
@@ -87,7 +87,7 @@ export function DashboardPage() {
                   unit: '%',
                   trend: SNAPSHOT_TREND,
                   spark: Array(6).fill(kpis.attendanceRate) as number[],
-                  sparkColor: 'success',
+                  accent: 'blue',
                 }
           }
           pendingNote={pendingNote}
@@ -102,7 +102,7 @@ export function DashboardPage() {
                   value: kpis.lateCount,
                   trend: SNAPSHOT_TREND,
                   spark: Array(6).fill(kpis.lateCount) as number[],
-                  sparkColor: 'warning',
+                  accent: 'amber',
                 }
           }
           pendingNote={pendingNote}
@@ -117,7 +117,7 @@ export function DashboardPage() {
                   value: kpis.onLeaveCount,
                   trend: SNAPSHOT_TREND,
                   spark: Array(6).fill(kpis.onLeaveCount) as number[],
-                  sparkColor: 'dim',
+                  accent: 'slate',
                 }
           }
           pendingNote={pendingNote}

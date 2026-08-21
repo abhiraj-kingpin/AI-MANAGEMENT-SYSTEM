@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Field, Input, Select } from '@/shared/ui/Field';
+import { PhoneInput } from '@/shared/ui/PhoneInput';
 import { Reveal } from '@/shared/ui/Reveal';
 import {
   EmployeePicker,
@@ -200,12 +201,11 @@ function EmployeeFormBody({
             </Field>
 
             <Field label="Phone" htmlFor="phone">
-              <Input
+              <PhoneInput
                 id="phone"
                 required
                 value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="+91 98765 43210"
+                onChange={(phone) => setForm((f) => ({ ...f, phone }))}
               />
             </Field>
             <Field label="Date of Joining" htmlFor="dateOfJoining">

@@ -26,17 +26,37 @@ function linePath(points: AttendanceTrendPoint[], getValue: (p: AttendanceTrendP
   return points.map((p, i) => `${xFor(i, points.length)},${yFor(getValue(p))}`).join(' ');
 }
 
+/** Same line, closed down to the plot's bottom edge — the fill under the primary series. */
+function areaPath(points: AttendanceTrendPoint[], getValue: (p: AttendanceTrendPoint) => number) {
+  const bottom = PADDING.top + PLOT_HEIGHT;
+  const coords = points.map((p, i) => `${xFor(i, points.length)},${yFor(getValue(p))}`);
+  const first = xFor(0, points.length);
+  const last = xFor(points.length - 1, points.length);
+  return `M${first},${bottom} L${coords.join(' L')} L${last},${bottom} Z`;
+}
+
 /**
  * A hand-rolled SVG line chart, matching `shared/lib/sparkline.ts`'s
  * no-dependency approach rather than pulling in a charting library for one
  * screen. Fixed 0–100 y-axis (both series are already percentages) so the
  * scale reads the same across every date range, instead of autoscaling to
  * whatever the data happens to span.
+ *
+ * The Attendance Rate series is the app's one chart carrying the brand
+ * identity directly — its stroke is the accent→accent-2 gradient (rather
+ * than a flat color like the Late Rate series below it), it draws in
+ * left-to-right on first reveal, fills to a soft gradient underneath, and
+ * finishes on a glowing endpoint dot. See index.css's `.chart-draw` /
+ * `.chart-area` / `.chart-dot`.
  */
 export function AttendanceTrendChart({ points }: { points: AttendanceTrendPoint[] }) {
   if (points.length === 0) {
     return <p className="py-10 text-center text-sm text-text-dim">Not enough data yet.</p>;
   }
+
+  const lastIndex = points.length - 1;
+  const dotX = xFor(lastIndex, points.length);
+  const dotY = yFor(points[lastIndex].attendanceRate);
 
   return (
     <div>
@@ -44,7 +64,7 @@ export function AttendanceTrendChart({ points }: { points: AttendanceTrendPoint[
         <span className="flex items-center gap-1.5">
           <span
             className="h-2 w-2 rounded-full"
-            style={{ background: 'var(--color-accent-light)' }}
+            style={{ backgroundImage: 'var(--gradient-brand)' }}
             aria-hidden="true"
           />
           Attendance Rate
@@ -65,6 +85,17 @@ export function AttendanceTrendChart({ points }: { points: AttendanceTrendPoint[
         role="img"
         aria-label="Monthly attendance and late-rate trend"
       >
+        <defs>
+          <linearGradient id="attendanceLineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="var(--color-accent)" />
+            <stop offset="100%" stopColor="var(--color-accent-2)" />
+          </linearGradient>
+          <linearGradient id="attendanceAreaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-accent-2)" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="var(--color-accent-2)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
         {GRID_LINES.map((value) => (
           <g key={value}>
             <line
@@ -100,37 +131,42 @@ export function AttendanceTrendChart({ points }: { points: AttendanceTrendPoint[
           </text>
         ))}
 
-        <polyline
-          points={linePath(points, (p) => p.attendanceRate)}
-          fill="none"
-          stroke="var(--color-accent-light)"
-          strokeWidth={2}
-          strokeLinejoin="round"
+        <path
+          className="chart-area"
+          d={areaPath(points, (p) => p.attendanceRate)}
+          fill="url(#attendanceAreaGrad)"
         />
+
         <polyline
+          className="chart-draw"
           points={linePath(points, (p) => p.lateRate)}
           fill="none"
           stroke="var(--color-warning)"
           strokeWidth={2}
           strokeLinejoin="round"
         />
+        <polyline
+          className="chart-draw"
+          points={linePath(points, (p) => p.attendanceRate)}
+          fill="none"
+          stroke="url(#attendanceLineGrad)"
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          style={{ filter: 'drop-shadow(0 0 6px rgba(255,138,61,0.35))' }}
+        />
 
         {points.map((p, i) => (
-          <g key={p.month}>
-            <circle
-              cx={xFor(i, points.length)}
-              cy={yFor(p.attendanceRate)}
-              r={3}
-              fill="var(--color-accent-light)"
-            />
-            <circle
-              cx={xFor(i, points.length)}
-              cy={yFor(p.lateRate)}
-              r={3}
-              fill="var(--color-warning)"
-            />
-          </g>
+          <circle
+            key={p.month}
+            cx={xFor(i, points.length)}
+            cy={yFor(p.lateRate)}
+            r={3}
+            fill="var(--color-warning)"
+          />
         ))}
+
+        <circle cx={dotX} cy={dotY} r={3} fill="var(--color-accent-2)" className="chart-dot" />
       </svg>
     </div>
   );
