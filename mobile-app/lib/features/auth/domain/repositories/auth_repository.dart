@@ -8,6 +8,13 @@ abstract class AuthRepository {
     required String password,
   });
 
+  /// Activates an account HR already created and, on success, signs the
+  /// employee in immediately — same local session persistence as [login].
+  Future<Result<AuthSessionEntity>> claimAccount({
+    required String email,
+    required String password,
+  });
+
   Future<void> logout();
 
   /// Reads the locally cached session (no network call) — used on app

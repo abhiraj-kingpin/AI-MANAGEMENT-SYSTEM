@@ -5,6 +5,7 @@ import 'package:ai_management_system/core/error/failures.dart';
 import 'package:ai_management_system/core/storage/secure_storage_service.dart';
 import 'package:ai_management_system/core/utils/result.dart';
 import 'package:ai_management_system/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:ai_management_system/features/auth/data/models/auth_session_model.dart';
 import 'package:ai_management_system/features/auth/data/models/user_model.dart';
 import 'package:ai_management_system/features/auth/domain/entities/auth_session_entity.dart';
 import 'package:ai_management_system/features/auth/domain/entities/user_entity.dart';
@@ -24,9 +25,29 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Result<AuthSessionEntity>> login({
     required String email,
     required String password,
-  }) async {
+  }) {
+    return _authenticate(
+        () => _remoteDataSource.login(email: email, password: password));
+  }
+
+  @override
+  Future<Result<AuthSessionEntity>> claimAccount({
+    required String email,
+    required String password,
+  }) {
+    return _authenticate(
+      () => _remoteDataSource.claimAccount(email: email, password: password),
+    );
+  }
+
+  /// [login] and [claimAccount] both end the same way — a session comes
+  /// back from the server and gets persisted locally the same way — this
+  /// is that shared tail, parameterized only by which call produced it.
+  Future<Result<AuthSessionEntity>> _authenticate(
+    Future<AuthSessionModel> Function() call,
+  ) async {
     try {
-      final session = await _remoteDataSource.login(email: email, password: password);
+      final session = await call();
       await _secureStorage.saveSession(
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,

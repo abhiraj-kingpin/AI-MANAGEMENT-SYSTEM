@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:ai_management_system/core/router/app_router.dart';
 import 'package:ai_management_system/features/auth/presentation/providers/auth_providers.dart';
 import 'package:ai_management_system/shared/widgets/primary_button.dart';
 
@@ -45,8 +47,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 88,
+                        height: 88,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
-                    'AI Management System',
+                    'WorkPulse AI',
                     style: Theme.of(context).textTheme.headlineSmall,
                     textAlign: TextAlign.center,
                   ),
@@ -63,7 +76,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     autofillHints: const [AutofillHints.email],
                     decoration: const InputDecoration(labelText: 'Email'),
                     validator: (value) =>
-                        (value == null || !value.contains('@')) ? 'Enter a valid email' : null,
+                        (value == null || !value.contains('@'))
+                            ? 'Enter a valid email'
+                            : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -71,15 +86,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
                     decoration: const InputDecoration(labelText: 'Password'),
-                    validator: (value) =>
-                        (value == null || value.length < 8) ? 'Minimum 8 characters' : null,
+                    validator: (value) => (value == null || value.length < 8)
+                        ? 'Minimum 8 characters'
+                        : null,
                     onFieldSubmitted: (_) => _submit(),
                   ),
                   if (authState.errorMessage != null) ...[
                     const SizedBox(height: 12),
                     Text(
                       authState.errorMessage!,
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      style:
+                          TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -87,6 +104,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     label: 'Sign in',
                     isLoading: authState.isLoading,
                     onPressed: _submit,
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => context.push(registerPath),
+                    child: const Text('New employee? Set up your account'),
                   ),
                 ],
               ),
