@@ -18,10 +18,20 @@ class AttendanceScreen extends ConsumerWidget {
     final state = ref.watch(attendanceControllerProvider);
     final controller = ref.read(attendanceControllerProvider.notifier);
     final today = state.today;
-    final hasCheckedInToday = today != null && today.isSameDayAs(DateTime.now());
+    final hasCheckedInToday =
+        today != null && today.isSameDayAs(DateTime.now());
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Attendance')),
+      appBar: AppBar(
+        title: const Text('Attendance'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month_outlined),
+            tooltip: 'Attendance calendar',
+            onPressed: () => context.push(attendanceCalendarPath),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: controller.loadHistory,
         child: ListView(
@@ -49,7 +59,8 @@ class AttendanceScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
                       Text(
                         state.errorMessage!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
                       ),
                     ],
                     if (state.infoMessage != null) ...[
@@ -73,8 +84,9 @@ class AttendanceScreen extends ConsumerWidget {
                       OutlinedButton.icon(
                         icon: const Icon(Icons.qr_code_scanner_outlined),
                         label: const Text('Check In with QR'),
-                        onPressed:
-                            state.isActionInProgress ? null : () => context.push(qrCheckInPath),
+                        onPressed: state.isActionInProgress
+                            ? null
+                            : () => context.push(qrCheckInPath),
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
@@ -152,10 +164,15 @@ class _HistoryTile extends StatelessWidget {
                 : '${_timeFormat.format(record.checkInAt!.toLocal())} – '
                     '${_timeFormat.format(record.checkOutAt!.toLocal())}',
       ),
-      trailing: Text(
-        record.status.replaceAll('_', ' '),
-        style: Theme.of(context).textTheme.labelMedium,
-      ),
+      // Present/late/half_day are all just judgment calls HR makes about
+      // *when* — this row already shows the actual check-in/check-out
+      // times above, which is the real fact; a "late" badge next to it
+      // added nothing but a value judgment. `on_leave` is kept because
+      // it's information the times genuinely can't convey (an approved
+      // absence, not just an unrecorded one).
+      trailing: record.status == 'on_leave'
+          ? Text('on leave', style: Theme.of(context).textTheme.labelMedium)
+          : null,
     );
   }
 }

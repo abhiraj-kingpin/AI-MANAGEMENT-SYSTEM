@@ -40,6 +40,23 @@ class LeaveScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
             ],
+            // The FAB above silently disables itself when leaveTypes is
+            // empty — real, but easy to mistake for "the button doesn't
+            // work" rather than "HR hasn't configured any leave types yet"
+            // (an org-setup gap, not a bug in this screen). Say so plainly
+            // once loading has actually finished.
+            if (!state.isLoading && state.leaveTypes.isEmpty) ...[
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    "No leave types are configured yet, so there's nothing to "
+                    'apply for. Ask HR to set these up first.',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (state.balances.isNotEmpty) ...[
               Text('Balance', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
@@ -58,12 +75,14 @@ class LeaveScreen extends ConsumerWidget {
                               children: [
                                 Text(
                                   balance.leaveTypeName,
-                                  style: Theme.of(context).textTheme.labelMedium,
+                                  style:
+                                      Theme.of(context).textTheme.labelMedium,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   '${balance.remaining}',
-                                  style: Theme.of(context).textTheme.headlineSmall,
+                                  style:
+                                      Theme.of(context).textTheme.headlineSmall,
                                 ),
                                 Text(
                                   'of ${balance.allocated + balance.carriedForward} left',
@@ -95,7 +114,9 @@ class LeaveScreen extends ConsumerWidget {
               ...state.leaves.map(
                 (leave) => _LeaveTile(
                   leave: leave,
-                  onCancel: leave.isCancellable ? () => controller.cancelLeave(leave.id) : null,
+                  onCancel: leave.isCancellable
+                      ? () => controller.cancelLeave(leave.id)
+                      : null,
                 ),
               ),
           ],
@@ -123,7 +144,8 @@ class _LeaveTile extends StatelessWidget {
     return Card(
       child: ListTile(
         title: Text(leave.leaveTypeName ?? 'Leave'),
-        subtitle: Text('$dateRange · ${leave.totalDays} day(s)\n${leave.reason}'),
+        subtitle:
+            Text('$dateRange · ${leave.totalDays} day(s)\n${leave.reason}'),
         isThreeLine: true,
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
