@@ -12,3 +12,7 @@ coverage
 # dump from a single run (written up by hand in README/CHANGELOG instead).
 lfw-data/
 lfw-eval-results.json
+
+# Local ML evaluation output
+lfw-eval-results.json
+lfw-run2.log
