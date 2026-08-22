@@ -27,10 +27,6 @@ export async function fetchMyBalance(): Promise<LeaveBalance[]> {
   return res.data.data;
 }
 
-// Unlike /attendance's correct/approve/reject trio, these four wrap the DTO
-// as `{ leave }` (leave.controller.ts calls `sendSuccess(res, { leave })`) —
-// checked against the actual controller, matching the Employee/Department
-// convention rather than Attendance's unwrapped one.
 export async function applyLeave(input: ApplyLeaveInput): Promise<Leave> {
   const res = await api.post<ApiSuccess<{ leave: Leave }>>('/leaves', input);
   return res.data.data.leave;

@@ -1,4 +1,3 @@
-/// Mirrors `LeaveBalanceDTO` (backend/src/modules/leaves/leave.types.ts).
 class LeaveBalanceEntity {
   final String leaveTypeId;
   final String leaveTypeName;

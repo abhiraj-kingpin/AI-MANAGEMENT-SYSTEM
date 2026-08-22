@@ -11,6 +11,7 @@ class LeaveModel extends LeaveEntity {
     required super.reason,
     required super.status,
     required super.createdAt,
+    super.managerComment,
   });
 
   factory LeaveModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +25,7 @@ class LeaveModel extends LeaveEntity {
       reason: json['reason'] as String,
       status: json['status'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      managerComment: json['managerComment'] as String?,
     );
   }
 }

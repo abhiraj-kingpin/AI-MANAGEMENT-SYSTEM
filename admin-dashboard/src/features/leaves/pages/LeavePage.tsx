@@ -6,11 +6,18 @@ import { Select } from '@/shared/ui/Field';
 import { Reveal } from '@/shared/ui/Reveal';
 import { apiErrorMessage } from '@/shared/lib/apiError';
 import { ApplyLeaveModal } from '@/features/leaves/components/ApplyLeaveModal';
+import { LeaveCalendar } from '@/features/leaves/components/LeaveCalendar';
+import { useLeaveOverview } from '@/features/leaves/hooks/useLeaveOverview';
 import { useLeaveQueue } from '@/features/leaves/hooks/useLeaveQueue';
 import { useCancelLeave, useReviewLeave } from '@/features/leaves/hooks/useLeaveMutations';
 import { useMyBalance, useMyLeaves } from '@/features/leaves/hooks/useMyLeaves';
+import { computeLeaveSummary } from '@/features/leaves/utils/leaveStats';
 import { useAuthStore } from '@/stores/authStore';
 import type { Leave, LeaveStatus, ListLeavesQuery } from '@/types/api';
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 const STATUS_TONE: Record<LeaveStatus, 'success' | 'warning' | 'neutral' | 'danger'> = {
   pending: 'warning',
@@ -38,7 +45,6 @@ function formatDateRange(startIso: string, endIso: string): string {
     : `${formatDate(startIso)} – ${formatDate(endIso)}`;
 }
 
-/** Mirrors the exact rule `leave.service.ts#cancel` enforces server-side: pending is always cancellable; an already-approved leave only if it hasn't started yet. This is a UI convenience to hide a button that would just 400 — the server re-checks it regardless. */
 function canCancel(leave: Leave): boolean {
   return (
     leave.status === 'pending' ||
@@ -61,6 +67,8 @@ export function LeavePage() {
     isLoading: queueLoading,
     isError: queueError,
   } = useLeaveQueue(queueQuery, canReview);
+  const { data: overview } = useLeaveOverview(canReview);
+  const summary = overview ? computeLeaveSummary(overview.items) : null;
 
   const cancelMutation = useCancelLeave();
   const reviewMutation = useReviewLeave();
@@ -106,7 +114,30 @@ export function LeavePage() {
         <Button onClick={() => setIsApplying(true)}>Apply for Leave</Button>
       </Reveal>
 
-      <Reveal index={1}>
+      {canReview && summary && (
+        <Reveal index={1}>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Card className="px-5 py-4">
+              <p className="text-[12.5px] font-bold text-text-dim">Pending Requests</p>
+              <p className="mt-1.5 text-2xl font-extrabold">{summary.pending}</p>
+            </Card>
+            <Card className="px-5 py-4">
+              <p className="text-[12.5px] font-bold text-text-dim">On Leave Today</p>
+              <p className="mt-1.5 text-2xl font-extrabold">{summary.onLeaveToday}</p>
+            </Card>
+            <Card className="px-5 py-4">
+              <p className="text-[12.5px] font-bold text-text-dim">Upcoming Leaves</p>
+              <p className="mt-1.5 text-2xl font-extrabold">{summary.upcoming}</p>
+            </Card>
+            <Card className="px-5 py-4">
+              <p className="text-[12.5px] font-bold text-text-dim">Approved This Month</p>
+              <p className="mt-1.5 text-2xl font-extrabold">{summary.approvedThisMonth}</p>
+            </Card>
+          </div>
+        </Reveal>
+      )}
+
+      <Reveal index={2}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {balances?.map((balance) => (
             <Card key={balance.leaveTypeId} className="px-5 py-4">
@@ -126,7 +157,7 @@ export function LeavePage() {
         </div>
       </Reveal>
 
-      <Reveal index={2}>
+      <Reveal index={3}>
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <h2 className="text-[15px] font-bold">My Requests</h2>
@@ -189,6 +220,14 @@ export function LeavePage() {
                       </td>
                       <td className="px-5 py-3.5">
                         <Chip tone={STATUS_TONE[leave.status]}>{STATUS_LABEL[leave.status]}</Chip>
+                        {leave.status === 'rejected' && leave.managerComment && (
+                          <div
+                            className="mt-1 max-w-[160px] truncate text-[11px] text-danger"
+                            title={leave.managerComment}
+                          >
+                            {leave.managerComment}
+                          </div>
+                        )}
                       </td>
                       <td className="px-5 py-3.5">
                         {canCancel(leave) && (
@@ -211,7 +250,7 @@ export function LeavePage() {
       </Reveal>
 
       {canReview && (
-        <Reveal index={3}>
+        <Reveal index={4}>
           <Card className="overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
               <h2 className="text-[15px] font-bold">Review Queue</h2>
@@ -248,6 +287,7 @@ export function LeavePage() {
                       <th className="px-5 py-3.5 font-bold">Leave Type</th>
                       <th className="px-5 py-3.5 font-bold">Dates</th>
                       <th className="px-5 py-3.5 font-bold">Days</th>
+                      <th className="px-5 py-3.5 font-bold">Applied On</th>
                       <th className="px-5 py-3.5 font-bold">Status</th>
                       <th className="px-5 py-3.5 font-bold">Actions</th>
                     </tr>
@@ -255,13 +295,13 @@ export function LeavePage() {
                   <tbody>
                     {queueLoading && !queue ? (
                       <tr>
-                        <td colSpan={6} className="px-5 py-10 text-center text-text-dim">
+                        <td colSpan={7} className="px-5 py-10 text-center text-text-dim">
                           Loading…
                         </td>
                       </tr>
                     ) : queue && queue.items.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-5 py-10 text-center text-text-dim">
+                        <td colSpan={7} className="px-5 py-10 text-center text-text-dim">
                           No leave requests match this filter.
                         </td>
                       </tr>
@@ -292,6 +332,9 @@ export function LeavePage() {
                             {formatDateRange(leave.startDate, leave.endDate)}
                           </td>
                           <td className="px-5 py-3.5 text-text-dim">{leave.totalDays}</td>
+                          <td className="px-5 py-3.5 text-text-dim">
+                            {formatDateTime(leave.createdAt)}
+                          </td>
                           <td className="px-5 py-3.5">
                             <Chip tone={STATUS_TONE[leave.status]}>
                               {STATUS_LABEL[leave.status]}
@@ -351,6 +394,12 @@ export function LeavePage() {
               </div>
             )}
           </Card>
+        </Reveal>
+      )}
+
+      {canReview && overview && (
+        <Reveal index={5}>
+          <LeaveCalendar leaves={overview.items} />
         </Reveal>
       )}
 

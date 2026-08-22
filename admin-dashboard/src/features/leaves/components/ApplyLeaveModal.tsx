@@ -10,7 +10,6 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** `POST /leaves` — self-service application. Overlap, balance, and business-day checks all happen server-side; this form just surfaces whatever message comes back (e.g. `INSUFFICIENT_BALANCE`'s exact remaining/requested counts) rather than re-implementing the rules client-side. */
 export function ApplyLeaveModal({ onClose }: { onClose: () => void }) {
   const { data: leaveTypes } = useLeaveTypes();
   const [leaveTypeId, setLeaveTypeId] = useState('');

@@ -28,11 +28,6 @@ class LeaveController extends StateNotifier<LeaveState> {
     load();
   }
 
-  /// Loads leave types, balance, and history concurrently — none of the
-  /// three depends on another finishing first. Each branch updates its own
-  /// slice of state independently via `copyWith` (which preserves every
-  /// other field), so this avoids forcing three differently-typed
-  /// `Result<List<...>>`s into one homogeneously-typed `Future.wait` list.
   Future<void> load() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     String? firstError;

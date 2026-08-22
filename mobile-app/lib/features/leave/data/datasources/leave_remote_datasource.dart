@@ -100,8 +100,6 @@ class LeaveRemoteDataSourceImpl implements LeaveRemoteDataSource {
   }
 
   LeaveModel _parseLeave(Map<String, dynamic>? body) {
-    // POST /leaves, PATCH /leaves/:id/cancel wrap the DTO as { leave } —
-    // checked against leave.controller.ts.
     final data = body?['data'] as Map<String, dynamic>?;
     final leave = data?['leave'] as Map<String, dynamic>?;
     if (leave == null) {

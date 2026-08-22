@@ -6,10 +6,8 @@ import 'package:ai_management_system/features/leave/presentation/providers/leave
 import 'package:ai_management_system/shared/widgets/primary_button.dart';
 
 final _dateFormat = DateFormat.yMMMd();
+const _maxReasonLength = 500;
 
-/// A modal bottom sheet rather than a separate route — this form is short
-/// enough (4 fields) that pushing a whole new screen for it would be more
-/// navigation than the task warrants.
 class ApplyLeaveSheet extends ConsumerStatefulWidget {
   final List<LeaveTypeEntity> leaveTypes;
   const ApplyLeaveSheet({required this.leaveTypes, super.key});
@@ -22,8 +20,8 @@ class _ApplyLeaveSheetState extends ConsumerState<ApplyLeaveSheet> {
   final _formKey = GlobalKey<FormState>();
   final _reasonController = TextEditingController();
   String? _leaveTypeId;
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now();
+  DateTimeRange? _range;
+  bool _reviewing = false;
   String? _errorMessage;
   bool _isSubmitting = false;
 
@@ -31,6 +29,7 @@ class _ApplyLeaveSheetState extends ConsumerState<ApplyLeaveSheet> {
   void initState() {
     super.initState();
     if (widget.leaveTypes.isNotEmpty) _leaveTypeId = widget.leaveTypes.first.id;
+    _reasonController.addListener(() => setState(() {}));
   }
 
   @override
@@ -39,27 +38,49 @@ class _ApplyLeaveSheetState extends ConsumerState<ApplyLeaveSheet> {
     super.dispose();
   }
 
-  Future<void> _pickDate({required bool isStart}) async {
-    final initial = isStart ? _startDate : _endDate;
-    final picked = await showDatePicker(
+  String? get _leaveTypeName {
+    if (_leaveTypeId == null) return null;
+    for (final type in widget.leaveTypes) {
+      if (type.id == _leaveTypeId) return type.name;
+    }
+    return null;
+  }
+
+  int get _totalDays {
+    if (_range == null) return 0;
+    return _range!.end.difference(_range!.start).inDays + 1;
+  }
+
+  Future<void> _pickRange() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: initial,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
+      initialDateRange: _range,
+      helpText: 'Select leave dates',
+      saveText: 'Select',
     );
     if (picked == null) return;
+    setState(() => _range = picked);
+  }
+
+  void _clearRange() => setState(() => _range = null);
+
+  void _goToReview() {
+    if (!_formKey.currentState!.validate()) return;
+    if (_range == null) {
+      setState(() => _errorMessage = 'Select a date range for your leave.');
+      return;
+    }
     setState(() {
-      if (isStart) {
-        _startDate = picked;
-        if (_endDate.isBefore(_startDate)) _endDate = _startDate;
-      } else {
-        _endDate = picked;
-      }
+      _errorMessage = null;
+      _reviewing = true;
     });
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _leaveTypeId == null) return;
     setState(() {
       _isSubmitting = true;
       _errorMessage = null;
@@ -67,8 +88,8 @@ class _ApplyLeaveSheetState extends ConsumerState<ApplyLeaveSheet> {
 
     final success = await ref.read(leaveControllerProvider.notifier).applyLeave(
           leaveTypeId: _leaveTypeId!,
-          startDate: _startDate,
-          endDate: _endDate,
+          startDate: _range!.start,
+          endDate: _range!.end,
           reason: _reasonController.text.trim(),
         );
 
@@ -92,78 +113,149 @@ class _ApplyLeaveSheetState extends ConsumerState<ApplyLeaveSheet> {
         top: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Apply for Leave', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _leaveTypeId,
-              decoration: const InputDecoration(labelText: 'Leave Type'),
-              items: widget.leaveTypes
-                  .map((type) => DropdownMenuItem(value: type.id, child: Text(type.name)))
-                  .toList(),
-              onChanged: (value) => setState(() => _leaveTypeId = value),
-              validator: (value) => value == null ? 'Select a leave type' : null,
+      child: _reviewing ? _buildReview(context) : _buildForm(context),
+    );
+  }
+
+  Widget _buildForm(BuildContext context) {
+    final reasonLength = _reasonController.text.length;
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Apply for Leave', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: _leaveTypeId,
+            decoration: const InputDecoration(labelText: 'Leave Type'),
+            items: widget.leaveTypes
+                .map((type) => DropdownMenuItem(value: type.id, child: Text(type.name)))
+                .toList(),
+            onChanged: (value) => setState(() => _leaveTypeId = value),
+            validator: (value) => value == null ? 'Select a leave type' : null,
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: _pickRange,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Dates',
+                suffixIcon: _range != null
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        tooltip: 'Clear selection',
+                        onPressed: _clearRange,
+                      )
+                    : const Icon(Icons.calendar_month_outlined),
+              ),
+              child: Text(
+                _range == null
+                    ? 'Tap to choose from/to dates'
+                    : '${_dateFormat.format(_range!.start)} → ${_dateFormat.format(_range!.end)}'
+                        ' ($_totalDays day${_totalDays == 1 ? '' : 's'})',
+              ),
             ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _reasonController,
+            decoration: InputDecoration(
+              labelText: 'Reason for Leave',
+              hintText: 'Please enter the reason for your leave…',
+              counterText: '$reasonLength/$_maxReasonLength',
+            ),
+            maxLines: 3,
+            maxLength: _maxReasonLength,
+            validator: (value) =>
+                (value == null || value.trim().isEmpty) ? 'A reason is required' : null,
+          ),
+          if (_errorMessage != null) ...[
             const SizedBox(height: 12),
-            Row(
+            Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
+          const SizedBox(height: 20),
+          PrimaryButton(label: 'Review Request', onPressed: _goToReview),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReview(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Confirm Leave Request', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _DateField(
-                    label: 'Start Date',
-                    value: _startDate,
-                    onTap: () => _pickDate(isStart: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _DateField(
-                    label: 'End Date',
-                    value: _endDate,
-                    onTap: () => _pickDate(isStart: false),
-                  ),
-                ),
+                _SummaryRow(label: 'Leave Type', value: _leaveTypeName ?? '—'),
+                _SummaryRow(label: 'From', value: _dateFormat.format(_range!.start)),
+                _SummaryRow(label: 'To', value: _dateFormat.format(_range!.end)),
+                _SummaryRow(label: 'Total Days', value: '$_totalDays'),
+                const SizedBox(height: 8),
+                Text('Reason', style: Theme.of(context).textTheme.labelMedium),
+                const SizedBox(height: 4),
+                Text(_reasonController.text.trim()),
               ],
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _reasonController,
-              decoration: const InputDecoration(labelText: 'Reason'),
-              maxLines: 2,
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'A reason is required' : null,
+          ),
+        ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        ],
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _isSubmitting ? null : () => setState(() => _reviewing = false),
+                child: const Text('Edit'),
+              ),
             ),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 12),
-              Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ],
-            const SizedBox(height: 20),
-            PrimaryButton(label: 'Submit Request', isLoading: _isSubmitting, onPressed: _submit),
+            const SizedBox(width: 12),
+            Expanded(
+              child: PrimaryButton(
+                label: 'Submit',
+                isLoading: _isSubmitting,
+                onPressed: _submit,
+              ),
+            ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
 
-class _DateField extends StatelessWidget {
+class _SummaryRow extends StatelessWidget {
   final String label;
-  final DateTime value;
-  final VoidCallback onTap;
-
-  const _DateField({required this.label, required this.value, required this.onTap});
+  final String value;
+  const _SummaryRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: InputDecorator(
-        decoration: InputDecoration(labelText: label),
-        child: Text(_dateFormat.format(value)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            value,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

@@ -7,6 +7,13 @@ import 'package:ai_management_system/features/leave/presentation/screens/apply_l
 
 final _dateFormat = DateFormat.MMMd();
 
+const _statusColors = {
+  'pending': Colors.amber,
+  'approved': Colors.green,
+  'rejected': Colors.red,
+  'cancelled': Colors.grey,
+};
+
 class LeaveScreen extends ConsumerWidget {
   const LeaveScreen({super.key});
 
@@ -40,11 +47,6 @@ class LeaveScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
             ],
-            // The FAB above silently disables itself when leaveTypes is
-            // empty — real, but easy to mistake for "the button doesn't
-            // work" rather than "HR hasn't configured any leave types yet"
-            // (an org-setup gap, not a bug in this screen). Say so plainly
-            // once loading has actually finished.
             if (!state.isLoading && state.leaveTypes.isEmpty) ...[
               const Card(
                 child: Padding(
@@ -142,19 +144,76 @@ class _LeaveTile extends StatelessWidget {
         : '${_dateFormat.format(leave.startDate)} – ${_dateFormat.format(leave.endDate)}';
 
     return Card(
-      child: ListTile(
-        title: Text(leave.leaveTypeName ?? 'Leave'),
-        subtitle:
-            Text('$dateRange · ${leave.totalDays} day(s)\n${leave.reason}'),
-        isThreeLine: true,
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(leave.status, style: Theme.of(context).textTheme.labelMedium),
-            if (onCancel != null)
-              TextButton(onPressed: onCancel, child: const Text('Cancel')),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    leave.leaveTypeName ?? 'Leave',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                _StatusBadge(status: leave.status),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text('$dateRange · ${leave.totalDays} day(s)'),
+            const SizedBox(height: 2),
+            Text(leave.reason, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 4),
+            Text(
+              'Applied ${_dateFormat.format(leave.createdAt)}',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.outline),
+            ),
+            if (leave.status == 'rejected' &&
+                leave.managerComment != null &&
+                leave.managerComment!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Reason: ${leave.managerComment}',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            if (onCancel != null) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(onPressed: onCancel, child: const Text('Cancel')),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColors[status] ?? Colors.grey;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        status[0].toUpperCase() + status.substring(1),
+        style: TextStyle(
+          color: color.shade900,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
