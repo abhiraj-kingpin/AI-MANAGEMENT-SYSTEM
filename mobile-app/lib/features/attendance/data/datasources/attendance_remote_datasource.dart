@@ -16,6 +16,9 @@ abstract class AttendanceRemoteDataSource {
   Future<AttendanceModel> checkInWithFace({
     required List<double> embedding,
     required bool livenessPassed,
+    required double lat,
+    required double lng,
+    double? accuracyMeters,
   });
 
   Future<AttendanceModel> checkOut({double? lat, double? lng, double? accuracyMeters});
@@ -72,6 +75,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   Future<AttendanceModel> checkInWithFace({
     required List<double> embedding,
     required bool livenessPassed,
+    required double lat,
+    required double lng,
+    double? accuracyMeters,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -80,6 +86,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           'method': 'face',
           'faceEmbedding': embedding,
           'livenessPassed': livenessPassed,
+          'location': {
+            'lat': lat,
+            'lng': lng,
+            if (accuracyMeters != null) 'accuracyMeters': accuracyMeters,
+          },
         },
       );
       return _parseAttendance(response.data);

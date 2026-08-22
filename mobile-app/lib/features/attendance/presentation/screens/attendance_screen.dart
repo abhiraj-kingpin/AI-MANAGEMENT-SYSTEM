@@ -77,9 +77,9 @@ class AttendanceScreen extends ConsumerWidget {
                     const SizedBox(height: 20),
                     if (!hasCheckedInToday || today.checkInAt == null) ...[
                       PrimaryButton(
-                        label: 'Check In with GPS',
+                        label: 'Check In with Face',
                         isLoading: state.isActionInProgress,
-                        onPressed: controller.checkIn,
+                        onPressed: () => context.push(faceCheckInPath),
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
@@ -88,14 +88,6 @@ class AttendanceScreen extends ConsumerWidget {
                         onPressed: state.isActionInProgress
                             ? null
                             : () => context.push(qrCheckInPath),
-                      ),
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.face_outlined),
-                        label: const Text('Check In with Face'),
-                        onPressed: state.isActionInProgress
-                            ? null
-                            : () => context.push(faceCheckInPath),
                       ),
                     ] else if (today.checkOutAt == null) ...[
                       if (today.hasOpenBreak) ...[

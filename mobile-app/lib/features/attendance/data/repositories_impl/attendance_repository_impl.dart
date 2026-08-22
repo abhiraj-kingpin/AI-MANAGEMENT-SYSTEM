@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:geolocator/geolocator.dart';
 import 'package:ai_management_system/core/error/exceptions.dart';
 import 'package:ai_management_system/core/error/failures.dart';
 import 'package:ai_management_system/core/offline/offline_queue_service.dart';
@@ -93,10 +94,24 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required List<double> embedding,
     required bool livenessPassed,
   }) async {
+    // Face check-in proves who you are, not where you are — it requires the
+    // same geofence proof GPS check-in does, fetched the same way.
+    final Position position;
+    try {
+      position = await _locationService.getCurrentPosition();
+    } on LocationServiceDisabledError catch (e) {
+      return ResultFailure(ValidationFailure(e.message));
+    } on LocationPermissionDeniedException catch (e) {
+      return ResultFailure(ValidationFailure(e.message));
+    }
+
     try {
       final attendance = await _remoteDataSource.checkInWithFace(
         embedding: embedding,
         livenessPassed: livenessPassed,
+        lat: position.latitude,
+        lng: position.longitude,
+        accuracyMeters: position.accuracy,
       );
       return Success(attendance);
     } on NetworkException {
@@ -107,6 +122,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
           method: 'face',
           faceEmbedding: embedding,
           livenessPassed: livenessPassed,
+          lat: position.latitude,
+          lng: position.longitude,
+          accuracyMeters: position.accuracy,
           occurredAt: DateTime.now(),
         ),
       );
