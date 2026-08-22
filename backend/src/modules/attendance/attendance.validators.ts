@@ -9,10 +9,6 @@ export const geoPointSchema = z.object({
 });
 
 export const checkInSchema = z.object({
-  // `manual`, `gps`, `qr`, and `face` are all live as of Phase 8 — the
-  // embedding here is client-computed (on-device ML Kit + TFLite, per
-  // docs/architecture/06-tech-stack-justification.md), never a raw image;
-  // the server only ever runs cosine-similarity comparison on it.
   body: z
     .object({
       method: z.enum(ATTENDANCE_METHODS),
@@ -22,11 +18,11 @@ export const checkInSchema = z.object({
       livenessPassed: z.boolean().optional(),
     })
     .superRefine((body, ctx) => {
-      if (body.method === 'gps' && !body.location) {
+      if ((body.method === 'gps' || body.method === 'face') && !body.location) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['location'],
-          message: 'GPS check-in requires a location.',
+          message: `${body.method === 'gps' ? 'GPS' : 'Face'} check-in requires a location.`,
         });
       }
       if (body.method === 'qr' && !body.qrToken) {
@@ -102,12 +98,6 @@ export const reviewCorrectionSchema = z.object({
   }),
 });
 
-// One offline-queued punch — mirrors checkInSchema's per-method evidence
-// requirements, plus the two fields a live check-in doesn't need:
-// `clientGeneratedId` (idempotency key, assigned on-device when the punch
-// was first queued) and `occurredAt` (when it actually happened, not when
-// connectivity came back). See
-// docs/architecture/08-sequence-diagrams.md#5-offline-attendance-sync.
 const syncPunchSchema = z
   .object({
     clientGeneratedId: z.string().trim().min(1),
@@ -131,16 +121,10 @@ const syncPunchSchema = z
 
 export const syncAttendanceSchema = z.object({
   body: z.object({
-    // Capped — this is a bulk catch-up endpoint for a phone reconnecting,
-    // not an unbounded import; a device with more queued than this splits
-    // across multiple sync calls.
     punches: z.array(syncPunchSchema).min(1).max(100),
   }),
 });
 
-// `date` optional — the controller defaults to "yesterday" (see
-// attendance.controller.ts#absenceSweep), the common case for an
-// end-of-day/next-morning HR action.
 export const absenceSweepSchema = z.object({
   body: z.object({
     date: z.coerce.date().optional(),

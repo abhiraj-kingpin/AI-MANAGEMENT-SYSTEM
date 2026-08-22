@@ -26,12 +26,6 @@ import type {
   SyncPunchInput,
 } from './attendance.validators';
 
-// Fallback only — used when an employee has no active ShiftAssignment
-// (Phase 10, modules/shifts/). Real per-employee shift start time, grace
-// period, and workday length (for overtime/half-day) now come from
-// shiftAssignment.service.ts#getEffectiveShift wherever one exists; these
-// constants exist so check-in/out never fails outright over an employee
-// nobody has assigned a shift to yet. See resolveShift() below.
 const DEFAULT_SHIFT_START = '09:00';
 const DEFAULT_GRACE_PERIOD_MINUTES = 10;
 const STANDARD_WORKDAY_MINUTES = 8 * 60;
@@ -40,7 +34,6 @@ function hasOpenBreak(attendance: IAttendance): boolean {
   return attendance.breaks.some((b) => !b.end);
 }
 
-/** The employee's real assigned shift on `date`, or the documented default when they don't have one — never throws over a missing assignment. */
 async function resolveShift(
   employeeId: string,
   date: Date,
@@ -55,7 +48,6 @@ async function resolveShift(
   );
 }
 
-/** Recomputes workingMinutes/overtime from checkIn/checkOut/breaks against the given shift's workday length — shared by checkOut and direct/approved corrections. */
 function recomputeWorkingHours(attendance: IAttendance, workdayMinutes: number): void {
   if (!attendance.checkInAt || !attendance.checkOutAt) return;
 
@@ -71,13 +63,11 @@ function recomputeWorkingHours(attendance: IAttendance, workdayMinutes: number):
     : 0;
 }
 
-/** Strips Mongoose-internal keys from a `.toObject()` result before it goes into an AuditLog entry. */
 function sanitizeForAudit(doc: object): Record<string, unknown> {
   const { __v: _v, _id: _id, ...rest } = doc as Record<string, unknown>;
   return rest;
 }
 
-/** Builds the Mongo filter for report/export/list — the one place team/department scoping lives. */
 async function buildAttendanceFilter(
   query: Pick<ListAttendanceQuery, 'employeeId' | 'departmentId' | 'status' | 'from' | 'to'>,
   actor: ActorContext,
@@ -96,8 +86,6 @@ async function buildAttendanceFilter(
       filter.employeeId = { $in: teamIds };
     }
   } else {
-    // HR / Super Admin — full visibility, optionally narrowed by one of
-    // employeeId or departmentId (combining both is a v2 refinement).
     if (query.employeeId) {
       filter.employeeId = query.employeeId;
     } else if (query.departmentId) {
@@ -117,14 +105,6 @@ async function buildAttendanceFilter(
   return filter;
 }
 
-/**
- * The actual check-in logic, parameterized on `now` so both the live
- * self-service endpoint (`now = new Date()`) and offline sync (`now` = the
- * punch's original `occurredAt`, per
- * docs/architecture/08-sequence-diagrams.md#5-offline-attendance-sync) share
- * one implementation rather than two copies that could drift. `clientGeneratedId`
- * is only ever set by the sync path — see `applySyncPunch` below.
- */
 async function performCheckIn(
   actor: ActorContext,
   employeeId: string,
@@ -135,28 +115,18 @@ async function performCheckIn(
   const { method, location, qrToken, faceEmbedding, livenessPassed } = input;
 
   if (method === 'manual' && actor.role !== 'super_admin' && actor.role !== 'hr') {
-    // Now that GPS/QR/Face are available, self-service "manual" is
-    // HR/Admin-only again — per the original design
-    // (docs/architecture/04-api-documentation.md). It was open to everyone
-    // in Phase 5 as an interim measure while none of them existed yet.
     throw AppError.forbidden(
       'Manual check-in is reserved for HR/Admin corrections — use GPS, QR, or Face to check in.',
       'MANUAL_CHECKIN_RESTRICTED',
     );
   }
 
-  // Checked before any method-specific work (not after) so a QR token is
-  // never consumed for a punch that was going to be rejected anyway — see
-  // qr.service.ts#validateAndConsumeQrToken, which mutates usedBy/isUsed
-  // as a side effect and isn't safe to call speculatively.
   const date = startOfUtcDay(now);
 
   let attendance = await Attendance.findOne({ employeeId, date });
   if (attendance?.checkInAt) {
     throw AppError.conflict('You have already checked in today.', 'ALREADY_CHECKED_IN');
   }
-  // Set by leave.service.ts#markAttendanceOnLeave when a leave request
-  // covering today gets approved — see docs/architecture/08-sequence-diagrams.md#6-leave-application--approval.
   if (attendance?.status === 'on_leave') {
     throw AppError.badRequest('You are on approved leave today.', 'ON_APPROVED_LEAVE');
   }
@@ -165,13 +135,15 @@ async function performCheckIn(
   let matchedQrCodeId: string | undefined;
   let faceMatchConfidence: number | undefined;
 
-  if (method === 'gps') {
-    // Already enforced by checkInSchema's superRefine — re-checked here so
-    // the service is correct standalone, not just behind that one route.
-    if (!location) {
-      throw AppError.badRequest('GPS check-in requires a location.', 'LOCATION_REQUIRED');
+  // Shared by both 'gps' and 'face': face check-in proves identity but says
+  // nothing about *where* the phone is, so it requires the same geofence
+  // proof GPS check-in always has — one combined method, not two weaker
+  // ones. Throws the same OUTSIDE_GEOFENCE either way.
+  async function requireInsideGeofence(loc: GeoPointInput | undefined): Promise<string> {
+    if (!loc) {
+      throw AppError.badRequest('Location is required to check in.', 'LOCATION_REQUIRED');
     }
-    const match = await findNearestGeofence(location.lat, location.lng);
+    const match = await findNearestGeofence(loc.lat, loc.lng);
     if (!match) {
       throw AppError.unprocessable(
         'No office location is configured yet — contact HR.',
@@ -185,7 +157,11 @@ async function performCheckIn(
         { distanceMeters: match.distanceMeters, branchName: match.geofence.branchName },
       );
     }
-    matchedGeofenceId = match.geofence.id;
+    return match.geofence.id;
+  }
+
+  if (method === 'gps') {
+    matchedGeofenceId = await requireInsideGeofence(location);
   }
 
   if (method === 'qr') {
@@ -201,21 +177,20 @@ async function performCheckIn(
     if (!faceEmbedding) {
       throw AppError.badRequest('Face check-in requires an embedding.', 'FACE_EMBEDDING_REQUIRED');
     }
-    // Liveness itself is computed on-device (ML Kit analyzing consecutive
-    // camera frames) — the server can't re-derive that from a single
-    // embedding vector, so it trusts the client's flag but still requires
-    // it to be explicitly true rather than merely present, closing the
-    // "just omit the field" bypass.
     if (livenessPassed !== true) {
       throw AppError.unprocessable(
         'Liveness check failed. Please try again.',
         'LIVENESS_CHECK_FAILED',
       );
     }
+    // Identity (face) and location (geofence) are both required — checked
+    // independently so each failure gets its own honest error rather than
+    // one check silently covering for the other.
+    matchedGeofenceId = await requireInsideGeofence(location);
     const result = await faceService.verify(actor, faceEmbedding);
     if (!result.matched) {
       throw AppError.unauthorized(
-        'Face not recognized. Try again or use GPS/QR.',
+        'Face not recognized. Try again or use QR.',
         'FACE_MATCH_LOW_CONFIDENCE',
       );
     }
@@ -248,7 +223,6 @@ async function performCheckIn(
   return attendance;
 }
 
-/** Mirrors performCheckIn — parameterized on `now` for the same reason. */
 async function performCheckOut(
   employeeId: string,
   location: GeoPointInput | undefined,
@@ -285,17 +259,9 @@ export interface PunchSyncResult {
   clientGeneratedId: string;
   status: 'applied' | 'duplicate' | 'conflict';
   attendanceId?: string;
-  /** The AppError code that produced a `conflict` — omitted for `applied`/`duplicate`. */
   reason?: string;
 }
 
-/**
- * Applies one offline-queued punch. Never throws for an ordinary business-
- * rule rejection (already checked in, outside geofence, liveness failed,
- * ...) — those become `status: 'conflict'` with `reason` set to the
- * AppError code, so one bad punch in a batch doesn't fail the rest of it.
- * Only a genuine unexpected error propagates.
- */
 async function applySyncPunch(
   actor: ActorContext,
   employeeId: string,
@@ -339,12 +305,8 @@ async function applySyncPunch(
       attendanceId: attendance.id as string,
     };
   } catch (error) {
-    if (!(error instanceof AppError)) throw error; // a genuine bug, not a business-rule rejection — don't mask it as a conflict
+    if (!(error instanceof AppError)) throw error;
 
-    // Server is always the source of truth once a record exists for the
-    // day — never silently dropped, always surfaced (and logged for the
-    // Phase 15 anomaly-detection pass), per
-    // docs/architecture/08-sequence-diagrams.md#5-offline-attendance-sync.
     const conflicting = await Attendance.findOne({
       employeeId,
       date: startOfUtcDay(punch.occurredAt),
@@ -380,11 +342,6 @@ export const attendanceService = {
     return toAttendanceDTO(attendance);
   },
 
-  /**
-   * Bulk-applies offline-queued punches, in the order given (a check-out
-   * only makes sense after its check-in has landed, including one earlier
-   * in this same batch) — sequential by design, not `Promise.all`.
-   */
   async syncAttendance(actor: ActorContext, punches: SyncPunchInput[]): Promise<PunchSyncResult[]> {
     const employeeId = requireEmployeeId(actor);
     const results: PunchSyncResult[] = [];
@@ -447,7 +404,6 @@ export const attendanceService = {
     }
 
     const records = await Attendance.find(filter).sort({ date: -1 }).limit(90);
-    // Own history — the caller already knows who they are, no employee ref needed.
     return records.map((record) => toAttendanceDTO(record));
   },
 
@@ -472,9 +428,6 @@ export const attendanceService = {
       Attendance.countDocuments(filter),
     ]);
 
-    // Real bug, found while building the admin-dashboard's attendance list:
-    // this report is exactly what an HR/Manager reads to see who did what —
-    // showing a bare ObjectId instead of a name would be useless to them.
     const employeeById = await resolveEmployeeRefs(items, (item) => String(item.employeeId));
 
     return {
@@ -630,7 +583,6 @@ export const attendanceService = {
     actor: ActorContext,
   ): Promise<Buffer> {
     const filter = await buildAttendanceFilter(query, actor);
-    // Hard cap on report size for v1 — not a paginated/streamed export.
     const items = await Attendance.find(filter)
       .populate({ path: 'employeeId', select: 'employeeCode firstName lastName' })
       .sort({ date: -1 })
@@ -740,7 +692,6 @@ interface PopulatedEmployeeRef {
   lastName: string;
 }
 
-/** Reads the populated employeeId ref off a report row — undefined if population somehow didn't happen. */
 function employeeRef(attendance: IAttendance): PopulatedEmployeeRef | undefined {
   const value = attendance.employeeId as unknown;
   if (value && typeof value === 'object' && 'firstName' in value) {

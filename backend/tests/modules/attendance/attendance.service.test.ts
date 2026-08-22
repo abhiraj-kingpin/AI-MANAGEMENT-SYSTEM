@@ -1,7 +1,5 @@
 import { mockQuery } from '../../utils/mockQuery';
 
-// Service-layer unit tests — models/collaborators mocked, no live database.
-// Same approach as auth.service.test.ts / employee.service.test.ts.
 jest.mock('../../../src/modules/attendance/attendance.model', () => {
   const actual = jest.requireActual('../../../src/modules/attendance/attendance.model');
 
@@ -136,17 +134,12 @@ function createFakeAttendance(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // No shift assigned by default — every existing test in this file was
-  // written against the hardcoded 09:00/10-min-grace/8h-workday defaults,
-  // which is exactly what resolveShift() falls back to when this resolves
-  // null. Tests for the *real* per-employee shift path override this.
   mockedGetEffectiveShift.mockResolvedValue(null);
 });
 
 describe('attendanceService.checkIn — manual (HR/Admin only, as of Phase 6)', () => {
   it('creates a new record with status "present" when checking in on time', async () => {
     mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
-    // Freeze "now" to well inside the default 09:00 + grace window.
     jest.useFakeTimers().setSystemTime(new Date('2026-08-04T09:05:00Z'));
 
     const result = await attendanceService.checkIn(hr, { method: 'manual' });
@@ -180,16 +173,12 @@ describe('attendanceService.checkIn — manual (HR/Admin only, as of Phase 6)', 
 
   it("uses the employee's real assigned shift, not the 09:00 default, when one exists (Phase 10)", async () => {
     mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
-    // A night shift starting at 22:00 with a 5-minute grace period.
     mockedGetEffectiveShift.mockResolvedValue({
       startTime: '22:00',
       gracePeriodMinutes: 5,
       workdayMinutes: 480,
       shiftId: 'shift-1',
     });
-    // 22:10 — 10 minutes past a 22:00 start, outside the 5-minute grace
-    // period. Against the 09:00 default this timestamp would be "present"
-    // for a totally different reason (it isn't even the same shift window).
     jest.useFakeTimers().setSystemTime(new Date('2026-08-04T22:10:00Z'));
 
     const result = await attendanceService.checkIn(hr, { method: 'manual' });
@@ -346,13 +335,26 @@ describe('attendanceService.checkIn — qr', () => {
 
 describe('attendanceService.checkIn — face', () => {
   const faceEmbedding = Array.from({ length: 128 }, (_, i) => i / 128);
+  const location = { lat: 12.9716, lng: 77.5946, accuracyMeters: 8 };
+  const insideMatch = {
+    geofence: { id: 'geo-1', branchName: 'HQ - Bengaluru', radiusMeters: 150 },
+    distanceMeters: 42,
+    isInside: true,
+  };
+  const outsideMatch = {
+    geofence: { id: 'geo-1', branchName: 'HQ - Bengaluru', radiusMeters: 150 },
+    distanceMeters: 420,
+    isInside: false,
+  };
 
-  it('checks in on a matched, liveness-passed face and stores the confidence', async () => {
+  it('checks in on a matched, liveness-passed face inside the geofence, and stores both the confidence and the location', async () => {
     mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
+    mockedFindNearestGeofence.mockResolvedValue(insideMatch);
     mockedFaceVerify.mockResolvedValue({ matched: true, confidence: 0.94 });
 
     const result = await attendanceService.checkIn(employee, {
       method: 'face',
+      location,
       faceEmbedding,
       livenessPassed: true,
     });
@@ -360,16 +362,50 @@ describe('attendanceService.checkIn — face', () => {
     expect(result.method).toBe('face');
     expect(mockedFaceVerify).toHaveBeenCalledWith(employee, faceEmbedding);
     expect(mockedAttendanceCtor).toHaveBeenCalledWith(
-      expect.objectContaining({ faceMatchConfidence: 0.94 }),
+      expect.objectContaining({
+        faceMatchConfidence: 0.94,
+        checkInLocation: location,
+        geofenceId: 'geo-1',
+      }),
     );
   });
 
-  it('rejects when liveness did not pass, without ever calling face verification', async () => {
+  it('rejects without a location, without ever calling face verification', async () => {
     mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
 
     await expect(
-      attendanceService.checkIn(employee, { method: 'face', faceEmbedding, livenessPassed: false }),
+      attendanceService.checkIn(employee, { method: 'face', faceEmbedding, livenessPassed: true }),
+    ).rejects.toMatchObject({ code: 'LOCATION_REQUIRED' });
+    expect(mockedFaceVerify).not.toHaveBeenCalled();
+  });
+
+  it('rejects when outside every geofence, without ever calling face verification', async () => {
+    mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
+    mockedFindNearestGeofence.mockResolvedValue(outsideMatch);
+
+    await expect(
+      attendanceService.checkIn(employee, {
+        method: 'face',
+        location,
+        faceEmbedding,
+        livenessPassed: true,
+      }),
+    ).rejects.toMatchObject({ code: 'OUTSIDE_GEOFENCE' });
+    expect(mockedFaceVerify).not.toHaveBeenCalled();
+  });
+
+  it('rejects when liveness did not pass, without ever checking location or face verification', async () => {
+    mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
+
+    await expect(
+      attendanceService.checkIn(employee, {
+        method: 'face',
+        location,
+        faceEmbedding,
+        livenessPassed: false,
+      }),
     ).rejects.toMatchObject({ code: 'LIVENESS_CHECK_FAILED' });
+    expect(mockedFindNearestGeofence).not.toHaveBeenCalled();
     expect(mockedFaceVerify).not.toHaveBeenCalled();
   });
 
@@ -377,21 +413,28 @@ describe('attendanceService.checkIn — face', () => {
     mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
 
     await expect(
-      attendanceService.checkIn(employee, { method: 'face', faceEmbedding }),
+      attendanceService.checkIn(employee, { method: 'face', location, faceEmbedding }),
     ).rejects.toMatchObject({ code: 'LIVENESS_CHECK_FAILED' });
   });
 
   it('rejects a low-confidence match', async () => {
     mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
+    mockedFindNearestGeofence.mockResolvedValue(insideMatch);
     mockedFaceVerify.mockResolvedValue({ matched: false, confidence: 0.4 });
 
     await expect(
-      attendanceService.checkIn(employee, { method: 'face', faceEmbedding, livenessPassed: true }),
+      attendanceService.checkIn(employee, {
+        method: 'face',
+        location,
+        faceEmbedding,
+        livenessPassed: true,
+      }),
     ).rejects.toMatchObject({ code: 'FACE_MATCH_LOW_CONFIDENCE' });
   });
 
   it('propagates FACE_NOT_REGISTERED from the face service unchanged', async () => {
     mockedAttendanceFindOne.mockReturnValue(mockQuery(null));
+    mockedFindNearestGeofence.mockResolvedValue(insideMatch);
     const AppErrorModule = jest.requireActual('../../../src/shared/errors/AppError');
     mockedFaceVerify.mockRejectedValue(
       new AppErrorModule.AppError(
@@ -402,7 +445,12 @@ describe('attendanceService.checkIn — face', () => {
     );
 
     await expect(
-      attendanceService.checkIn(employee, { method: 'face', faceEmbedding, livenessPassed: true }),
+      attendanceService.checkIn(employee, {
+        method: 'face',
+        location,
+        faceEmbedding,
+        livenessPassed: true,
+      }),
     ).rejects.toMatchObject({ code: 'FACE_NOT_REGISTERED' });
   });
 
@@ -412,7 +460,12 @@ describe('attendanceService.checkIn — face', () => {
     );
 
     await expect(
-      attendanceService.checkIn(employee, { method: 'face', faceEmbedding, livenessPassed: true }),
+      attendanceService.checkIn(employee, {
+        method: 'face',
+        location,
+        faceEmbedding,
+        livenessPassed: true,
+      }),
     ).rejects.toMatchObject({ code: 'ALREADY_CHECKED_IN' });
     expect(mockedFaceVerify).not.toHaveBeenCalled();
   });
@@ -425,11 +478,11 @@ describe('attendanceService.checkOut', () => {
       breaks: [{ start: new Date('2026-08-04T13:00:00Z'), end: new Date('2026-08-04T13:30:00Z') }],
     });
     mockedAttendanceFindOne.mockReturnValue(mockQuery(fake));
-    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T18:00:00Z')); // 9h gross - 0.5h break = 8.5h
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T18:00:00Z'));
 
     const result = await attendanceService.checkOut(employee);
 
-    expect(result.workingMinutes).toBe(510); // 8.5 * 60
+    expect(result.workingMinutes).toBe(510);
     expect(result.isOvertime).toBe(true);
     expect(result.overtimeMinutes).toBe(30);
     jest.useRealTimers();
@@ -438,7 +491,7 @@ describe('attendanceService.checkOut', () => {
   it('downgrades status to half_day when working minutes are below the threshold', async () => {
     const fake = createFakeAttendance({ checkInAt: new Date('2026-08-04T09:00:00Z') });
     mockedAttendanceFindOne.mockReturnValue(mockQuery(fake));
-    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T11:00:00Z')); // 2h worked
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T11:00:00Z'));
 
     const result = await attendanceService.checkOut(employee);
 
@@ -478,8 +531,6 @@ describe('attendanceService.checkOut', () => {
   });
 
   it("derives overtime/half-day thresholds from the employee's real assigned shift length, not the 8h default (Phase 10)", async () => {
-    // A 6-hour shift (09:00-15:00) — half-day threshold is 3h, not the
-    // default 4h; overtime kicks in past 6h, not 8h.
     mockedGetEffectiveShift.mockResolvedValue({
       startTime: '09:00',
       gracePeriodMinutes: 10,
@@ -488,20 +539,18 @@ describe('attendanceService.checkOut', () => {
     });
     const fake = createFakeAttendance({ checkInAt: new Date('2026-08-04T09:00:00Z') });
     mockedAttendanceFindOne.mockReturnValue(mockQuery(fake));
-    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T16:00:00Z')); // 7h worked
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T16:00:00Z'));
 
     const result = await attendanceService.checkOut(employee);
 
-    expect(result.workingMinutes).toBe(420); // 7 * 60
+    expect(result.workingMinutes).toBe(420);
     expect(result.isOvertime).toBe(true);
-    expect(result.overtimeMinutes).toBe(60); // 7h - 6h shift
-    expect(result.status).not.toBe('half_day'); // well above the 3h half-day line
+    expect(result.overtimeMinutes).toBe(60);
+    expect(result.status).not.toBe('half_day');
     jest.useRealTimers();
   });
 
   it('flags half_day against the real shift length even when it would be a full day under the 8h default', async () => {
-    // A 3-hour shift — half-day threshold 1.5h. 2h worked is a full day for
-    // this shift but would be "half_day" under the hardcoded 4h default.
     mockedGetEffectiveShift.mockResolvedValue({
       startTime: '09:00',
       gracePeriodMinutes: 10,
@@ -510,7 +559,7 @@ describe('attendanceService.checkOut', () => {
     });
     const fake = createFakeAttendance({ checkInAt: new Date('2026-08-04T09:00:00Z') });
     mockedAttendanceFindOne.mockReturnValue(mockQuery(fake));
-    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T11:00:00Z')); // 2h worked
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T11:00:00Z'));
 
     const result = await attendanceService.checkOut(employee);
 
@@ -528,7 +577,6 @@ describe('attendanceService.breakStart / breakEnd', () => {
     expect(fake.breaks).toHaveLength(1);
     expect(fake.breaks[0].end).toBeNull();
 
-    // Same record now has an open break — a second breakStart should reject.
     mockedAttendanceFindOne.mockReturnValue(mockQuery(fake));
     await expect(attendanceService.breakStart(employee)).rejects.toMatchObject({
       code: 'ACTIVE_BREAK',
@@ -592,7 +640,7 @@ describe('attendanceService.listAttendance (report scoping)', () => {
   it('gives HR unscoped visibility by default', async () => {
     mockedAttendanceFind.mockReturnValue(mockQuery([]));
     mockedAttendanceCount.mockResolvedValue(0);
-    mockedEmployeeFind.mockReturnValue(mockQuery([])); // no rows -> no employee refs to batch-resolve
+    mockedEmployeeFind.mockReturnValue(mockQuery([]));
 
     await attendanceService.listAttendance(baseListQuery, hr);
 
@@ -606,7 +654,7 @@ describe('attendanceService.listAttendance (report scoping)', () => {
       mockQuery([
         { id: 'att-1', employeeId: empA, status: 'present', breaks: [] },
         { id: 'att-2', employeeId: empB, status: 'present', breaks: [] },
-        { id: 'att-3', employeeId: empA, status: 'late', breaks: [] }, // same employee again — still one lookup
+        { id: 'att-3', employeeId: empA, status: 'late', breaks: [] },
       ]),
     );
     mockedAttendanceCount.mockResolvedValue(3);
@@ -774,8 +822,8 @@ describe('attendanceService.syncAttendance', () => {
 
   it('applies a new check-in punch and tags it with clientGeneratedId', async () => {
     mockedAttendanceFindOne
-      .mockReturnValueOnce(mockQuery(null)) // idempotency check
-      .mockReturnValueOnce(mockQuery(null)); // no attendance yet today
+      .mockReturnValueOnce(mockQuery(null))
+      .mockReturnValueOnce(mockQuery(null));
 
     const results = await attendanceService.syncAttendance(hr, [checkInPunch()]);
 
@@ -803,9 +851,9 @@ describe('attendanceService.syncAttendance', () => {
   it('reports a check-in conflict (already checked in) with the AppError code as the reason, and audits it', async () => {
     const already = createFakeAttendance({ id: 'att-today', checkInAt: new Date() });
     mockedAttendanceFindOne
-      .mockReturnValueOnce(mockQuery(null)) // idempotency check
-      .mockReturnValueOnce(mockQuery(already)) // performCheckIn's day lookup -> throws
-      .mockReturnValueOnce(mockQuery(already)); // conflict lookup in the catch block
+      .mockReturnValueOnce(mockQuery(null))
+      .mockReturnValueOnce(mockQuery(already))
+      .mockReturnValueOnce(mockQuery(already));
 
     const results = await attendanceService.syncAttendance(hr, [checkInPunch()]);
 
@@ -825,8 +873,8 @@ describe('attendanceService.syncAttendance', () => {
   it('applies a check-out punch against an already-checked-in day', async () => {
     const openDay = createFakeAttendance({ checkInAt: new Date('2026-08-04T09:00:00Z') });
     mockedAttendanceFindOne
-      .mockReturnValueOnce(mockQuery(null)) // idempotency check
-      .mockReturnValueOnce(mockQuery(openDay)); // performCheckOut's day lookup
+      .mockReturnValueOnce(mockQuery(null))
+      .mockReturnValueOnce(mockQuery(openDay));
 
     const results = await attendanceService.syncAttendance(employee, [checkOutPunch()]);
 
@@ -838,9 +886,9 @@ describe('attendanceService.syncAttendance', () => {
 
   it('reports a check-out conflict when there is nothing to check out from, with no attendanceId', async () => {
     mockedAttendanceFindOne
-      .mockReturnValueOnce(mockQuery(null)) // idempotency check
-      .mockReturnValueOnce(mockQuery(null)) // performCheckOut's day lookup -> throws NOT_CHECKED_IN
-      .mockReturnValueOnce(mockQuery(null)); // conflict lookup in the catch block
+      .mockReturnValueOnce(mockQuery(null))
+      .mockReturnValueOnce(mockQuery(null))
+      .mockReturnValueOnce(mockQuery(null));
 
     const results = await attendanceService.syncAttendance(employee, [checkOutPunch()]);
 
@@ -851,11 +899,11 @@ describe('attendanceService.syncAttendance', () => {
 
   it('processes punches sequentially, in the given order, not concurrently', async () => {
     mockedAttendanceFindOne
-      .mockReturnValueOnce(mockQuery(null)) // uuid-1 idempotency check
-      .mockReturnValueOnce(mockQuery(null)) // uuid-1 day lookup (applied)
-      .mockReturnValueOnce(mockQuery(null)) // uuid-2 idempotency check
-      .mockReturnValueOnce(mockQuery(null)); // uuid-2 day lookup -> NOT_CHECKED_IN
-    mockedAttendanceFindOne.mockReturnValueOnce(mockQuery(null)); // uuid-2 conflict lookup
+      .mockReturnValueOnce(mockQuery(null))
+      .mockReturnValueOnce(mockQuery(null))
+      .mockReturnValueOnce(mockQuery(null))
+      .mockReturnValueOnce(mockQuery(null));
+    mockedAttendanceFindOne.mockReturnValueOnce(mockQuery(null));
 
     const results = await attendanceService.syncAttendance(hr, [
       checkInPunch({ clientGeneratedId: 'uuid-1' }),
