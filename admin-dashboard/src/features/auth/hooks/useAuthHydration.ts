@@ -6,9 +6,10 @@ import { useAuthStore } from '@/stores/authStore';
 // Mirrors the backend's AUTH_DISABLED bypass (auth.middleware.ts) — when on,
 // skip the real refresh/login flow and hand the app a fixed super_admin
 // session directly, matching the fixed actor the backend now accepts every
-// request as. Off by default; both flags must be flipped back together to
-// restore real login.
-const AUTH_DISABLED = import.meta.env.VITE_AUTH_DISABLED === 'true';
+// request as. ON by default (no env var needed); set VITE_AUTH_DISABLED=false
+// explicitly to restore real login (and flip AUTH_DISABLED=false to match on
+// the backend too).
+const AUTH_DISABLED = import.meta.env.VITE_AUTH_DISABLED !== 'false';
 
 export function useAuthHydration() {
   const setAuth = useAuthStore((s) => s.setAuth);

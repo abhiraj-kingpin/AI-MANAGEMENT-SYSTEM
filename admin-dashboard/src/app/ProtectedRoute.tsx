@@ -1,9 +1,7 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 
-/** Blocks access to everything under it until a valid session exists. */
 export function ProtectedRoute() {
-  const accessToken = useAuthStore((s) => s.accessToken);
   const isHydrating = useAuthStore((s) => s.isHydrating);
 
   if (isHydrating) {
@@ -14,9 +12,8 @@ export function ProtectedRoute() {
     );
   }
 
-  if (!accessToken) {
-    return <Navigate to="/login" replace />;
-  }
-
+  // No login screen to send anyone to anymore (see useAuthHydration's
+  // AUTH_DISABLED bypass) — always let the app through once hydration
+  // settles.
   return <Outlet />;
 }

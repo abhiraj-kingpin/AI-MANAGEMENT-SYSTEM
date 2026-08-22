@@ -3,7 +3,6 @@ import { AppShell } from '@/app/layout/AppShell';
 import { ProtectedRoute } from '@/app/ProtectedRoute';
 import { AiInsightsPage } from '@/features/analytics/pages/AiInsightsPage';
 import { AttendancePage } from '@/features/attendance/pages/AttendancePage';
-import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { EmployeeDetailPage } from '@/features/employees/pages/EmployeeDetailPage';
 import { EmployeeFormPage } from '@/features/employees/pages/EmployeeFormPage';
@@ -16,7 +15,7 @@ import { QrCodesPage } from '@/features/qr/pages/QrCodesPage';
 import { ShiftsPage } from '@/features/shifts/pages/ShiftsPage';
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
+  { path: '/login', element: <Navigate to="/" replace /> },
   {
     element: <ProtectedRoute />,
     children: [

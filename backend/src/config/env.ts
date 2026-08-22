@@ -18,12 +18,13 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
   QR_TOKEN_SECRET: z.string().min(1, 'QR_TOKEN_SECRET is required'),
-  // Opt-in bypass for the whole auth system — see auth.middleware.ts. Off by
-  // default; only set to true deliberately.
+  // Bypass for the whole auth system — see auth.middleware.ts. ON by default
+  // (no env var needed); set AUTH_DISABLED=false explicitly to restore real
+  // login.
   AUTH_DISABLED: z
     .string()
     .optional()
-    .transform((v) => v === 'true'),
+    .transform((v) => v !== 'false'),
 
   CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
 
