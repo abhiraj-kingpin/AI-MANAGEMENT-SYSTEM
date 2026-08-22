@@ -12,25 +12,35 @@ const DISABLED_ACTOR = {
 };
 
 export function authenticate(req: Request, _res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+
+  // A real Bearer token — from a genuine mobile-app login, most importantly
+  // — always wins when present and valid, regardless of AUTH_DISABLED. This
+  // is what AUTH_DISABLED=true previously skipped entirely, which silently
+  // replaced every real employee's identity (including their employeeId)
+  // with the fixed admin actor below on every single request.
+  if (header?.startsWith('Bearer ')) {
+    const token = header.slice('Bearer '.length);
+    try {
+      const payload = verifyAccessToken(token);
+      req.user = { id: payload.sub, role: payload.role, employeeId: payload.employeeId };
+      next();
+      return;
+    } catch {
+      // Falls through to the bypass below only if AUTH_DISABLED is on;
+      // otherwise this is reported as the real auth failure it is.
+    }
+  }
+
   if (env.AUTH_DISABLED) {
     req.user = DISABLED_ACTOR;
     next();
     return;
   }
 
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    next(AppError.unauthorized('Missing or malformed Authorization header.', 'MISSING_TOKEN'));
-    return;
-  }
-
-  const token = header.slice('Bearer '.length);
-
-  try {
-    const payload = verifyAccessToken(token);
-    req.user = { id: payload.sub, role: payload.role, employeeId: payload.employeeId };
-    next();
-  } catch {
-    next(AppError.unauthorized('Session expired. Please log in again.', 'TOKEN_EXPIRED'));
-  }
+  next(
+    header?.startsWith('Bearer ')
+      ? AppError.unauthorized('Session expired. Please log in again.', 'TOKEN_EXPIRED')
+      : AppError.unauthorized('Missing or malformed Authorization header.', 'MISSING_TOKEN'),
+  );
 }
