@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:ai_management_system/features/attendance/presentation/providers/attendance_providers.dart';
 import 'package:ai_management_system/features/attendance/presentation/providers/attendance_state.dart';
 
-/// Scans a QR code and submits it as a `method: 'qr'` check-in.
-/// `mobile_scanner` is touched only here — the same one-place-per-plugin
-/// discipline `CameraService`/`FaceDetectionService` keep for Face
-/// check-in. Unlike Face check-in, there's no multi-step capture pipeline
-/// to justify its own controller/state: decoding a barcode is a single
-/// event, so this screen owns the `MobileScannerController` directly and
-/// forwards straight to `AttendanceController.checkInWithQr()` — the same
-/// controller GPS and Face check-in already submit through.
+final _dayDateTimeFormat = DateFormat('EEEE, MMMM d \'at\' h:mm a');
+
 class QrCheckInScreen extends ConsumerStatefulWidget {
   const QrCheckInScreen({super.key});
 
@@ -22,9 +17,6 @@ class QrCheckInScreen extends ConsumerStatefulWidget {
 class _QrCheckInScreenState extends ConsumerState<QrCheckInScreen> {
   final _controller = MobileScannerController();
 
-  /// True once a code has been read and handed off — guards against
-  /// `onDetect` firing again (it keeps scanning every frame) for the same
-  /// code before the controller has actually stopped.
   bool _handled = false;
 
   void _onDetect(BarcodeCapture capture) {
@@ -104,9 +96,7 @@ class _QrCheckInScreenState extends ConsumerState<QrCheckInScreen> {
         ],
       );
     }
-    // Success — including the offline-queued case, which surfaces via
-    // infoMessage rather than errorMessage (see AttendanceController's
-    // OfflineQueuedFailure handling).
+    final checkInAt = state.today?.checkInAt;
     return Column(
       children: [
         Text(
@@ -114,6 +104,14 @@ class _QrCheckInScreenState extends ConsumerState<QrCheckInScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(color: Theme.of(context).colorScheme.primary),
         ),
+        if (checkInAt != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _dayDateTimeFormat.format(checkInAt.toLocal()),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
         const SizedBox(height: 12),
         OutlinedButton(
           onPressed: () => Navigator.of(context).pop(),

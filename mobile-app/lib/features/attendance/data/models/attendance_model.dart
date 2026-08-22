@@ -11,6 +11,7 @@ class AttendanceModel extends AttendanceEntity {
     required super.status,
     required super.isOvertime,
     required super.overtimeMinutes,
+    super.breaks,
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +25,12 @@ class AttendanceModel extends AttendanceEntity {
       status: json['status'] as String,
       isOvertime: json['isOvertime'] as bool,
       overtimeMinutes: json['overtimeMinutes'] as int,
+      breaks: (json['breaks'] as List<dynamic>? ?? [])
+          .map((b) => BreakEntity(
+                start: DateTime.parse((b as Map<String, dynamic>)['start'] as String),
+                end: b['end'] != null ? DateTime.parse(b['end'] as String) : null,
+              ))
+          .toList(growable: false),
     );
   }
 }

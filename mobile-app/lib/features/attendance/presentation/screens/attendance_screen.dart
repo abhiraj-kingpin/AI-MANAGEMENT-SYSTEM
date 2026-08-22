@@ -9,6 +9,7 @@ import 'package:ai_management_system/shared/widgets/primary_button.dart';
 
 final _timeFormat = DateFormat.jm();
 final _dateFormat = DateFormat.MMMd();
+final _dayDateTimeFormat = DateFormat('EEEE, MMMM d \'at\' h:mm a');
 
 class AttendanceScreen extends ConsumerWidget {
   const AttendanceScreen({super.key});
@@ -96,13 +97,48 @@ class AttendanceScreen extends ConsumerWidget {
                             ? null
                             : () => context.push(faceCheckInPath),
                       ),
-                    ] else if (today.checkOutAt == null)
-                      PrimaryButton(
-                        label: 'Check Out',
-                        isLoading: state.isActionInProgress,
-                        onPressed: controller.checkOut,
-                      )
-                    else
+                    ] else if (today.checkOutAt == null) ...[
+                      if (today.hasOpenBreak) ...[
+                        Text(
+                          'On break since ${_timeFormat.format(today.breaks.lastWhere((b) => b.isOpen).start.toLocal())}',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 10),
+                        PrimaryButton(
+                          label: 'End Break',
+                          isLoading: state.isActionInProgress,
+                          onPressed: controller.breakEnd,
+                        ),
+                      ] else ...[
+                        PrimaryButton(
+                          label: 'Check Out',
+                          isLoading: state.isActionInProgress,
+                          onPressed: controller.checkOut,
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.free_breakfast_outlined),
+                          label: const Text('Start Break'),
+                          onPressed: state.isActionInProgress
+                              ? null
+                              : controller.breakStart,
+                        ),
+                      ],
+                      if (today.breaks.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text('Today\'s breaks',
+                            style: Theme.of(context).textTheme.labelMedium),
+                        const SizedBox(height: 4),
+                        for (final b in today.breaks)
+                          Text(
+                            b.end != null
+                                ? '${_timeFormat.format(b.start.toLocal())} – ${_timeFormat.format(b.end!.toLocal())}'
+                                : '${_timeFormat.format(b.start.toLocal())} – ongoing',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                      ],
+                    ] else
                       const Text(
                         'You\'re done for today.',
                         textAlign: TextAlign.center,
@@ -135,9 +171,9 @@ class AttendanceScreen extends ConsumerWidget {
   String _statusLine(AttendanceEntity? today) {
     if (today == null || today.checkInAt == null) return 'Not checked in yet';
     if (today.checkOutAt == null) {
-      return 'Checked in at ${_timeFormat.format(today.checkInAt!.toLocal())}';
+      return 'Checked in ${_dayDateTimeFormat.format(today.checkInAt!.toLocal())}';
     }
-    return 'Checked out at ${_timeFormat.format(today.checkOutAt!.toLocal())}';
+    return 'Checked out ${_dayDateTimeFormat.format(today.checkOutAt!.toLocal())}';
   }
 
   String _formatMinutes(int minutes) {
@@ -164,12 +200,6 @@ class _HistoryTile extends StatelessWidget {
                 : '${_timeFormat.format(record.checkInAt!.toLocal())} – '
                     '${_timeFormat.format(record.checkOutAt!.toLocal())}',
       ),
-      // Present/late/half_day are all just judgment calls HR makes about
-      // *when* — this row already shows the actual check-in/check-out
-      // times above, which is the real fact; a "late" badge next to it
-      // added nothing but a value judgment. `on_leave` is kept because
-      // it's information the times genuinely can't convey (an approved
-      // absence, not just an unrecorded one).
       trailing: record.status == 'on_leave'
           ? Text('on leave', style: Theme.of(context).textTheme.labelMedium)
           : null,

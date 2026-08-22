@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:ai_management_system/features/attendance/presentation/providers/attendance_providers.dart';
@@ -9,6 +11,7 @@ import 'package:ai_management_system/features/face/presentation/providers/face_c
 import 'package:ai_management_system/shared/widgets/primary_button.dart';
 
 final _timeFormat = DateFormat.jm();
+final _dayDateFormat = DateFormat('EEEE, MMMM d');
 
 class FaceCheckInScreen extends ConsumerStatefulWidget {
   const FaceCheckInScreen({super.key});
@@ -18,21 +21,40 @@ class FaceCheckInScreen extends ConsumerStatefulWidget {
 }
 
 class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
+  // Brief white flash + haptic tap the instant a photo is captured — the
+  // camera preview alone gave no confirmation a photo was actually taken.
+  bool _flash = false;
+  Timer? _flashTimer;
+
+  void _triggerCaptureFlash() {
+    HapticFeedback.mediumImpact();
+    setState(() => _flash = true);
+    _flashTimer?.cancel();
+    _flashTimer = Timer(const Duration(milliseconds: 160), () {
+      if (mounted) setState(() => _flash = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _flashTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<FaceCheckInState>(faceCheckInControllerProvider,
+        (previous, next) {
+      final justCaptured = previous?.stage != FaceCaptureStage.processingCapture &&
+          next.stage == FaceCaptureStage.processingCapture;
+      if (justCaptured) _triggerCaptureFlash();
+    });
+
     final state = ref.watch(faceCheckInControllerProvider);
     final attendanceState = ref.watch(attendanceControllerProvider);
 
-    // The three-pose capture pipeline (this screen) and the actual
-    // check-in submission (AttendanceController) are two separate
-    // controllers — once the third pose hands off a verified embedding,
-    // this screen just reflects AttendanceController's own submission
-    // state instead of inventing a parallel "submitting" state of its own.
     final isSubmitting = state.stage == FaceCaptureStage.done &&
         attendanceState.isActionInProgress;
-    // Capture succeeding is not the same thing as the check-in itself
-    // succeeding — the server can still reject it (outside every geofence,
-    // already checked in today, …) after a perfectly good face match.
     final submissionOutcome = state.stage == FaceCaptureStage.done &&
             !attendanceState.isActionInProgress
         ? _outcomeFor(attendanceState)
@@ -69,8 +91,6 @@ class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
-            // The check-in's own failure — distinct from a capture
-            // failure above; both are real and both need to be visible.
             if (submissionOutcome == _Outcome.failure &&
                 attendanceState.errorMessage != null) ...[
               const SizedBox(height: 8),
@@ -117,15 +137,11 @@ class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
       return () =>
           ref.read(faceCheckInControllerProvider.notifier).captureCurrentPose();
     }
-    return null; // busy (initializing/processing/verifying) — button shows a spinner instead
+    return null;
   }
 
   _Outcome _outcomeFor(AttendanceState attendanceState) {
     if (attendanceState.errorMessage != null) return _Outcome.failure;
-    // An OfflineQueuedFailure surfaces as infoMessage, not errorMessage
-    // (see AttendanceController) — it's not a failure, but it's also not
-    // yet a confirmed server-side check-in, so it gets its own status text
-    // rather than being folded into success.
     if (attendanceState.infoMessage != null) return _Outcome.queued;
     return _Outcome.success;
   }
@@ -143,7 +159,16 @@ class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
               ? 'Checked in at ${_timeFormat.format(checkInAt.toLocal())}'
               : 'Checked in',
           style: Theme.of(context).textTheme.titleLarge,
+          textAlign: TextAlign.center,
         ),
+        if (checkInAt != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _dayDateFormat.format(checkInAt.toLocal()),
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ],
     );
   }
@@ -160,7 +185,19 @@ class _FaceCheckInScreenState extends ConsumerState<FaceCheckInScreen> {
       borderRadius: BorderRadius.circular(16),
       child: AspectRatio(
         aspectRatio: controller.value.aspectRatio,
-        child: CameraPreview(controller),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CameraPreview(controller),
+            IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _flash ? 0.85 : 0,
+                duration: const Duration(milliseconds: 80),
+                child: const ColoredBox(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

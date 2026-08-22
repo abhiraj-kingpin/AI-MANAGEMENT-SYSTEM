@@ -1,8 +1,6 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
-  /// Override at build time: `flutter run --dart-define=API_BASE_URL=https://api.ai-management-system.app/v1`
-  /// Default targets the Android emulator's alias for the host machine's localhost.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://10.0.2.2:5000/api/v1',
@@ -16,6 +14,8 @@ class ApiEndpoints {
 
   static const String checkIn = '/attendance/check-in';
   static const String checkOut = '/attendance/check-out';
+  static const String breakStart = '/attendance/break/start';
+  static const String breakEnd = '/attendance/break/end';
   static const String myAttendance = '/attendance/me';
   static const String attendanceSync = '/attendance/sync';
 
@@ -37,6 +37,4 @@ class ApiEndpoints {
   static const String markAllNotificationsRead = '/notifications/read-all';
   static String markNotificationRead(String id) => '/notifications/$id/read';
 
-  // Shift endpoints are added here once that screen lands — see
-  // docs/architecture/04-api-documentation.md.
 }

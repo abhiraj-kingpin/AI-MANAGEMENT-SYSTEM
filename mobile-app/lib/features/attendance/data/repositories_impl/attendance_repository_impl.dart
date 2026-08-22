@@ -12,10 +12,6 @@ import 'package:ai_management_system/features/attendance/domain/repositories/att
 
 final _random = Random();
 
-/// Not a formal UUID (this project has no `uuid` package as a direct
-/// dependency, only transitively) — just unique enough client-side for
-/// `POST /attendance/sync`'s deduplication key, which only needs to be
-/// unique per-device, not globally.
 String _generateClientId() {
   return '${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 32)}';
 }
@@ -45,10 +41,6 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         );
         return Success(attendance);
       } on NetworkException {
-        // GPS worked, but the request itself couldn't reach the server —
-        // queue it rather than losing the punch. Unlike check-out, GPS is
-        // required for check-in, so this branch always has a real position
-        // to enqueue with.
         await _offlineQueue.enqueue(
           PendingPunch(
             clientGeneratedId: _generateClientId(),
@@ -79,17 +71,6 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       final attendance = await _remoteDataSource.checkInWithQr(qrToken: qrToken);
       return Success(attendance);
     } on NetworkException {
-      // Queued the same way GPS/Face are, for consistency — but honestly,
-      // less useful here: a QR token is time-boxed (`QR_DEFAULT_VALID_MINUTES`
-      // server-side) and `validateAndConsumeQrToken` checks it against
-      // "now" at sync time, not the punch's original `occurredAt`. If the
-      // outage outlasts the token's validity window (likely — outages
-      // rarely resolve in under a few minutes), the eventual sync attempt
-      // will come back `QR_EXPIRED`, which `SyncService` already treats as
-      // a terminal (non-retried) result, same as any other conflict. Queued
-      // anyway rather than special-cased out: it's still strictly better
-      // than silently discarding the attempt, and correct when the outage
-      // is short.
       await _offlineQueue.enqueue(
         PendingPunch(
           clientGeneratedId: _generateClientId(),
@@ -119,9 +100,6 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       );
       return Success(attendance);
     } on NetworkException {
-      // The embedding/liveness verdict were already computed on-device by
-      // the time this is called — only the network round trip failed, so
-      // queue exactly what would have been sent, same as GPS.
       await _offlineQueue.enqueue(
         PendingPunch(
           clientGeneratedId: _generateClientId(),
@@ -142,9 +120,6 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
   @override
   Future<Result<AttendanceEntity>> checkOut() async {
-    // Check-out's location is optional server-side — a permission revoked
-    // (or GPS turned off) between check-in and check-out shouldn't block
-    // it the way it blocks check-in.
     double? lat;
     double? lng;
     double? accuracyMeters;
@@ -154,7 +129,6 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       lng = position.longitude;
       accuracyMeters = position.accuracy;
     } catch (_) {
-      // Fall through with no location — see comment above.
     }
 
     try {
@@ -180,6 +154,33 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       );
     } on ServerException catch (e) {
       return ResultFailure(ServerFailure(e.message, code: e.code));
+    }
+  }
+
+  @override
+  Future<Result<AttendanceEntity>> breakStart() async {
+    try {
+      final attendance = await _remoteDataSource.breakStart();
+      return Success(attendance);
+    } on ServerException catch (e) {
+      return ResultFailure(ServerFailure(e.message, code: e.code));
+    } on NetworkException catch (e) {
+      // Breaks aren't offline-queued (unlike check-in/out) — a short gap in
+      // connectivity right at the office door is the realistic case those
+      // exist for; a mid-day break action failing here just needs a retry.
+      return ResultFailure(NetworkFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Result<AttendanceEntity>> breakEnd() async {
+    try {
+      final attendance = await _remoteDataSource.breakEnd();
+      return Success(attendance);
+    } on ServerException catch (e) {
+      return ResultFailure(ServerFailure(e.message, code: e.code));
+    } on NetworkException catch (e) {
+      return ResultFailure(NetworkFailure(e.message));
     }
   }
 

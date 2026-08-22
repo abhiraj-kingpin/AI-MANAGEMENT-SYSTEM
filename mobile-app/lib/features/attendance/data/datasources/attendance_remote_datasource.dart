@@ -20,6 +20,10 @@ abstract class AttendanceRemoteDataSource {
 
   Future<AttendanceModel> checkOut({double? lat, double? lng, double? accuracyMeters});
 
+  Future<AttendanceModel> breakStart();
+
+  Future<AttendanceModel> breakEnd();
+
   Future<List<AttendanceModel>> getMyAttendance();
 }
 
@@ -98,6 +102,26 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             },
         },
       );
+      return _parseAttendance(response.data);
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  @override
+  Future<AttendanceModel> breakStart() async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(ApiEndpoints.breakStart);
+      return _parseAttendance(response.data);
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  @override
+  Future<AttendanceModel> breakEnd() async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(ApiEndpoints.breakEnd);
       return _parseAttendance(response.data);
     } on DioException catch (e) {
       throw mapDioException(e);

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ai_management_system/core/error/failures.dart';
 import 'package:ai_management_system/features/attendance/domain/entities/attendance_entity.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/break_end_usecase.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/break_start_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_face_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_qr_usecase.dart';
@@ -13,6 +15,8 @@ class AttendanceController extends StateNotifier<AttendanceState> {
   final CheckInWithQrUseCase _checkInWithQrUseCase;
   final CheckInWithFaceUseCase _checkInWithFaceUseCase;
   final CheckOutUseCase _checkOutUseCase;
+  final BreakStartUseCase _breakStartUseCase;
+  final BreakEndUseCase _breakEndUseCase;
   final GetMyAttendanceUseCase _getMyAttendanceUseCase;
 
   AttendanceController({
@@ -20,11 +24,15 @@ class AttendanceController extends StateNotifier<AttendanceState> {
     required CheckInWithQrUseCase checkInWithQrUseCase,
     required CheckInWithFaceUseCase checkInWithFaceUseCase,
     required CheckOutUseCase checkOutUseCase,
+    required BreakStartUseCase breakStartUseCase,
+    required BreakEndUseCase breakEndUseCase,
     required GetMyAttendanceUseCase getMyAttendanceUseCase,
   })  : _checkInUseCase = checkInUseCase,
         _checkInWithQrUseCase = checkInWithQrUseCase,
         _checkInWithFaceUseCase = checkInWithFaceUseCase,
         _checkOutUseCase = checkOutUseCase,
+        _breakStartUseCase = breakStartUseCase,
+        _breakEndUseCase = breakEndUseCase,
         _getMyAttendanceUseCase = getMyAttendanceUseCase,
         super(const AttendanceState()) {
     loadHistory();
@@ -61,9 +69,6 @@ class AttendanceController extends StateNotifier<AttendanceState> {
     );
   }
 
-  /// Called once a QR code has already been scanned — this controller
-  /// doesn't touch the scanner plugin itself, same separation `checkIn()`
-  /// keeps from `geolocator`.
   Future<void> checkInWithQr(String qrToken) async {
     state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
     final result = await _checkInWithQrUseCase(qrToken);
@@ -78,9 +83,6 @@ class AttendanceController extends StateNotifier<AttendanceState> {
     );
   }
 
-  /// Called once `features/face/` has already computed the embedding and
-  /// run the liveness check — this controller doesn't touch the camera or
-  /// ML Kit itself, same separation `checkIn()` keeps from `geolocator`.
   Future<void> checkInWithFace({
     required List<double> embedding,
     required bool livenessPassed,
@@ -115,9 +117,34 @@ class AttendanceController extends StateNotifier<AttendanceState> {
     );
   }
 
-  /// `OfflineQueuedFailure` isn't really an error (see its own doc comment)
-  /// — routed to `infoMessage` so the screen shows it as neutral "queued"
-  /// text instead of a red error banner.
+  Future<void> breakStart() async {
+    state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
+    final result = await _breakStartUseCase();
+    await result.when(
+      success: (attendance) async {
+        state = state.copyWith(isActionInProgress: false, today: attendance);
+        await loadHistory();
+      },
+      failure: (failure) async {
+        state = _applyActionFailure(failure);
+      },
+    );
+  }
+
+  Future<void> breakEnd() async {
+    state = state.copyWith(isActionInProgress: true, errorMessage: null, infoMessage: null);
+    final result = await _breakEndUseCase();
+    await result.when(
+      success: (attendance) async {
+        state = state.copyWith(isActionInProgress: false, today: attendance);
+        await loadHistory();
+      },
+      failure: (failure) async {
+        state = _applyActionFailure(failure);
+      },
+    );
+  }
+
   AttendanceState _applyActionFailure(Failure failure) {
     if (failure is OfflineQueuedFailure) {
       return state.copyWith(isActionInProgress: false, infoMessage: failure.message);

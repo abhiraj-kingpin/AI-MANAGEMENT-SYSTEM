@@ -3,6 +3,8 @@ import 'package:ai_management_system/core/providers/core_providers.dart';
 import 'package:ai_management_system/features/attendance/data/datasources/attendance_remote_datasource.dart';
 import 'package:ai_management_system/features/attendance/data/repositories_impl/attendance_repository_impl.dart';
 import 'package:ai_management_system/features/attendance/domain/repositories/attendance_repository.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/break_end_usecase.dart';
+import 'package:ai_management_system/features/attendance/domain/usecases/break_start_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_face_usecase.dart';
 import 'package:ai_management_system/features/attendance/domain/usecases/check_in_with_qr_usecase.dart';
@@ -31,6 +33,8 @@ final attendanceControllerProvider =
     checkInWithQrUseCase: CheckInWithQrUseCase(repository),
     checkInWithFaceUseCase: CheckInWithFaceUseCase(repository),
     checkOutUseCase: CheckOutUseCase(repository),
+    breakStartUseCase: BreakStartUseCase(repository),
+    breakEndUseCase: BreakEndUseCase(repository),
     getMyAttendanceUseCase: GetMyAttendanceUseCase(repository),
   );
 });
