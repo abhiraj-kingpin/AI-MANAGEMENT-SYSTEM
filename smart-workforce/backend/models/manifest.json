@@ -1,0 +1,40 @@
+{
+  "$schema": "none — hand-maintained, verified against real files by tests/shared/modelManifest.test.ts",
+  "description": "Machine-readable inventory of every real ONNX model file this backend loads at runtime. Human-readable provenance/evaluation detail lives in MODEL_CARDS.md in this same directory — this file exists so integrity (does the file on disk still match what shipped) can be checked by code, not just read by a person.",
+  "models": [
+    {
+      "file": "w600k_mbf.onnx",
+      "name": "MobileFaceNet (w600k_mbf)",
+      "sha256": "9cc6e4a75f0e2bf0b1aed94578f144d15175f357bdc05e815e5c4a02b319eb4f",
+      "sizeBytes": 13616099,
+      "source": "https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_s.zip",
+      "license": "MIT",
+      "addedInVersion": "backend-v1.1.6",
+      "usedBy": [
+        "src/modules/face-recognition/faceEmbedding.provider.ts",
+        "scripts/lfw-eval.ts",
+        "mobile-app/assets/models/w600k_mbf.onnx (identical checksum, bundled separately for on-device inference)"
+      ]
+    },
+    {
+      "file": "det_500m.onnx",
+      "name": "SCRFD face detector (det_500m)",
+      "sha256": "5e4447f50245bbd7966bd6c0fa52938c61474a04ec7def48753668a9d8b4ea3a",
+      "sizeBytes": 2524817,
+      "source": "https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_s.zip",
+      "license": "MIT",
+      "addedInVersion": "backend-v1.1.7",
+      "usedBy": ["src/modules/face-recognition/faceDetector.ts"]
+    },
+    {
+      "file": "minifasnet_v2.onnx",
+      "name": "MiniFASNet-V2 anti-spoofing",
+      "sha256": "d7b3cd9ba8a7ceb13baa8c4720902e27ca3112eff52f926c08804af6b6eecc7b",
+      "sizeBytes": 1744116,
+      "source": "https://huggingface.co/garciafido/minifasnet-v2-anti-spoofing-onnx (ONNX conversion of minivision-ai/Silent-Face-Anti-Spoofing's upstream 2.7_80x80_MiniFASNetV2.pth, sha256 a5eb02e1843f19b5386b953cc4c9f011c3f985d0ee2bb9819eea9a142099bec0 — see MODEL_CARDS.md)",
+      "license": "Apache-2.0",
+      "addedInVersion": "backend-v1.1.9",
+      "usedBy": ["src/modules/face-recognition/livenessDetector.ts"]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The native OS-drawn frame shown between process start and the Flutter
+     engine's first painted frame — SplashScreen (lib/features/auth/
+     presentation/screens/splash_screen.dart) takes over immediately after
+     that with its own animated version of the same logo on the same
+     background color, so there's no flash of mismatched color/blank white
+     in between. WPColors.bg (#F4F4F7) matches that Dart screen exactly
+     rather than the Flutter template's plain white. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/launch_background_color" />
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/ic_launcher" />
+    </item>
+</layer-list>

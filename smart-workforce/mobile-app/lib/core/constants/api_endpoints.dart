@@ -1,0 +1,41 @@
+class ApiEndpoints {
+  ApiEndpoints._();
+
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:5000/api/v1',
+  );
+
+  static const String login = '/auth/login';
+  static const String claimAccount = '/auth/claim-account';
+  static const String refresh = '/auth/refresh';
+  static const String logout = '/auth/logout';
+  static const String me = '/auth/me';
+
+  static const String checkIn = '/attendance/check-in';
+  static const String checkOut = '/attendance/check-out';
+  static const String breakStart = '/attendance/break/start';
+  static const String breakEnd = '/attendance/break/end';
+  static const String myAttendance = '/attendance/me';
+  static const String attendanceSync = '/attendance/sync';
+
+  static const String faceRegisterEmbeddings = '/face/register-embeddings';
+  static const String faceRegistrationStatus = '/face/registration-status';
+
+  static const String myShift = '/shifts/me';
+  static String employeeById(String id) => '/employees/$id';
+
+  static const String leaveTypes = '/leave-types';
+  static const String leaves = '/leaves';
+  static const String myLeaves = '/leaves/me';
+  static const String myLeaveBalance = '/leaves/balance';
+  static String cancelLeave(String id) => '/leaves/$id/cancel';
+
+  static const String myPayslips = '/payslips/me';
+  static String payslipPdf(String id) => '/payslips/$id/pdf';
+
+  static const String myNotifications = '/notifications/me';
+  static const String markAllNotificationsRead = '/notifications/read-all';
+  static String markNotificationRead(String id) => '/notifications/$id/read';
+
+}

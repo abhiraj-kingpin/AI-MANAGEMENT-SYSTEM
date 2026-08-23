@@ -1,0 +1,20 @@
+# Template for android/key.properties — copy this file to
+# android/key.properties (gitignored, never commit the real one) and fill in
+# the real values once the production keystore exists. app/build.gradle
+# reads this file automatically when it's present; release builds fall back
+# to debug signing when it's absent, so this file's absence never breaks a
+# normal dev build — it only matters for producing a Play-Store-signed
+# release.
+#
+# storePassword / keyPassword: the two passwords chosen when the keystore
+#   was generated (they can be the same value or different — both are
+#   required either way).
+# keyAlias: the alias name chosen when the keystore was generated.
+# storeFile: path to the .jks keystore file, relative to android/app/ (e.g.
+#   "../upload-keystore.jks" if the file lives at android/upload-keystore.jks),
+#   or an absolute path if you keep it outside the project entirely.
+
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=REPLACE_ME
+storeFile=REPLACE_ME

@@ -1,0 +1,8 @@
+# Each sub-project also has its own, more specific .gitignore
+# (backend/.gitignore, admin-dashboard/.gitignore, mobile-app/.gitignore).
+# This one catches anything created at the repo root.
+
+.DS_Store
+*.log
+.env
+.env.local

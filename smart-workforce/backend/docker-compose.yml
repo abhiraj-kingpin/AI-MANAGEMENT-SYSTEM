@@ -1,0 +1,57 @@
+services:
+  api:
+    build:
+      context: .
+      target: runtime
+    ports:
+      - '5000:5000'
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/ai_management_system
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # BullMQ background workers (face embedding, payroll runs, exports, notifications)
+  # are added from Phase 6 onward — same image, different entrypoint:
+  #
+  # worker:
+  #   build:
+  #     context: .
+  #     target: runtime
+  #   command: ['node', 'dist/jobs/worker.js']
+  #   env_file: .env
+  #   depends_on: [mongo, redis]
+
+volumes:
+  mongo_data:
+  redis_data:

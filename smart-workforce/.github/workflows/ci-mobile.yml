@@ -1,0 +1,45 @@
+name: CI — Mobile App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile-app/**'
+      - '.github/workflows/ci-mobile.yml'
+  pull_request:
+    paths:
+      - 'mobile-app/**'
+      - '.github/workflows/ci-mobile.yml'
+
+defaults:
+  run:
+    working-directory: mobile-app
+
+jobs:
+  analyze-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+      # A debug (unsigned) build, not `--release` — no signing keystore is
+      # configured anywhere in this repo. GitHub's own ubuntu-latest runner
+      # image ships a pre-installed, license-accepted Android SDK
+      # specifically for this, unlike a fresh local machine (see
+      # mobile-app/README.md's Status section for exactly that gap, hit and
+      # documented while verifying this workflow locally) — so this step
+      # can do something local verification couldn't.
+      - run: flutter build apk --debug
+
+      # Phase 20 update: `android/`/`ios/` now exist (flutter create . was
+      # run once real Flutter tooling became available) and this codebase's
+      # first-ever machine verification found exactly one lint nit, already
+      # fixed. This workflow is expected to be green, not a coin flip.

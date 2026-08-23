@@ -1,0 +1,333 @@
+@import 'tailwindcss';
+
+/*
+ * Design system: "Office App" theme — a single Midnight Navy accent over a
+ * light, near-white ground, with one deliberately dark surface (the
+ * sidebar, and a handful of "ink" cards that carry emphasis). Replaces the
+ * "Cosmoq" dark/dual-accent theme this app launched with. Tokens live here
+ * as Tailwind v4 `@theme` values so every utility class (bg-accent,
+ * text-text-dim, rounded-pill, ...) derives from one source — no
+ * color/radius/font gets hand-typed a second time in a component. See the
+ * Office App Icon design handoff for the brand color (#14304F) this file
+ * implements.
+ */
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Was 'Space Mono' — the "unusual/dotted" font on the dashboard's
+     eyebrow labels and big numeric displays (StatCard, LandingHero's
+     stats row, every page's "Analytics"/"Attendance"/... eyebrow). One
+     token, so switching it to Inter fixes every one of those call sites
+     without touching --font-sans or any component's own classes. */
+  --font-mono: 'Inter', 'Roboto', sans-serif;
+
+  /* Page background behind the app shell. */
+  --color-bg: #e8e8ec;
+  /* The console shell, hero panel, and any surface that needs to read as a
+     level below white cards rather than the page background itself. */
+  --color-bg-raised: #f4f4f7;
+  /* Table headers, stat tiles nested inside a card — one step lighter than
+     a plain white card. */
+  --color-card-subtle: #fafafc;
+
+  /* Single brand accent — Midnight Navy (#14304F), per the Office App Icon
+     design handoff — rather than the old violet. --color-accent-2 stays as
+     a secondary "info" blue for the handful of elements that want a second
+     hue (charts, the odd status dot) without it reading as the brand
+     color; left as-is, it wasn't the color being replaced. */
+  --color-accent: #14304f;
+  --color-accent-light: #3b6ea5;
+  --color-accent-hover: #0e2439;
+  --color-accent-2: #3e63f5;
+  --color-accent-2-light: #7d9bff;
+
+  --color-text: #14141c;
+  --color-text-dim: #5a5a6c;
+  --color-text-faint: #9a9aac;
+
+  /* The one deliberately dark surface — the sidebar, and "ink" cards like
+     the payroll summary — rather than a text color. Same hex as
+     --color-text; kept as a separate token so `bg-ink` reads as a
+     background, not a foreground, at the call site. */
+  --color-ink: #14141c;
+
+  /* Card surfaces — opaque white, not glass, now that the ground is light
+     rather than a near-black mesh a translucent panel could float over. */
+  --color-surface: #ffffff;
+  --color-surface-strong: #fafafc;
+  --color-border: rgb(20 20 40 / 0.07);
+  --color-border-strong: rgb(20 20 40 / 0.1);
+
+  /* Semantic state — separate from the brand accent so status reads at a
+     glance without competing with it (present/late/on-leave, trend arrows). */
+  --color-success: #0a8c63;
+  --color-warning: #b0740f;
+  --color-danger: #c43f3f;
+
+  --radius-pill: 100px;
+  --radius-card: 20px;
+
+  --ease-out-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  /* Not a Tailwind color token (it's a two-stop gradient, not a single
+     value, so it can't become a `bg-brand` utility the way the flat colors
+     above do) — a plain CSS custom property instead, consumed via
+     `.brand-gradient` below and by the few SVG gradients that need the same
+     stops (AttendanceTrendChart's line, LandingHero's pulse line). Reserved
+     for the elements that are meant to carry the brand identity itself: the
+     logo mark, primary buttons, the active nav row, the topbar avatar, and
+     the dashboard's headline chart line. Everywhere else --color-accent
+     alone is used, not this gradient. */
+  --gradient-brand: linear-gradient(135deg, #14304f, #0e2439);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+select option {
+  background-color: #ffffff;
+  color: var(--color-text);
+}
+
+.brand-gradient {
+  background-image: var(--gradient-brand);
+}
+
+/* The "Overview" eyebrow's animated gradient-text sweep — the one place in
+   the app where the dual brand accent moves rather than just sitting on a
+   surface. Frozen under reduced motion below. */
+.text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-accent),
+    var(--color-accent-2),
+    var(--color-accent)
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-text 5s linear infinite;
+}
+@keyframes shimmer-text {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+/* ---------- Atmosphere: fixed mesh-glow behind every screen ---------- */
+@keyframes drift-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(60px, 40px) scale(1.08);
+  }
+}
+@keyframes drift-b {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-50px, 30px) scale(1.05);
+  }
+}
+@keyframes drift-c {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -40px) scale(1.1);
+  }
+}
+
+/* ---------- Card border highlight ---------- */
+/* A faint top-left highlight on an otherwise flat 1px border — kept subtle
+   now that cards are opaque white rather than glass over a dark ground. */
+.card-edge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(160deg, rgb(20 20 40 / 0.06), transparent 40%);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ---------- StatCard: per-metric hover glow ---------- */
+/* Each StatCard sets --stat-border/--stat-shadow inline (see StatCard.tsx's
+   STAT_ACCENTS map) so one card's hover reads in its own color — orange for
+   Headcount, blue for Attendance, amber for Late Arrivals, slate for On
+   Leave — rather than every card lighting up the same accent regardless of
+   what it's reporting. */
+.stat-glow {
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.stat-glow:hover {
+  transform: translateY(-4px);
+  border-color: var(--stat-border, var(--color-border-strong));
+  box-shadow: var(--stat-shadow, none);
+}
+
+/* ---------- Scroll reveal ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  filter: blur(8px);
+  transition:
+    opacity 0.8s var(--ease-out-smooth),
+    transform 0.8s var(--ease-out-smooth),
+    filter 0.8s var(--ease-out-smooth);
+  transition-delay: calc(var(--reveal-i, 0) * 70ms);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* ---------- Attendance Trend chart: draw-in line + endpoint dot ---------- */
+.chart-draw {
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: dash-draw 1.6s var(--ease-out-smooth) 0.3s forwards;
+}
+@keyframes dash-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.chart-area {
+  opacity: 0;
+  animation: area-fade 1s ease 1.4s forwards;
+}
+@keyframes area-fade {
+  to {
+    opacity: 1;
+  }
+}
+.chart-dot {
+  animation:
+    dot-pop 0.5s ease 1.9s both,
+    glow-pulse 2.4s ease-in-out 2.4s infinite;
+}
+@keyframes dot-pop {
+  0% {
+    r: 0;
+    opacity: 0;
+  }
+  60% {
+    r: 6px;
+    opacity: 1;
+  }
+  100% {
+    r: 3px;
+    opacity: 1;
+  }
+}
+
+/* ---------- Shared pulse, used by the landing hero's badge dot/glow ---------- */
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes bounce-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(7px);
+  }
+}
+
+/* ---------- Landing hero: attendance-bar background ---------- */
+/* Each bar animates its own scaleY on a slightly offset duration/delay
+   (set inline per-bar, see LandingHero.tsx) so the row reads as a live
+   attendance chart rather than a single uniform pulse. */
+@keyframes hero-bar {
+  0%,
+  100% {
+    transform: scaleY(0.42);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+/* The travelling highlight segment drawn over the static waveform track,
+   see LandingHero.tsx's pulse-line SVG. */
+@keyframes hero-sweep {
+  to {
+    stroke-dashoffset: -1740;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesh-drift {
+    animation: none !important;
+  }
+  .reveal {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .text-shimmer {
+    animation: none !important;
+    background-position: 0% 50%;
+  }
+  .chart-draw {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  .chart-area {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  .chart-dot,
+  .landing-pulse {
+    animation: none !important;
+  }
+  .hero-bar {
+    animation: none !important;
+    transform: scaleY(0.75) !important;
+  }
+  .hero-sweep {
+    animation: none !important;
+  }
+}

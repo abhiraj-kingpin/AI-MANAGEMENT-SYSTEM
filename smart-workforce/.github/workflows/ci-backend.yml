@@ -1,0 +1,63 @@
+name: CI — Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+
+jobs:
+  lint-typecheck-test-build:
+    runs-on: ubuntu-latest
+    # Scoped to this job only, not the whole workflow — docker-build below
+    # needs to run from the repo root, since its build context path
+    # (./backend) is relative to the runner's working directory. A
+    # workflow-level `defaults.run.working-directory` would have applied to
+    # both jobs and silently resolved that path to backend/backend, which
+    # doesn't exist — exactly the bug this comment is here to prevent
+    # reintroducing.
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # >=22 is correct regardless (package.json#engines) even though
+          # the Node 20->22 bump turned out NOT to be what fixed the SIGABRT
+          # crash below — see backend/CHANGELOG.md's v1.1.8 entry for the
+          # real cause (a Jest module-isolation + onnxruntime-node native
+          # singleton interaction) and fix.
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+
+      # Jest sets NODE_ENV=test automatically, which points src/config/env.ts
+      # at .env.test (dummy values, committed — see that file) instead of a
+      # real .env. No live MongoDB, no secrets: every test in this suite
+      # mocks its own models (see README.md#testing).
+      - run: npm test
+
+      - run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: lint-typecheck-test-build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Build-only, no push/registry — this just proves the Dockerfile that
+      # deploy.yml's Render hook depends on still actually builds, catching
+      # a broken Dockerfile before it's discovered on a real deploy.
+      - run: docker build -t ai-management-system-backend:ci ./backend

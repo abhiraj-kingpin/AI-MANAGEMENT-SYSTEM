@@ -1,0 +1,53 @@
+name: CI — Admin Dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'admin-dashboard/**'
+      - '.github/workflows/ci-admin.yml'
+  pull_request:
+    paths:
+      - 'admin-dashboard/**'
+      - '.github/workflows/ci-admin.yml'
+
+defaults:
+  run:
+    working-directory: admin-dashboard
+
+jobs:
+  lint-typecheck-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Bumped from '20': Vitest 4.1.11's dependency chain pulls in a
+          # version of undici whose CacheStorage calls
+          # webidl.util.markAsUncloneable, a Node internal that doesn't
+          # exist on Node 20 — "TypeError: webidl.util.markAsUncloneable is
+          # not a function", crashing every forks-pool worker before any
+          # test file ran (a ~1s failure, not a real assertion failure).
+          # Found only by adding a temporary CI step that routed npm test's
+          # captured output through ::error:: annotations, since this
+          # environment can't download Actions job logs directly (403) or
+          # execute the client-rendered log viewer page — and completely
+          # invisible locally, since this machine runs Node 24. '22' is
+          # current Node LTS and has no such gap.
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: admin-dashboard/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      # Vitest + React Testing Library — covers real, non-presentational
+      # logic: RBAC gating (`hasRole`, and Sidebar's actual role-based nav
+      # visibility, rendered against the real store rather than a mocked
+      # one), the axios-error-message extraction every mutation in the app
+      # relies on, and the reduced-motion count-up hook's deterministic
+      # branches. See admin-dashboard/README.md's Status section.
+      - run: npm test
+      - run: npm run build

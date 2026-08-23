@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#14304F</color>
+    <!-- WPColors.bg — matches the in-Flutter SplashScreen's background
+         exactly, see drawable*/launch_background.xml. -->
+    <color name="launch_background_color">#F4F4F7</color>
+</resources>

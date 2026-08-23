@@ -1,0 +1,129 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+// Production signing — read from android/key.properties when it exists
+// (gitignored; see key.properties.example for the format and .gitignore's
+// comment for why). Its absence is not an error: local/CI dev builds must
+// keep working without the real production keystore, so buildTypes.release
+// below falls back to debug signing whenever this file isn't present.
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+def hasReleaseSigning = keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace = "com.aimanagementsystem.ai_management_system"
+    // Overridden above flutter.compileSdkVersion (34) — mobile_scanner
+    // itself (not just its androidx.camera transitives) requires compiling
+    // against API 36, the highest requirement among this project's plugins
+    // (they're backward-compatible, so the highest one wins). Found via
+    // two successive real local `flutter build apk --debug` failures, see
+    // settings.gradle's AGP-bump comment for the paired fix. Flutter's own
+    // docs document this exact override pattern for plugins that need a
+    // newer SDK than Flutter's bundled default.
+    compileSdk = 36
+    // Overridden above flutter.ndkVersion (23.1.7779620, Flutter's older
+    // bundled default) — camera/connectivity_plus/geolocator_android/
+    // google_mlkit_face_detection/mobile_scanner/onnxruntime/open_filex/
+    // path_provider_android/etc. all declare a dependency on
+    // 27.0.12077973 (bumped again by a `flutter pub get` pulling newer
+    // plugin releases); NDK versions are backward-compatible, so taking
+    // the highest one currently requested satisfies all of them at once.
+    ndkVersion = "27.0.12077973"
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+        // Required by geolocator_android (minSdk here is 23, below the 26
+        // threshold where the JDK APIs it uses are natively available) —
+        // see https://pub.dev/packages/geolocator#android.
+        coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        applicationId = "com.aimanagementsystem.ai_management_system"
+        // Overridden above flutter.minSdkVersion (21) — androidx.camera:
+        // camera-video:1.5.0 (a mobile_scanner/camera transitive) declares
+        // minSdkVersion 23 in its own manifest, and the manifest merger
+        // fails outright if the app declares anything lower (a real local
+        // build failure, not a guess — Gradle's own error names the exact
+        // library and version). Drops official support for Android 5.0/5.1
+        // (API 21-22) devices; every other plugin here is already fine at
+        // 23. Library subprojects reading `flutter.minSdkVersion` directly
+        // (geolocator_android, via the compatibility shim in the root
+        // android/build.gradle) can stay declared at 21 — the merger only
+        // requires the *app's* effective minSdk to be >= every library's,
+        // and 23 already is.
+        minSdkVersion = 23
+        // Overridden above flutter.targetSdkVersion (34, this Flutter SDK's
+        // bundled default) — Google Play requires targeting the previous
+        // year's Android release at minimum, which by now is well past 34;
+        // compileSdk is already 36 above (for mobile_scanner), so targeting
+        // the same version is both compliant and consistent rather than
+        // introducing a gap between what the app compiles against and what
+        // it declares as its target.
+        targetSdk = 36
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+        // camera + google_mlkit_face_detection push the app past the 64K
+        // method limit. Native multidex via D8 is automatic at API 21+ (no
+        // extra library/Application-class change needed, unlike the
+        // legacy Dalvik-era multidex support library required below API
+        // 21) — this flag mainly documents the reason explicitly rather
+        // than changing runtime behavior, added proactively alongside
+        // those two plugins rather than waiting to hit a dex-merge failure
+        // on CI.
+        multiDexEnabled true
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // Real production signing once android/key.properties exists;
+            // until then this still falls back to the debug key so local
+            // and CI builds keep working without it. See this file's top
+            // comment and key.properties.example.
+            signingConfig = hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
+            // R8 minification + resource shrinking for the release build —
+            // was off entirely before (no minifyEnabled/shrinkResources at
+            // all), which is fine for local testing but leaves real,
+            // avoidable size on the table for an actual Play Store upload.
+            // proguard-rules.pro carries the app-specific keep rules this
+            // project's native/reflection-based plugins need (camera,
+            // onnxruntime, mobile_scanner, flutter_secure_storage);
+            // proguard-android-optimize.txt is the standard Android/Flutter
+            // default ruleset.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+}
