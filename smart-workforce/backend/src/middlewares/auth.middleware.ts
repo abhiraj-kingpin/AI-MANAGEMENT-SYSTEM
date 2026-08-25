@@ -5,7 +5,10 @@ import { env } from '../config/env';
 
 // Single opt-in bypass, gated by one env var: when AUTH_DISABLED=true, every
 // request is treated as this fixed super_admin actor and the login screen is
-// never required. Off (the default) restores normal JWT auth with one flip.
+// never required. Off by default — a deployed environment that never sets
+// this env var gets real, required auth, not a silent bypass. Only ever set
+// AUTH_DISABLED=true for local dev convenience, never in a deployed
+// environment (see .env.example).
 const DISABLED_ACTOR = {
   id: '6a89776861f6ab6e21c9d56b',
   role: 'super_admin' as const,

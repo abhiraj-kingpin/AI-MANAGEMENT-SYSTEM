@@ -18,13 +18,14 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
   QR_TOKEN_SECRET: z.string().min(1, 'QR_TOKEN_SECRET is required'),
-  // Bypass for the whole auth system — see auth.middleware.ts. ON by default
-  // (no env var needed); set AUTH_DISABLED=false explicitly to restore real
-  // login.
+  // Bypass for the whole auth system — see auth.middleware.ts. OFF by
+  // default (real login required); a deployed environment that never sets
+  // this still gets real auth. Set AUTH_DISABLED=true explicitly for local
+  // dev convenience (see .env.example) — never in a deployed environment.
   AUTH_DISABLED: z
     .string()
     .optional()
-    .transform((v) => v !== 'false'),
+    .transform((v) => v === 'true'),
 
   // Comma-separated. Local dev needs no env var (both common Vite/CRA ports
   // are allowed out of the box); every deployed environment (Render) MUST

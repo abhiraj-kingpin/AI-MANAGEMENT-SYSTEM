@@ -1,0 +1,16 @@
+# This project only deploys smart-workforce/admin-dashboard to Vercel (see
+# Project Settings → Root Directory). Everything else in this monorepo —
+# the backend (deployed separately to Render) and the Flutter mobile app —
+# has no business being uploaded in a Vercel deployment archive.
+smart-workforce/backend
+smart-workforce/mobile-app
+smart-workforce/docs
+
+# Belt and suspenders: nested .gitignore files should already keep these out
+# of the repo, but exclude them explicitly here too in case a CLI deploy
+# ever runs against an untracked/dirty working tree.
+node_modules
+dist
+build
+.dart_tool
+.git
