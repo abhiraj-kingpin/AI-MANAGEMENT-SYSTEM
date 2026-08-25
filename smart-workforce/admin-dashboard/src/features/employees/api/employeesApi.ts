@@ -3,6 +3,7 @@ import type {
   ApiSuccess,
   CreateEmployeeInput,
   Employee,
+  EmployeeDocument,
   EmployeeSummary,
   ListEmployeesQuery,
   UpdateEmployeeInput,
@@ -51,6 +52,11 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
 
 export async function deleteEmployee(id: string): Promise<void> {
   await api.delete(`/employees/${id}`);
+}
+
+export async function fetchEmployeeDocuments(id: string): Promise<EmployeeDocument[]> {
+  const res = await api.get<ApiSuccess<EmployeeDocument[]>>(`/employees/${id}/documents`);
+  return res.data.data;
 }
 
 export async function searchEmployees(q: string): Promise<EmployeeSummary[]> {

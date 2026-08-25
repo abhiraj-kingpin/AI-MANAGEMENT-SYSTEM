@@ -9,7 +9,10 @@ import { matchesQuery } from '@/shared/lib/searchFilter';
 import { useDepartments } from '@/features/departments/hooks/useDepartments';
 import { useAttendance } from '@/features/attendance/hooks/useAttendance';
 import { useReviewCorrection } from '@/features/attendance/hooks/useAttendanceMutations';
+import { AddMissingAttendanceModal } from '@/features/attendance/components/AddMissingAttendanceModal';
 import { CorrectionModal } from '@/features/attendance/components/CorrectionModal';
+import { CorrectionsQueue } from '@/features/attendance/components/CorrectionsQueue';
+import { pushToast } from '@/stores/toastStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useSearchStore } from '@/stores/searchStore';
 import type { Attendance, AttendanceMethod, AttendanceStatus, ListAttendanceQuery } from '@/types/api';
@@ -163,6 +166,7 @@ export function AttendancePage() {
     to: today(),
   });
   const [correctingRecord, setCorrectingRecord] = useState<Attendance | null>(null);
+  const [addingMissing, setAddingMissing] = useState(false);
 
   const { data: departments } = useDepartments();
   const { data, isLoading, isError } = useAttendance(query);
@@ -179,7 +183,10 @@ export function AttendancePage() {
       decision === 'approve' ? 'Approval comment (optional):' : 'Reason for rejecting (optional):',
     );
     if (comment === null) return;
-    reviewMutation.mutate({ id, decision, comment: comment || undefined });
+    reviewMutation.mutate(
+      { id, decision, comment: comment || undefined },
+      { onSuccess: () => pushToast(`Correction ${decision === 'approve' ? 'approved' : 'rejected'}`) },
+    );
   };
 
   return (
@@ -191,7 +198,13 @@ export function AttendancePage() {
         <h1 className="text-[26px] font-extrabold text-balance">Attendance</h1>
       </Reveal>
 
-      <Reveal index={1}>
+      {canCorrect && (
+        <Reveal index={1}>
+          <CorrectionsQueue onAddMissing={() => setAddingMissing(true)} />
+        </Reveal>
+      )}
+
+      <Reveal index={2}>
         <Card className="flex flex-wrap items-center gap-3 px-5 py-4">
           <input
             type="date"
@@ -241,7 +254,7 @@ export function AttendancePage() {
         </Card>
       </Reveal>
 
-      <Reveal index={2}>
+      <Reveal index={3}>
         <Card className="overflow-hidden">
           {isError ? (
             <p className="p-8 text-center text-sm text-danger">
@@ -408,6 +421,7 @@ export function AttendancePage() {
       {correctingRecord && (
         <CorrectionModal attendance={correctingRecord} onClose={() => setCorrectingRecord(null)} />
       )}
+      {addingMissing && <AddMissingAttendanceModal onClose={() => setAddingMissing(false)} />}
     </div>
   );
 }

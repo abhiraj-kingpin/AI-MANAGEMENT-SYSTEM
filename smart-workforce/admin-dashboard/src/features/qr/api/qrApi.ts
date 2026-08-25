@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { api } from '@/shared/lib/axios';
-import type { ApiSuccess, GenerateQrInput, QrCode } from '@/types/api';
+import type { ApiSuccess, GenerateQrInput, QrCode, QrCodeLifecycleRow } from '@/types/api';
 
 export async function fetchActiveQr(geofenceId: string): Promise<QrCode | null> {
   try {
@@ -21,4 +21,9 @@ export async function generateQr(input: GenerateQrInput): Promise<QrCode> {
 
 export async function revokeQr(id: string): Promise<void> {
   await api.post<ApiSuccess<{ status: string }>>(`/qr/${id}/revoke`);
+}
+
+export async function fetchRecentQrCodes(): Promise<QrCodeLifecycleRow[]> {
+  const res = await api.get<ApiSuccess<QrCodeLifecycleRow[]>>('/qr/recent');
+  return res.data.data;
 }

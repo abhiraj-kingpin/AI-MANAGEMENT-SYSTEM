@@ -46,3 +46,35 @@ export async function fetchAnomalies(days = 30): Promise<Anomaly[]> {
   });
   return res.data.data;
 }
+
+export interface ExportRange {
+  from: string;
+  to: string;
+  departmentId?: string;
+}
+
+async function downloadBlob(url: string, params: object, filename: string): Promise<void> {
+  const res = await api.get<Blob>(url, { params, responseType: 'blob' });
+  const objectUrl = URL.createObjectURL(res.data);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+export function exportAttendanceCsv(range: ExportRange): Promise<void> {
+  return downloadBlob('/analytics/export/csv', range, `attendance-${range.from}-to-${range.to}.csv`);
+}
+
+export function exportAttendancePdf(range: ExportRange): Promise<void> {
+  return downloadBlob('/analytics/export/pdf', range, `attendance-${range.from}-to-${range.to}.pdf`);
+}
+
+// Excel export lives on /attendance (built for the Attendance log), not
+// /analytics — reused here rather than duplicated server-side.
+export function exportAttendanceExcel(range: ExportRange): Promise<void> {
+  return downloadBlob('/attendance/export/excel', range, `attendance-${range.from}-to-${range.to}.xlsx`);
+}

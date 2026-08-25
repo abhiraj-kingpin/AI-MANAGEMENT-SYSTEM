@@ -21,6 +21,9 @@ jest.mock('../../../src/modules/employees/employee.model', () => ({
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notify: jest.fn(() => Promise.resolve()),
 }));
+jest.mock('../../../src/modules/audit/audit.service', () => ({
+  recordAudit: jest.fn(() => Promise.resolve()),
+}));
 
 import { Attendance } from '../../../src/modules/attendance/attendance.model';
 import { Employee } from '../../../src/modules/employees/employee.model';
@@ -244,21 +247,23 @@ describe('payslipService.getMyPayslips', () => {
 });
 
 describe('payslipService.release', () => {
+  const hr: ActorContext = { id: 'user-hr', role: 'hr' };
+
   it('404s for a missing payslip', async () => {
     mockedPayslipFindById.mockResolvedValue(null);
-    await expect(payslipService.release('ghost')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(payslipService.release('ghost', hr)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   it('rejects releasing an already-released payslip', async () => {
     mockedPayslipFindById.mockResolvedValue(fakePayslip({ status: 'released' }));
-    await expect(payslipService.release('payslip-1')).rejects.toMatchObject({
+    await expect(payslipService.release('payslip-1', hr)).rejects.toMatchObject({
       code: 'ALREADY_RELEASED',
     });
   });
 
   it('rejects releasing a payslip still in draft', async () => {
     mockedPayslipFindById.mockResolvedValue(fakePayslip({ status: 'draft' }));
-    await expect(payslipService.release('payslip-1')).rejects.toMatchObject({
+    await expect(payslipService.release('payslip-1', hr)).rejects.toMatchObject({
       code: 'PAYSLIP_NOT_GENERATED',
     });
   });
@@ -267,7 +272,7 @@ describe('payslipService.release', () => {
     const payslip = fakePayslip({ status: 'generated' });
     mockedPayslipFindById.mockResolvedValue(payslip);
 
-    const dto = await payslipService.release('payslip-1');
+    const dto = await payslipService.release('payslip-1', hr);
 
     expect(payslip.status).toBe('released');
     expect(dto.status).toBe('released');

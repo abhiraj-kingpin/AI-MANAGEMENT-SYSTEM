@@ -55,9 +55,30 @@ export const listAttendanceQuerySchema = z.object({
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
     status: z.enum(ATTENDANCE_STATUSES).optional(),
+    // Powers the Attendance corrections queue — records with an
+    // open, not-yet-reviewed correction request, across every employee.
+    hasPendingCorrection: z.coerce.boolean().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
   }),
+});
+
+// "Add missing attendance" — HR/Admin backfilling a day with no punch at
+// all (unlike /:id/correct, which edits a record that already exists).
+export const manualAttendanceSchema = z.object({
+  body: z
+    .object({
+      employeeId: objectIdString,
+      date: z.coerce.date(),
+      checkInAt: z.coerce.date().optional(),
+      checkOutAt: z.coerce.date().optional(),
+      status: z.enum(ATTENDANCE_STATUSES),
+      reason: z.string().trim().min(1, 'A reason is required for a manual entry.'),
+    })
+    .refine((body) => !body.checkOutAt || !body.checkInAt || body.checkOutAt >= body.checkInAt, {
+      message: 'checkOutAt must be on or after checkInAt.',
+      path: ['checkOutAt'],
+    }),
 });
 
 export const myAttendanceQuerySchema = z.object({
@@ -137,6 +158,7 @@ export type CheckOutInput = z.infer<typeof checkOutSchema>['body'];
 export type ListAttendanceQuery = z.infer<typeof listAttendanceQuerySchema>['query'];
 export type MyAttendanceQuery = z.infer<typeof myAttendanceQuerySchema>['query'];
 export type CorrectAttendanceInput = z.infer<typeof correctAttendanceSchema>['body'];
+export type ManualAttendanceInput = z.infer<typeof manualAttendanceSchema>['body'];
 export type RequestCorrectionInput = z.infer<typeof requestCorrectionSchema>['body'];
 export type SyncPunchInput = z.infer<typeof syncPunchSchema>;
 export type SyncAttendanceInput = z.infer<typeof syncAttendanceSchema>['body'];

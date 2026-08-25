@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Chip } from '@/shared/ui/Chip';
@@ -6,12 +6,17 @@ import { Reveal } from '@/shared/ui/Reveal';
 import { apiErrorMessage } from '@/shared/lib/apiError';
 import { matchesQuery } from '@/shared/lib/searchFilter';
 import { AssignShiftModal } from '@/features/shifts/components/AssignShiftModal';
+import { RosterGrid } from '@/features/shifts/components/RosterGrid';
 import { ShiftFormModal } from '@/features/shifts/components/ShiftFormModal';
 import { useDeactivateShift } from '@/features/shifts/hooks/useShiftMutations';
-import { useShifts } from '@/features/shifts/hooks/useShifts';
+import { useRoster, useShifts } from '@/features/shifts/hooks/useShifts';
 import { useAuthStore } from '@/stores/authStore';
 import { useSearchStore } from '@/stores/searchStore';
 import type { Shift } from '@/types/api';
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 const TYPE_LABEL: Record<Shift['type'], string> = {
   morning: 'Morning',
@@ -33,6 +38,26 @@ export function ShiftsPage() {
     isError: shiftsError,
   } = useShifts(false, canManage);
   const deactivateMutation = useDeactivateShift();
+
+  // Today's snapshot of who's on which shift — powers the template cards'
+  // "assigned" count and coverage bar (out of everyone with a shift today).
+  const { data: todaysAssignments } = useRoster({ from: todayIso(), to: todayIso() }, canManage);
+  const assignedCountByShift = useMemo(() => {
+    const counts = new Map<string, number>();
+    let totalAssigned = 0;
+    for (const row of todaysAssignments ?? []) {
+      const active = row.assignments.find((a) => {
+        const from = a.effectiveFrom.slice(0, 10);
+        const to = a.effectiveTo ? a.effectiveTo.slice(0, 10) : null;
+        const today = todayIso();
+        return from <= today && (!to || to >= today);
+      });
+      if (!active) continue;
+      totalAssigned += 1;
+      counts.set(active.shift.id, (counts.get(active.shift.id) ?? 0) + 1);
+    }
+    return { counts, totalAssigned };
+  }, [todaysAssignments]);
 
   const searchQuery = useSearchStore((s) => s.query);
   const visibleShifts = (shifts ?? []).filter((shift) =>
@@ -84,7 +109,45 @@ export function ShiftsPage() {
         </div>
       </Reveal>
 
-      <Reveal index={1}>
+      {shifts && shifts.length > 0 && (
+        <Reveal index={1}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {shifts.map((shift) => {
+              const assigned = assignedCountByShift.counts.get(shift.id) ?? 0;
+              const coverage = assignedCountByShift.totalAssigned
+                ? Math.round((assigned / assignedCountByShift.totalAssigned) * 100)
+                : 0;
+              return (
+                <Card key={shift.id} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13.5px] font-extrabold">{shift.name}</span>
+                    <Chip tone={shift.isActive ? 'success' : 'neutral'}>
+                      {shift.isActive ? 'Active' : 'Inactive'}
+                    </Chip>
+                  </div>
+                  <div className="mt-2.5 font-mono text-[16px] font-bold tabular-nums">
+                    {shift.startTime}–{shift.endTime}
+                  </div>
+                  <div className="mt-1 text-[11.5px] font-medium text-text-dim">
+                    {assigned} assigned today · grace {shift.gracePeriodMinutes}m
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-pill bg-ink/[0.06]">
+                    <div
+                      className="h-full rounded-pill bg-gradient-to-r from-accent to-accent-light"
+                      style={{ width: `${coverage}%` }}
+                    />
+                  </div>
+                  <div className="mt-1.5 text-[11px] font-semibold text-text-dim">
+                    {coverage}% of today's assigned headcount
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </Reveal>
+      )}
+
+      <Reveal index={2}>
         <Card className="overflow-hidden">
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-[15px] font-bold">Shift Definitions</h2>
@@ -167,6 +230,12 @@ export function ShiftsPage() {
             )}
           </Card>
         </Reveal>
+
+      {canManage && shifts && shifts.length > 0 && (
+        <Reveal index={3}>
+          <RosterGrid shifts={shifts} />
+        </Reveal>
+      )}
 
       {editingShift && (
         <ShiftFormModal

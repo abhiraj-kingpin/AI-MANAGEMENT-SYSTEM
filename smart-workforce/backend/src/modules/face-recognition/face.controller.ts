@@ -52,3 +52,13 @@ export const deleteFaceData = asyncHandler(async (req, res) => {
   await faceService.deleteFaceData(req.params.employeeId);
   sendSuccess(res, { status: 'ok' });
 });
+
+export const listEnrollments = asyncHandler(async (_req, res) => {
+  const rows = await faceService.adminListEnrollments();
+  sendSuccess(res, rows);
+});
+
+export const enrollmentStats = asyncHandler(async (_req, res) => {
+  const stats = await faceService.adminStats();
+  sendSuccess(res, stats);
+});

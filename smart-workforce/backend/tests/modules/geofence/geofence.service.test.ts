@@ -8,16 +8,21 @@ jest.mock('../../../src/modules/geofence/geofence.model', () => ({
     findById: jest.fn(),
   },
 }));
+jest.mock('../../../src/modules/audit/audit.service', () => ({
+  recordAudit: jest.fn(),
+}));
 
 import { Geofence } from '../../../src/modules/geofence/geofence.model';
 import {
   findNearestGeofence,
   geofenceService,
 } from '../../../src/modules/geofence/geofence.service';
+import type { ActorContext } from '../../../src/shared/types/actorContext';
 
 const mockedAggregate = Geofence.aggregate as unknown as jest.Mock;
 const mockedCreate = Geofence.create as unknown as jest.Mock;
 const mockedFindById = Geofence.findById as unknown as jest.Mock;
+const hr: ActorContext = { id: 'user-hr', role: 'hr' };
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -73,7 +78,7 @@ describe('findNearestGeofence', () => {
         $geoNear: expect.objectContaining({
           near: { type: 'Point', coordinates: [77.5946, 12.9716] },
           spherical: true,
-          query: { isActive: true },
+          query: { isActive: true, type: 'building' },
         }),
       }),
       { $limit: 1 },
@@ -87,11 +92,15 @@ describe('geofenceService.createGeofence', () => {
       Promise.resolve({ id: 'geo-1', createdAt: new Date(), updatedAt: new Date(), ...data }),
     );
 
-    const dto = await geofenceService.createGeofence({
-      branchName: 'HQ',
-      center: { lat: 12.9716, lng: 77.5946 },
-      radiusMeters: 150,
-    });
+    const dto = await geofenceService.createGeofence(
+      {
+        branchName: 'HQ',
+        type: 'building',
+        center: { lat: 12.9716, lng: 77.5946 },
+        radiusMeters: 150,
+      },
+      hr,
+    );
 
     expect(mockedCreate).toHaveBeenCalledWith(
       expect.objectContaining({

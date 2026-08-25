@@ -33,6 +33,13 @@ router.get(
 );
 router.post('/verify', validate(verifyFaceSchema), faceController.verifyFace);
 
+router.get(
+  '/admin/enrollments',
+  requireRole('super_admin', 'hr'),
+  faceController.listEnrollments,
+);
+router.get('/admin/stats', requireRole('super_admin', 'hr'), faceController.enrollmentStats);
+
 router.delete('/:employeeId', requireRole('super_admin', 'hr'), faceController.deleteFaceData);
 
 export { router as faceRouter };

@@ -4,6 +4,7 @@ import type {
   Attendance,
   CorrectAttendanceInput,
   ListAttendanceQuery,
+  ManualAttendanceInput,
 } from '@/types/api';
 
 export interface AttendancePage {
@@ -44,5 +45,10 @@ export async function rejectCorrection(id: string, comment?: string): Promise<At
   const res = await api.post<ApiSuccess<Attendance>>(`/attendance/${id}/reject-correction`, {
     comment,
   });
+  return res.data.data;
+}
+
+export async function createManualAttendance(input: ManualAttendanceInput): Promise<Attendance> {
+  const res = await api.post<ApiSuccess<Attendance>>('/attendance/manual', input);
   return res.data.data;
 }

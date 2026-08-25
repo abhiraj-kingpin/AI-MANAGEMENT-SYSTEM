@@ -14,6 +14,10 @@ export interface IQrCode extends Document {
   usedBy: QrUsage[];
   singleUse: boolean;
   generatedBy: Types.ObjectId;
+  // Set only by an explicit revoke — distinct from validTo simply having
+  // elapsed, so the QR Attendance console can tell "expired on schedule"
+  // apart from "pulled early" instead of collapsing both into one state.
+  revokedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +49,7 @@ const qrCodeSchema = new Schema<IQrCode>(
     usedBy: { type: [qrUsageSchema], default: [] },
     singleUse: { type: Boolean, default: false },
     generatedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    revokedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

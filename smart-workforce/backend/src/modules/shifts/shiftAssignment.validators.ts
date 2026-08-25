@@ -17,5 +17,16 @@ export const bulkAssignShiftSchema = z.object({
   }),
 });
 
+// Powers the Shifts roster grid — every assignment whose effective range
+// touches the requested week, per employee.
+export const listAssignmentsQuerySchema = z.object({
+  query: z.object({
+    from: z.coerce.date(),
+    to: z.coerce.date(),
+    departmentId: objectIdString.optional(),
+  }),
+});
+
 export type AssignShiftInput = z.infer<typeof assignShiftSchema>['body'];
 export type BulkAssignShiftInput = z.infer<typeof bulkAssignShiftSchema>['body'];
+export type ListAssignmentsQuery = z.infer<typeof listAssignmentsQuerySchema>['query'];

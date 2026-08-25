@@ -70,11 +70,13 @@ export interface Employee extends EmployeeSummary {
   email: string;
   role: Role;
   isActive: boolean;
+  accountClaimed: boolean;
   phone: string;
   profileImageUrl: string | null;
   department: { id: string; name: string; code: string } | null;
   designation: string;
   manager: EmployeeSummary | null;
+  primaryOffice: { id: string; branchName: string } | null;
   dateOfJoining: string;
   employmentStatus: EmploymentStatus;
   emergencyContact: EmergencyContact;
@@ -92,6 +94,7 @@ export interface CreateEmployeeInput {
   departmentId: string;
   designation: string;
   managerId?: string;
+  primaryOfficeId?: string;
   dateOfJoining: string;
   emergencyContact?: EmergencyContact;
   address?: Address;
@@ -104,6 +107,7 @@ export interface UpdateEmployeeInput {
   departmentId?: string;
   designation?: string;
   managerId?: string | null;
+  primaryOfficeId?: string | null;
   dateOfJoining?: string;
   employmentStatus?: EmploymentStatus;
   emergencyContact?: EmergencyContact;
@@ -136,6 +140,7 @@ export interface Attendance {
   method: AttendanceMethod;
   checkInLocation: GeoPoint | null;
   checkOutLocation: GeoPoint | null;
+  geofenceId: string | null;
   faceMatchConfidence: number | null;
   workingMinutes: number;
   status: AttendanceStatus;
@@ -153,12 +158,22 @@ export interface ListAttendanceQuery {
   status?: AttendanceStatus;
   from?: string;
   to?: string;
+  hasPendingCorrection?: boolean;
 }
 
 export interface CorrectAttendanceInput {
   checkInAt?: string;
   checkOutAt?: string;
   status?: AttendanceStatus;
+  reason: string;
+}
+
+export interface ManualAttendanceInput {
+  employeeId: string;
+  date: string;
+  checkInAt?: string;
+  checkOutAt?: string;
+  status: AttendanceStatus;
   reason: string;
 }
 
@@ -198,6 +213,13 @@ export interface Leave {
   managerComment?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  isOptional: boolean;
 }
 
 export interface ApplyLeaveInput {
@@ -345,23 +367,39 @@ export interface GeoPoint {
   accuracyMeters?: number;
 }
 
+export type GeofenceType = 'building' | 'floor' | 'room';
+
 export interface Geofence {
   id: string;
   branchName: string;
   center: GeoPoint;
   radiusMeters: number;
   isActive: boolean;
+  type: GeofenceType;
+  parentId: string | null;
+  capacity: number | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateGeofenceInput {
   branchName: string;
-  center: GeoPoint;
+  type?: GeofenceType;
+  parentId?: string;
+  capacity?: number;
+  center?: GeoPoint;
   radiusMeters?: number;
 }
 
-export type UpdateGeofenceInput = Partial<CreateGeofenceInput & { isActive: boolean }>;
+export type UpdateGeofenceInput = Partial<
+  Omit<CreateGeofenceInput, 'type' | 'parentId'> & { isActive: boolean }
+>;
+
+export interface OfficeSummary {
+  officeId: string;
+  assigned: number;
+  attendanceRate: number;
+}
 
 export interface QrCode {
   id: string;
@@ -380,6 +418,17 @@ export interface GenerateQrInput {
   geofenceId: string;
   validForMinutes?: number;
   singleUse?: boolean;
+}
+
+export type QrCodeState = 'active' | 'expired' | 'revoked';
+
+export interface QrCodeLifecycleRow {
+  id: string;
+  code: string;
+  office: string;
+  issued: string;
+  scans: number;
+  state: QrCodeState;
 }
 
 export type ShiftType = 'morning' | 'night' | 'rotational' | 'flexible';
@@ -418,6 +467,28 @@ export interface AssignShiftInput {
   employeeId: string;
   shiftId: string;
   effectiveFrom: string;
+}
+
+export interface RosterEmployee {
+  employee: EmployeeSummary;
+  departmentId: string;
+  assignments: Array<{ shift: Shift; effectiveFrom: string; effectiveTo: string | null }>;
+}
+
+export interface ListRosterQuery {
+  from: string;
+  to: string;
+  departmentId?: string;
+}
+
+export type EmployeeDocumentType = 'id_proof' | 'resume' | 'offer_letter' | 'contract' | 'other';
+
+export interface EmployeeDocument {
+  id: string;
+  type: EmployeeDocumentType;
+  fileUrl: string;
+  fileName: string | null;
+  uploadedAt: string;
 }
 
 export interface ListEmployeesQuery {
@@ -474,10 +545,30 @@ export interface AbsenteeismTrendPoint {
   absenteeismRate: number;
 }
 
+export interface AbsenteeismDriver {
+  label: string;
+  valuePp: number;
+}
+
+export interface DepartmentAbsenteeismRow {
+  departmentId: string;
+  departmentName: string;
+  lastObservedRate: number;
+  projectedRate: number;
+  deltaPp: number;
+  risk: 'low' | 'medium' | 'high';
+}
+
 export interface AbsenteeismForecast {
   history: AbsenteeismTrendPoint[];
   forecastMonth: string;
   forecastRate: number;
+  confidenceIntervalPp: number;
+  trendPpPerMonth: number;
+  rSquared: number;
+  backtestMaePp: number | null;
+  drivers: AbsenteeismDriver[];
+  departmentBreakdown: DepartmentAbsenteeismRow[];
   method: 'linear-regression';
 }
 
@@ -502,3 +593,105 @@ export interface LoginResponse {
   user: AuthUser;
   employee?: EmployeeSummary;
 }
+
+// ---------- Audit Logs ----------
+
+export type AuditResult = 'success' | 'failed' | 'blocked';
+
+export interface AuditLog {
+  id: string;
+  actorId: string;
+  actorEmail: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  result: AuditResult;
+  source: string;
+  createdAt: string;
+}
+
+export interface ListAuditLogsQuery {
+  entityType?: string;
+  entityId?: string;
+  actorId?: string;
+  result?: AuditResult;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+// ---------- Face Management ----------
+
+export type FaceEnrollmentStatus = 'registered' | 'not_registered' | 're_enrollment_due';
+
+export interface FaceEnrollmentRow {
+  employeeId: string;
+  employeeCode: string;
+  name: string;
+  department: string;
+  status: FaceEnrollmentStatus;
+  enrolledAt: string | null;
+  lastVerifiedAt: string | null;
+}
+
+export interface FaceEnrollmentStats {
+  enrolled: number;
+  notRegistered: number;
+  reEnrollmentDue: number;
+  verificationsToday: number;
+}
+
+// ---------- Users & Roles ----------
+
+export interface ConsoleUser {
+  id: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  accountClaimed: boolean;
+  lastLoginAt: string | null;
+  employeeName: string | null;
+  createdAt: string;
+}
+
+export interface InviteUserInput {
+  email: string;
+  role: Exclude<Role, 'super_admin'>;
+}
+
+// ---------- Settings ----------
+
+export interface WorkspaceSettings {
+  attendanceRules: {
+    lateGraceMinutes: number;
+    autoMarkAbsentEnabled: boolean;
+    requireGeofenceForGps: boolean;
+    allowManualCheckIn: boolean;
+  };
+  leaveApprovals: {
+    autoApproveUnderDays: number;
+    requireManagerApproval: boolean;
+    carryForwardEnabled: boolean;
+  };
+  aiAnalytics: {
+    anomalyDetectionEnabled: boolean;
+    absenteeismForecastingEnabled: boolean;
+    lateRiskAlertsEnabled: boolean;
+  };
+  dataPayroll: {
+    payrollCutoffDay: number;
+    dataRetentionMonths: number;
+    weeklyDigestEmail: boolean;
+  };
+  updatedAt: string;
+}
+
+export type UpdateSettingsInput = Partial<{
+  attendanceRules: Partial<WorkspaceSettings['attendanceRules']>;
+  leaveApprovals: Partial<WorkspaceSettings['leaveApprovals']>;
+  aiAnalytics: Partial<WorkspaceSettings['aiAnalytics']>;
+  dataPayroll: Partial<WorkspaceSettings['dataPayroll']>;
+}>;

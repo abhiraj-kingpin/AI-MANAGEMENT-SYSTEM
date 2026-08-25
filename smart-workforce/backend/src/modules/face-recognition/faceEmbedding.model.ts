@@ -7,6 +7,7 @@ export interface IFaceEmbedding extends Document {
   qualityScore: number | null;
   isActive: boolean;
   registeredAt: Date;
+  lastVerifiedAt: Date | null;
 }
 
 const faceEmbeddingSchema = new Schema<IFaceEmbedding>({
@@ -23,6 +24,11 @@ const faceEmbeddingSchema = new Schema<IFaceEmbedding>({
   qualityScore: { type: Number, default: null },
   isActive: { type: Boolean, default: true },
   registeredAt: { type: Date, default: Date.now },
+  // Touched on every successful faceService.verify() — the Face Management
+  // console's "Last verified" column. Kept on the embedding rather than a
+  // separate log table since there's nothing else that needs one verify
+  // event's full detail, just the most recent timestamp per employee.
+  lastVerifiedAt: { type: Date, default: null },
 });
 
 faceEmbeddingSchema.index({ employeeId: 1, isActive: 1 });

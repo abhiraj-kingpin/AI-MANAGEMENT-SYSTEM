@@ -22,7 +22,7 @@ export const getMyPayslips = asyncHandler(async (req, res) => {
 });
 
 export const releasePayslip = asyncHandler(async (req, res) => {
-  const payslip = await payslipService.release(req.params.id);
+  const payslip = await payslipService.release(req.params.id, actorFromRequest(req));
   sendSuccess(res, { payslip });
 });
 

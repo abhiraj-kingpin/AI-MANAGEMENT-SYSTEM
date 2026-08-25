@@ -8,16 +8,27 @@ import {
   type EmployeeOption,
 } from '@/features/employees/components/EmployeePicker';
 import { useAssignShift } from '@/features/shifts/hooks/useShiftMutations';
+import { pushToast } from '@/stores/toastStore';
 import type { Shift } from '@/types/api';
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function AssignShiftModal({ shifts, onClose }: { shifts: Shift[]; onClose: () => void }) {
-  const [employee, setEmployee] = useState<EmployeeOption | null>(null);
+export function AssignShiftModal({
+  shifts,
+  onClose,
+  initialEmployee = null,
+  initialDate,
+}: {
+  shifts: Shift[];
+  onClose: () => void;
+  initialEmployee?: EmployeeOption | null;
+  initialDate?: string;
+}) {
+  const [employee, setEmployee] = useState<EmployeeOption | null>(initialEmployee);
   const [shiftId, setShiftId] = useState('');
-  const [effectiveFrom, setEffectiveFrom] = useState(today());
+  const [effectiveFrom, setEffectiveFrom] = useState(initialDate ?? today());
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useAssignShift();
@@ -32,7 +43,10 @@ export function AssignShiftModal({ shifts, onClose }: { shifts: Shift[]; onClose
     mutation.mutate(
       { employeeId: employee.id, shiftId, effectiveFrom },
       {
-        onSuccess: onClose,
+        onSuccess: () => {
+          pushToast(`${employee.label.split(' (')[0]} reassigned`);
+          onClose();
+        },
         onError: (err) => setError(apiErrorMessage(err)),
       },
     );

@@ -6,6 +6,7 @@ import type { PaginatedResult } from '../../shared/types/pagination';
 import { assertRoleAssignable } from '../../shared/utils/roleAssignment';
 import { escapeRegExp } from '../../shared/utils/regex';
 import { generateRandomToken } from '../../shared/utils/tokens';
+import { recordAudit } from '../audit/audit.service';
 import { Department } from '../departments/department.model';
 import { User } from '../users/user.model';
 import { type EmployeeDocumentType, EmployeeDocument } from './document.model';
@@ -34,7 +35,8 @@ const SELF_EDITABLE_FIELDS = new Set(['phone', 'address', 'emergencyContact']);
 const POPULATE_OPTIONS = [
   { path: 'departmentId', select: 'name code' },
   { path: 'managerId', select: 'employeeCode firstName lastName' },
-  { path: 'userId', select: 'email role isActive' },
+  { path: 'primaryOfficeId', select: 'branchName' },
+  { path: 'userId', select: 'email role isActive accountClaimed' },
 ];
 
 function toDTO(doc: unknown): EmployeeDTO {
@@ -107,12 +109,23 @@ export const employeeService = {
       departmentId: input.departmentId,
       designation: input.designation,
       managerId: input.managerId ?? null,
+      primaryOfficeId: input.primaryOfficeId ?? null,
       dateOfJoining: input.dateOfJoining,
       emergencyContact: input.emergencyContact,
       address: input.address,
     });
 
     const populated = await Employee.findById(employee.id).populate(POPULATE_OPTIONS);
+
+    await recordAudit({
+      actorId: actor.id,
+      action: 'employee.create',
+      entityType: 'Employee',
+      entityId: employee.id as string,
+      before: null,
+      after: { employeeCode, firstName: input.firstName, lastName: input.lastName, email: input.email, role },
+    });
+
     return toDTO(populated);
   },
 
@@ -254,8 +267,20 @@ export const employeeService = {
       await assertManagerExists(updates.managerId);
     }
 
+    const before = Object.fromEntries(
+      Object.keys(updates).map((key) => [key, (employee as unknown as Record<string, unknown>)[key]]),
+    );
     Object.assign(employee, updates);
     await employee.save();
+
+    await recordAudit({
+      actorId: actor.id,
+      action: 'employee.update',
+      entityType: 'Employee',
+      entityId: employee.id as string,
+      before,
+      after: updates,
+    });
 
     const populated = await Employee.findById(employee.id).populate(POPULATE_OPTIONS);
     return toDTO(populated);

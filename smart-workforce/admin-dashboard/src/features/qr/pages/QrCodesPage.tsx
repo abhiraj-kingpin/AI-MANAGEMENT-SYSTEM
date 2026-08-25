@@ -6,8 +6,16 @@ import { Reveal } from '@/shared/ui/Reveal';
 import { apiErrorMessage } from '@/shared/lib/apiError';
 import { useGeofences } from '@/features/geofences/hooks/useGeofences';
 import { GenerateQrModal } from '@/features/qr/components/GenerateQrModal';
-import { useActiveQr } from '@/features/qr/hooks/useQr';
+import { useActiveQr, useRecentQrCodes } from '@/features/qr/hooks/useQr';
 import { useRevokeQr } from '@/features/qr/hooks/useQrMutations';
+import type { QrCodeState } from '@/types/api';
+
+const STATE_LABEL: Record<QrCodeState, string> = { active: 'Active', expired: 'Expired', revoked: 'Revoked' };
+const STATE_TONE: Record<QrCodeState, 'success' | 'neutral' | 'warning'> = {
+  active: 'success',
+  expired: 'neutral',
+  revoked: 'warning',
+};
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -19,6 +27,7 @@ export function QrCodesPage() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const { data: activeQr, isLoading } = useActiveQr(geofenceId);
+  const { data: recentCodes, isLoading: recentLoading } = useRecentQrCodes();
   const revokeMutation = useRevokeQr();
   const selectedGeofence = geofences?.find((g) => g.id === geofenceId);
 
@@ -35,7 +44,7 @@ export function QrCodesPage() {
     <div className="flex flex-col gap-6">
       <Reveal>
         <p className="mb-1.5 text-[11.5px] font-bold tracking-[0.14em] text-accent-light uppercase">
-          Configuration
+          System
         </p>
         <h1 className="text-[26px] font-extrabold text-balance">QR Attendance</h1>
         <p className="mt-1 text-[12.5px] font-medium text-text-dim">
@@ -63,49 +72,60 @@ export function QrCodesPage() {
         </Card>
       </Reveal>
 
-      {geofenceId && (
-        <Reveal index={2}>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[340px_1fr]">
-            {/* Ink panel — the signed code itself, styled after the QR
-                Attendance console's dark "Generate QR" panel. */}
-            <div className="bg-ink flex flex-col gap-4 rounded-card p-5">
-              <div>
-                <h2 className="text-[15px] font-extrabold text-white">Generate QR</h2>
-                <p className="mt-0.5 text-[11.5px] font-medium text-white/50">
-                  {selectedGeofence?.branchName ?? 'Signed and time-boxed per office'}
+      <Reveal index={2}>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[340px_1fr]">
+          {/* Ink panel — the signed code itself, styled after the QR
+              Attendance console's dark "Generate QR" panel. */}
+          <div className="bg-ink flex flex-col gap-4 rounded-card p-5">
+            <div>
+              <h2 className="text-[15px] font-extrabold text-white">Generate QR</h2>
+              <p className="mt-0.5 text-[11.5px] font-medium text-white/50">
+                {selectedGeofence?.branchName ?? 'Signed and time-boxed per office'}
+              </p>
+            </div>
+
+            <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl bg-white/[0.06]">
+              {!geofenceId ? (
+                <p className="px-6 text-center font-mono text-[11px] leading-relaxed text-white/40">
+                  Select an office above
+                  <br />
+                  to generate a code
                 </p>
-              </div>
+              ) : isLoading ? (
+                <p className="text-[12.5px] text-white/50">Loading…</p>
+              ) : activeQr ? (
+                <img
+                  src={activeQr.qrImageDataUrl}
+                  alt="Check-in QR code"
+                  className="h-full w-full bg-white p-3"
+                />
+              ) : (
+                <p className="px-6 text-center font-mono text-[11px] leading-relaxed text-white/40">
+                  No active code
+                  <br />
+                  for this office
+                </p>
+              )}
+            </div>
 
-              <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl bg-white/[0.06]">
-                {isLoading ? (
-                  <p className="text-[12.5px] text-white/50">Loading…</p>
-                ) : activeQr ? (
-                  <img
-                    src={activeQr.qrImageDataUrl}
-                    alt="Check-in QR code"
-                    className="h-full w-full bg-white p-3"
-                  />
-                ) : (
-                  <p className="px-6 text-center font-mono text-[11px] leading-relaxed text-white/40">
-                    No active code
-                    <br />
-                    for this office
-                  </p>
-                )}
-              </div>
-
+            <div className="flex flex-col gap-2.5">
               {activeQr && (
-                <div className="flex flex-col gap-2.5">
+                <>
                   <QrRow label="Status" value={activeQr.isUsed ? 'Used' : 'Active'} />
                   {activeQr.singleUse && <QrRow label="Mode" value="Single use" />}
                   <QrRow
                     label="Validity"
                     value={`${formatTime(activeQr.validFrom)} – ${formatTime(activeQr.validTo)}`}
                   />
-                </div>
+                </>
               )}
+              {/* jsonwebtoken's default signing algorithm — see signQrToken
+                  in shared/utils/tokens.ts, no explicit algorithm override. */}
+              <QrRow label="Signing algorithm" value="HS256" />
+            </div>
 
-              {activeQr ? (
+            {geofenceId &&
+              (activeQr ? (
                 <button
                   type="button"
                   onClick={handleRevoke}
@@ -120,51 +140,58 @@ export function QrCodesPage() {
                   onClick={() => setIsGenerating(true)}
                   className="brand-gradient rounded-2xl py-3 text-center text-[13px] font-bold text-white shadow-[0_8px_20px_-8px_rgba(106,76,240,0.55)]"
                 >
-                  Generate QR Code
+                  Generate QR code
                 </button>
-              )}
-            </div>
-
-            {/* Lifecycle summary — this office's current code only; the API
-                doesn't expose a full rotation history to list further back. */}
-            <Card className="flex flex-col p-5">
-              <h2 className="text-[15px] font-extrabold">Code lifecycle</h2>
-              <p className="mt-0.5 mb-4 text-[11.5px] font-medium text-text-dim">
-                One active code per office at a time
-              </p>
-
-              {isLoading ? (
-                <p className="py-10 text-center text-sm text-text-dim">Loading…</p>
-              ) : !activeQr ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
-                  <span className="text-2xl" aria-hidden="true">
-                    ▦
-                  </span>
-                  <p className="text-sm text-text-dim">
-                    No active QR code for this location yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col divide-y divide-border">
-                  <LifecycleRow label="Office" value={selectedGeofence?.branchName ?? '—'} />
-                  <LifecycleRow label="Issued" value={formatTime(activeQr.validFrom)} />
-                  <LifecycleRow label="Expires" value={formatTime(activeQr.validTo)} />
-                  <LifecycleRow
-                    label="Mode"
-                    value={activeQr.singleUse ? 'Single use' : 'Multi-scan'}
-                  />
-                  <div className="flex items-center justify-between py-3 text-[13px]">
-                    <span className="font-semibold text-text-dim">State</span>
-                    <Chip tone={activeQr.isUsed ? 'neutral' : 'success'}>
-                      {activeQr.isUsed ? 'Used' : 'Active'}
-                    </Chip>
-                  </div>
-                </div>
-              )}
-            </Card>
+              ))}
           </div>
-        </Reveal>
-      )}
+
+          {/* Every office's recent codes, not just the selected one's —
+              GET /qr/recent, newest first. */}
+          <Card className="flex flex-col overflow-hidden">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-[15px] font-extrabold">Code lifecycle</h2>
+              <p className="mt-0.5 text-[11.5px] font-medium text-text-dim">Rotates every 15 minutes, across every office</p>
+            </div>
+            {recentLoading && !recentCodes ? (
+              <p className="py-10 text-center text-sm text-text-dim">Loading…</p>
+            ) : !recentCodes || recentCodes.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
+                <span className="text-2xl" aria-hidden="true">
+                  ▦
+                </span>
+                <p className="text-sm text-text-dim">No QR codes generated yet.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-[11px] tracking-wide text-text-dim uppercase">
+                      <th className="px-5 py-3 font-bold">Code</th>
+                      <th className="px-5 py-3 font-bold">Office</th>
+                      <th className="px-5 py-3 font-bold">Issued</th>
+                      <th className="px-5 py-3 font-bold">Scans</th>
+                      <th className="px-5 py-3 text-right font-bold">State</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentCodes.map((row) => (
+                      <tr key={row.id} className="border-b border-border/60 last:border-0">
+                        <td className="px-5 py-2.5 font-mono text-[12px] tabular-nums font-semibold">{row.code}</td>
+                        <td className="px-5 py-2.5 text-text-dim">{row.office}</td>
+                        <td className="px-5 py-2.5 font-mono text-[12px] tabular-nums text-text-dim">{formatTime(row.issued)}</td>
+                        <td className="px-5 py-2.5 font-mono text-[12px] tabular-nums">{row.scans}</td>
+                        <td className="px-5 py-2.5 text-right">
+                          <Chip tone={STATE_TONE[row.state]}>{STATE_LABEL[row.state]}</Chip>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      </Reveal>
 
       {isGenerating && geofenceId && (
         <GenerateQrModal geofenceId={geofenceId} onClose={() => setIsGenerating(false)} />
@@ -178,15 +205,6 @@ function QrRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between rounded-xl bg-white/[0.07] px-3.5 py-2.5">
       <span className="text-[11.5px] font-semibold text-white/60">{label}</span>
       <span className="font-mono text-[12px] text-white">{value}</span>
-    </div>
-  );
-}
-
-function LifecycleRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between py-3 text-[13px]">
-      <span className="font-semibold text-text-dim">{label}</span>
-      <span className="font-mono font-semibold">{value}</span>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Atmosphere } from './Atmosphere';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { LandingHero } from '@/features/landing/components/LandingHero';
+import { ToastHost } from '@/shared/ui/Toast';
 import { useSearchStore } from '@/stores/searchStore';
 
 type Phase = 'hero' | 'animating' | 'dashboard';
@@ -52,6 +53,7 @@ export function AppShell() {
 
   return (
     <div className="relative min-h-screen">
+      <ToastHost />
       {phase !== 'dashboard' && <LandingHero phase={phase} onEnter={enterDashboard} />}
 
       {/* The ambient mesh glow belongs to the marketing hero only — the

@@ -35,6 +35,7 @@ export interface IEmployee extends Document {
   departmentId: Types.ObjectId;
   designation: string;
   managerId: Types.ObjectId | null;
+  primaryOfficeId: Types.ObjectId | null;
   dateOfJoining: Date;
   employmentStatus: EmploymentStatus;
   emergencyContact: EmergencyContact;
@@ -76,6 +77,7 @@ const employeeSchema = new Schema<IEmployee>(
     departmentId: { type: Schema.Types.ObjectId, ref: 'Department', required: true, index: true },
     designation: { type: String, required: true, trim: true },
     managerId: { type: Schema.Types.ObjectId, ref: 'Employee', default: null, index: true },
+    primaryOfficeId: { type: Schema.Types.ObjectId, ref: 'Geofence', default: null },
     dateOfJoining: { type: Date, required: true },
     employmentStatus: {
       type: String,

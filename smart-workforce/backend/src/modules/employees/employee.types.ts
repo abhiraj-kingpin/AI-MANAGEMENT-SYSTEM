@@ -12,11 +12,15 @@ export interface EmployeeDTO extends EmployeeSummaryDTO {
   email: string;
   role: Role;
   isActive: boolean;
+  // False until the invited employee has signed in and claimed the
+  // account — the Employees list shows an "Invited" badge for those.
+  accountClaimed: boolean;
   phone: string;
   profileImageUrl: string | null;
   department: { id: string; name: string; code: string } | null;
   designation: string;
   manager: EmployeeSummaryDTO | null;
+  primaryOffice: { id: string; branchName: string } | null;
   dateOfJoining: Date;
   employmentStatus: EmploymentStatus;
   emergencyContact: EmergencyContact;
@@ -41,7 +45,8 @@ export interface PopulatedEmployeeLike {
   updatedAt: Date;
   departmentId: { id: string; name: string; code: string } | null;
   managerId: { id: string; employeeCode: string; firstName: string; lastName: string } | null;
-  userId: { id: string; email: string; role: Role; isActive: boolean } | null;
+  primaryOfficeId: { id: string; branchName: string } | null;
+  userId: { id: string; email: string; role: Role; isActive: boolean; accountClaimed: boolean } | null;
 }
 
 export function toEmployeeSummaryDTO(employee: {
@@ -67,11 +72,15 @@ export function toEmployeeDTO(employee: PopulatedEmployeeLike): EmployeeDTO {
     email: employee.userId?.email ?? '',
     role: employee.userId?.role ?? 'employee',
     isActive: employee.userId?.isActive ?? false,
+    accountClaimed: employee.userId?.accountClaimed ?? true,
     phone: employee.phone,
     profileImageUrl: employee.profileImageUrl,
     department: employee.departmentId,
     designation: employee.designation,
     manager: employee.managerId ? toEmployeeSummaryDTO(employee.managerId) : null,
+    primaryOffice: employee.primaryOfficeId
+      ? { id: employee.primaryOfficeId.id, branchName: employee.primaryOfficeId.branchName }
+      : null,
     dateOfJoining: employee.dateOfJoining,
     employmentStatus: employee.employmentStatus,
     emergencyContact: employee.emergencyContact,

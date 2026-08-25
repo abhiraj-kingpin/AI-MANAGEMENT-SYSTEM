@@ -8,6 +8,7 @@ import type {
   CheckInInput,
   CheckOutInput,
   ListAttendanceQuery,
+  ManualAttendanceInput,
   MyAttendanceQuery,
   SyncAttendanceInput,
 } from './attendance.validators';
@@ -63,6 +64,14 @@ export const correctAttendance = asyncHandler(async (req, res) => {
     actorFromRequest(req),
   );
   sendSuccess(res, result);
+});
+
+export const createManualRecord = asyncHandler(async (req, res) => {
+  const result = await attendanceService.createManualRecord(
+    req.body as ManualAttendanceInput,
+    actorFromRequest(req),
+  );
+  sendSuccess(res, result, 201);
 });
 
 export const requestCorrection = asyncHandler(async (req, res) => {

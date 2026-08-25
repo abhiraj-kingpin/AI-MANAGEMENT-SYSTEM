@@ -14,6 +14,7 @@ const router = Router();
 router.use(authenticate, requireRole('super_admin', 'hr'));
 
 router.get('/nearby', validate(nearbyQuerySchema), geofenceController.nearbyGeofences);
+router.get('/summary', geofenceController.officeStats);
 router.get('/', geofenceController.listGeofences);
 router.post('/', validate(createGeofenceSchema), geofenceController.createGeofence);
 router.patch('/:id', validate(updateGeofenceSchema), geofenceController.updateGeofence);

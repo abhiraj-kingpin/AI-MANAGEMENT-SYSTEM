@@ -7,6 +7,7 @@ import { requireEmployeeId } from '../../shared/utils/actor';
 import { resolveEmployeeRefs } from '../../shared/utils/employeeRef';
 import { round2 } from '../../shared/utils/math';
 import { Attendance } from '../attendance/attendance.model';
+import { recordAudit } from '../audit/audit.service';
 import { Employee } from '../employees/employee.model';
 import { notify } from '../notifications/notification.service';
 import { type IPayslip, Payslip } from './payslip.model';
@@ -169,7 +170,7 @@ export const payslipService = {
     return payslips.map((payslip) => toPayslipDTO(payslip));
   },
 
-  async release(payslipId: string): Promise<PayslipDTO> {
+  async release(payslipId: string, actor: ActorContext): Promise<PayslipDTO> {
     const payslip = await Payslip.findById(payslipId);
     if (!payslip) {
       throw AppError.notFound('Payslip not found.');
@@ -186,6 +187,15 @@ export const payslipService = {
 
     payslip.status = 'released';
     await payslip.save();
+
+    await recordAudit({
+      actorId: actor.id,
+      action: 'payslip.release',
+      entityType: 'Payslip',
+      entityId: payslip.id as string,
+      before: { status: 'generated' },
+      after: { status: 'released' },
+    });
 
     logger.info(`Payslip ${payslipId} released`);
     await notify(

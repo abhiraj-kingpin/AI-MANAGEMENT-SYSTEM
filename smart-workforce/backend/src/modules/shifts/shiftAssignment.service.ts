@@ -3,12 +3,23 @@ import { AppError } from '../../shared/errors/AppError';
 import type { ActorContext } from '../../shared/types/actorContext';
 import { requireEmployeeId } from '../../shared/utils/actor';
 import { shiftDurationMinutes, startOfUtcDay } from '../../shared/utils/dateTime';
+import type { EmployeeRefDTO } from '../../shared/utils/employeeRef';
+import { Employee } from '../employees/employee.model';
 import { notify } from '../notifications/notification.service';
+import { type ShiftDTO, toShiftDTO } from './shift.types';
 import type { IShift } from './shift.model';
 import { Shift } from './shift.model';
-import { type ShiftAssignmentDTO, toShiftAssignmentDTO } from './shiftAssignment.types';
+import {
+  type RosterEmployeeDTO,
+  type ShiftAssignmentDTO,
+  toShiftAssignmentDTO,
+} from './shiftAssignment.types';
 import { type IShiftAssignment, ShiftAssignment } from './shiftAssignment.model';
-import type { AssignShiftInput, BulkAssignShiftInput } from './shiftAssignment.validators';
+import type {
+  AssignShiftInput,
+  BulkAssignShiftInput,
+  ListAssignmentsQuery,
+} from './shiftAssignment.validators';
 
 function shiftRef(assignment: IShiftAssignment): IShift | undefined {
   const value = assignment.shiftId as unknown;
@@ -123,6 +134,65 @@ export const shiftAssignmentService = {
     const shift = shiftRef(assignment);
     if (!shift) return null;
     return toShiftAssignmentDTO(assignment, shift);
+  },
+
+  // Powers the Shifts roster grid — every employee (optionally scoped to a
+  // department), with the shift assignment(s) that overlap the requested
+  // week. An employee's assignment is an effective-date *range*, not a
+  // per-day rotation, so most weeks show the same shift repeated across
+  // every day; a cell only changes where a new assignment actually starts
+  // partway through the week.
+  async listRoster(query: ListAssignmentsQuery): Promise<RosterEmployeeDTO[]> {
+    const employeeFilter: Record<string, unknown> = { isDeleted: false };
+    if (query.departmentId) employeeFilter.departmentId = query.departmentId;
+
+    const employees = await Employee.find(employeeFilter)
+      .select('employeeCode firstName lastName departmentId')
+      .sort({ firstName: 1 })
+      .limit(500);
+    if (employees.length === 0) return [];
+
+    const employeeIds = employees.map((e) => e._id);
+    const assignments = await ShiftAssignment.find({
+      employeeId: { $in: employeeIds },
+      effectiveFrom: { $lte: query.to },
+      $or: [{ effectiveTo: null }, { effectiveTo: { $gte: query.from } }],
+    })
+      .populate('shiftId')
+      .sort({ effectiveFrom: 1 });
+
+    const byEmployee = new Map<string, IShiftAssignment[]>();
+    for (const assignment of assignments) {
+      const key = String(assignment.employeeId);
+      const list = byEmployee.get(key);
+      if (list) list.push(assignment);
+      else byEmployee.set(key, [assignment]);
+    }
+
+    return employees.map((employee) => {
+      const employeeId = String(employee._id);
+      const employeeAssignments = (byEmployee.get(employeeId) ?? [])
+        .map((assignment) => {
+          const shift = shiftRef(assignment);
+          return shift
+            ? {
+                shift: toShiftDTO(shift) as ShiftDTO,
+                effectiveFrom: assignment.effectiveFrom,
+                effectiveTo: assignment.effectiveTo,
+              }
+            : null;
+        })
+        .filter((x): x is { shift: ShiftDTO; effectiveFrom: Date; effectiveTo: Date | null } => x !== null);
+
+      const ref: EmployeeRefDTO = {
+        id: employeeId,
+        employeeCode: employee.employeeCode,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+      };
+
+      return { employee: ref, departmentId: String(employee.departmentId), assignments: employeeAssignments };
+    });
   },
 };
 

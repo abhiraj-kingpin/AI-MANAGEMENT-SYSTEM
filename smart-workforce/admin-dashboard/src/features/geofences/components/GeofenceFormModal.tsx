@@ -19,7 +19,10 @@ export function GeofenceFormModal({
   const [branchName, setBranchName] = useState(geofence?.branchName ?? '');
   const [lat, setLat] = useState(String(geofence?.center.lat ?? ''));
   const [lng, setLng] = useState(String(geofence?.center.lng ?? ''));
-  const [radiusMeters, setRadiusMeters] = useState(String(geofence?.radiusMeters ?? 150));
+  // Shown to the user as a full geofence "side" (matching the square shown
+  // on the Offices & Locations cards) but stored as a radius, same as the
+  // add-location form on that page — see geofenceSide()/toRadius() there.
+  const [side, setSide] = useState(String((geofence?.radiusMeters ?? 150) * 2));
   const [error, setError] = useState<string | null>(null);
 
   const createMutation = useCreateGeofence();
@@ -32,7 +35,7 @@ export function GeofenceFormModal({
     const input = {
       branchName,
       center: { lat: Number(lat), lng: Number(lng) },
-      radiusMeters: Number(radiusMeters),
+      radiusMeters: Number(side) / 2,
     };
     const onSettled = {
       onSuccess: onClose,
@@ -83,15 +86,15 @@ export function GeofenceFormModal({
             />
           </Field>
         </div>
-        <Field label="Radius (meters)" htmlFor="geofenceRadius">
+        <Field label="Geofence side (meters)" htmlFor="geofenceRadius">
           <Input
             id="geofenceRadius"
             type="number"
-            min={10}
-            max={5000}
+            min={20}
+            max={10000}
             required
-            value={radiusMeters}
-            onChange={(e) => setRadiusMeters(e.target.value)}
+            value={side}
+            onChange={(e) => setSide(e.target.value)}
           />
         </Field>
 

@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/shared/ui/Button';
-import { buttonClassName } from '@/shared/ui/buttonStyles';
 import { Card } from '@/shared/ui/Card';
 import { Chip } from '@/shared/ui/Chip';
 import { Reveal } from '@/shared/ui/Reveal';
 import { Select } from '@/shared/ui/Field';
+import { ImportIcon } from '@/shared/ui/icons';
+import { AddEmployeeModal } from '@/features/employees/components/AddEmployeeModal';
+import { BulkImportModal } from '@/features/employees/components/BulkImportModal';
+import { EmployeeDrawer } from '@/features/employees/components/EmployeeDrawer';
 import { useDepartments } from '@/features/departments/hooks/useDepartments';
 import { useEmployees } from '@/features/employees/hooks/useEmployees';
 import { useAuthStore } from '@/stores/authStore';
 import { useSearchStore } from '@/stores/searchStore';
-import type { EmploymentStatus, ListEmployeesQuery } from '@/types/api';
+import type { Employee, EmploymentStatus, ListEmployeesQuery } from '@/types/api';
 
 const STATUS_TONE: Record<EmploymentStatus, 'success' | 'warning' | 'neutral'> = {
   active: 'success',
@@ -38,11 +41,16 @@ export function EmployeesListPage() {
   // designation — see backend employee.service.ts) rather than just
   // whatever page of results happens to be on screen.
   const searchInput = useSearchStore((s) => s.query);
+  // Deep link from Departments' "View team" — reads once on mount, then
+  // this page's own filter controls take over (no round-trip back to the
+  // URL on every change).
+  const [searchParams] = useSearchParams();
   const [query, setQuery] = useState<ListEmployeesQuery>({
     page: 1,
     limit: PAGE_SIZE,
     sortBy: 'firstName',
     order: 'asc',
+    department: searchParams.get('department') ?? undefined,
   });
 
   useEffect(() => {
@@ -54,6 +62,9 @@ export function EmployeesListPage() {
 
   const { data: departments } = useDepartments();
   const { data, isLoading, isError } = useEmployees(query);
+  const [adding, setAdding] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [selected, setSelected] = useState<Employee | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -65,9 +76,23 @@ export function EmployeesListPage() {
           <h1 className="text-[26px] font-extrabold text-balance">Employees</h1>
         </div>
         {canManage && (
-          <Link to="/employees/new" className={buttonClassName()}>
-            + Add Employee
-          </Link>
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={() => setBulkImporting(true)}
+              className="flex items-center gap-1.5 rounded-pill border border-border bg-white px-4 py-2.5 text-[13px] font-bold text-text-dim hover:bg-ink/[0.03]"
+            >
+              <ImportIcon className="h-4 w-4" />
+              Bulk import
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="rounded-pill px-5 py-3 text-[13px] font-bold text-white brand-gradient shadow-[0_8px_20px_-8px_rgba(20,48,79,0.55)]"
+            >
+              + Add Employee
+            </button>
+          </div>
         )}
       </Reveal>
 
@@ -153,16 +178,14 @@ export function EmployeesListPage() {
                     data?.items.map((employee) => (
                       <tr
                         key={employee.id}
-                        className="border-b border-border/60 transition-colors last:border-0 hover:bg-ink/[0.025]"
+                        onClick={() => setSelected(employee)}
+                        className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-ink/[0.025]"
                       >
                         <td className="px-5 py-3.5">
-                          <Link
-                            to={`/employees/${employee.id}`}
-                            className="font-semibold text-text hover:text-accent-light"
-                          >
+                          <span className="font-semibold text-text">
                             {employee.firstName} {employee.lastName}
-                          </Link>
-                          <div className="font-mono text-[12px] text-text-dim">
+                          </span>
+                          <div className="font-mono text-[12px] tabular-nums text-text-dim">
                             {employee.employeeCode}
                           </div>
                         </td>
@@ -176,9 +199,12 @@ export function EmployeesListPage() {
                             : '—'}
                         </td>
                         <td className="px-5 py-3.5">
-                          <Chip tone={STATUS_TONE[employee.employmentStatus]}>
-                            {STATUS_LABEL[employee.employmentStatus]}
-                          </Chip>
+                          <div className="flex items-center gap-1.5">
+                            <Chip tone={STATUS_TONE[employee.employmentStatus]}>
+                              {STATUS_LABEL[employee.employmentStatus]}
+                            </Chip>
+                            {!employee.accountClaimed && <Chip tone="warning">Invited</Chip>}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -215,6 +241,10 @@ export function EmployeesListPage() {
           )}
         </Card>
       </Reveal>
+
+      {adding && <AddEmployeeModal onClose={() => setAdding(false)} />}
+      {bulkImporting && <BulkImportModal onClose={() => setBulkImporting(false)} />}
+      {selected && <EmployeeDrawer employee={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

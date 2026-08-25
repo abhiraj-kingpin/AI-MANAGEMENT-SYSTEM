@@ -22,6 +22,7 @@ import type {
   CorrectAttendanceInput,
   GeoPointInput,
   ListAttendanceQuery,
+  ManualAttendanceInput,
   RequestCorrectionInput,
   SyncPunchInput,
 } from './attendance.validators';
@@ -69,7 +70,10 @@ function sanitizeForAudit(doc: object): Record<string, unknown> {
 }
 
 async function buildAttendanceFilter(
-  query: Pick<ListAttendanceQuery, 'employeeId' | 'departmentId' | 'status' | 'from' | 'to'>,
+  query: Pick<
+    ListAttendanceQuery,
+    'employeeId' | 'departmentId' | 'status' | 'from' | 'to' | 'hasPendingCorrection'
+  >,
   actor: ActorContext,
 ): Promise<Record<string, unknown>> {
   const filter: Record<string, unknown> = {};
@@ -95,6 +99,7 @@ async function buildAttendanceFilter(
   }
 
   if (query.status) filter.status = query.status;
+  if (query.hasPendingCorrection) filter['correctionRequest.status'] = 'pending';
   if (query.from || query.to) {
     const dateFilter: Record<string, unknown> = {};
     if (query.from) dateFilter.$gte = startOfUtcDay(query.from);
@@ -467,6 +472,51 @@ export const attendanceService = {
       entityType: 'Attendance',
       entityId: attendance.id as string,
       before,
+      after: sanitizeForAudit(attendance.toObject()),
+    });
+
+    return toAttendanceDTO(attendance);
+  },
+
+  // "Add missing attendance" — backfills a day that has no attendance
+  // record at all (a full no-show that was actually excused, a device that
+  // never synced, ...). Distinct from correctAttendance, which edits a
+  // record that already exists.
+  async createManualRecord(
+    input: ManualAttendanceInput,
+    actor: ActorContext,
+  ): Promise<AttendanceDTO> {
+    const date = startOfUtcDay(input.date);
+    const existing = await Attendance.findOne({ employeeId: input.employeeId, date });
+    if (existing) {
+      throw AppError.conflict(
+        'This employee already has an attendance record for that date — use Correct instead.',
+        'ATTENDANCE_ALREADY_EXISTS',
+      );
+    }
+
+    const attendance = new Attendance({
+      employeeId: input.employeeId,
+      date,
+      method: 'manual',
+      checkInAt: input.checkInAt ?? null,
+      checkOutAt: input.checkOutAt ?? null,
+      status: input.status,
+      isCorrected: true,
+      correctedBy: actor.employeeId ? new Types.ObjectId(actor.employeeId) : null,
+      correctionReason: input.reason,
+    });
+
+    const shift = await resolveShift(input.employeeId, date);
+    recomputeWorkingHours(attendance, shift.workdayMinutes);
+    await attendance.save();
+
+    await recordAudit({
+      actorId: actor.id,
+      action: 'attendance.manual.create',
+      entityType: 'Attendance',
+      entityId: attendance.id as string,
+      before: null,
       after: sanitizeForAudit(attendance.toObject()),
     });
 

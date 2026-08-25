@@ -9,6 +9,7 @@ import {
   checkOutSchema,
   correctAttendanceSchema,
   listAttendanceQuerySchema,
+  manualAttendanceSchema,
   myAttendanceQuerySchema,
   requestCorrectionSchema,
   reviewCorrectionSchema,
@@ -56,6 +57,12 @@ router.post(
   attendanceController.absenceSweep,
 );
 
+router.post(
+  '/manual',
+  requireRole('super_admin', 'hr'),
+  validate(manualAttendanceSchema),
+  attendanceController.createManualRecord,
+);
 router.patch(
   '/:id/correct',
   requireRole('super_admin', 'hr'),

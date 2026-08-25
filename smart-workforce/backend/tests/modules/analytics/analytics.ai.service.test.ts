@@ -3,6 +3,9 @@ import { mockQuery } from '../../utils/mockQuery';
 jest.mock('../../../src/modules/employees/employee.model', () => ({
   Employee: { find: jest.fn() },
 }));
+jest.mock('../../../src/modules/departments/department.model', () => ({
+  Department: { find: jest.fn() },
+}));
 jest.mock('../../../src/modules/attendance/attendance.model', () => ({
   Attendance: { find: jest.fn(), aggregate: jest.fn() },
 }));
@@ -15,12 +18,14 @@ jest.mock('../../../src/modules/leaves/holiday.service', () => ({
 
 import { aiAnalyticsService } from '../../../src/modules/analytics/analytics.ai.service';
 import { Attendance } from '../../../src/modules/attendance/attendance.model';
+import { Department } from '../../../src/modules/departments/department.model';
 import { Employee } from '../../../src/modules/employees/employee.model';
 import { FaceEmbedding } from '../../../src/modules/face-recognition/faceEmbedding.model';
 import { getHolidayDatesInRange } from '../../../src/modules/leaves/holiday.service';
 import type { ActorContext } from '../../../src/shared/types/actorContext';
 
 const mockedEmployeeFind = Employee.find as unknown as jest.Mock;
+const mockedDepartmentFind = Department.find as unknown as jest.Mock;
 const mockedAttendanceFind = Attendance.find as unknown as jest.Mock;
 const mockedAttendanceAggregate = Attendance.aggregate as unknown as jest.Mock;
 const mockedFaceEmbeddingFind = FaceEmbedding.find as unknown as jest.Mock;
@@ -41,6 +46,11 @@ beforeEach(() => {
   mockedAttendanceFind.mockReturnValue(mockQuery([]));
   mockedAttendanceAggregate.mockResolvedValue([]);
   mockedFaceEmbeddingFind.mockReturnValue(mockQuery([]));
+  // getAbsenteeismTrend's department breakdown/drivers only run for an
+  // unscoped (non-manager) view — no departments by default so that branch
+  // resolves to empty rather than exercising per-department aggregation in
+  // every unrelated test.
+  mockedDepartmentFind.mockReturnValue(mockQuery([]));
 });
 
 describe('aiAnalyticsService.getLateRiskEmployees', () => {

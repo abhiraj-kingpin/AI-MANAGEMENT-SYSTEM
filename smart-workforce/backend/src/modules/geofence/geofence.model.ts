@@ -1,15 +1,25 @@
-import { type Document, Schema, model } from 'mongoose';
+import { type Document, Schema, type Types, model } from 'mongoose';
 
 export interface GeoJsonPoint {
   type: 'Point';
   coordinates: [number, number];
 }
 
+export const GEOFENCE_TYPES = ['building', 'floor', 'room'] as const;
+export type GeofenceType = (typeof GEOFENCE_TYPES)[number];
+
 export interface IGeofence extends Document {
   branchName: string;
   center: GeoJsonPoint;
   radiusMeters: number;
   isActive: boolean;
+  // Buildings carry their own geofence and stand alone (parentId null).
+  // Floors and rooms sit inside a building, inherit its center/radius for
+  // GPS matching, and exist mainly as capacity/roster bookkeeping — see
+  // Offices & Locations.
+  type: GeofenceType;
+  parentId: Types.ObjectId | null;
+  capacity: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +50,9 @@ const geofenceSchema = new Schema<IGeofence>(
     center: { type: geoJsonPointSchema, required: true },
     radiusMeters: { type: Number, required: true, default: 150, min: 10 },
     isActive: { type: Boolean, default: true },
+    type: { type: String, enum: GEOFENCE_TYPES, default: 'building' },
+    parentId: { type: Schema.Types.ObjectId, ref: 'Geofence', default: null, index: true },
+    capacity: { type: Number, default: null, min: 0 },
   },
   { timestamps: true },
 );

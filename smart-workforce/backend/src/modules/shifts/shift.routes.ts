@@ -5,13 +5,23 @@ import { validate } from '../../middlewares/validate.middleware';
 import * as shiftController from './shift.controller';
 import * as shiftAssignmentController from './shiftAssignment.controller';
 import { createShiftSchema, listShiftsQuerySchema, updateShiftSchema } from './shift.validators';
-import { assignShiftSchema, bulkAssignShiftSchema } from './shiftAssignment.validators';
+import {
+  assignShiftSchema,
+  bulkAssignShiftSchema,
+  listAssignmentsQuerySchema,
+} from './shiftAssignment.validators';
 
 const router = Router();
 
 router.use(authenticate);
 
 router.get('/me', shiftAssignmentController.getMyShift);
+router.get(
+  '/assignments',
+  requireRole('super_admin', 'hr'),
+  validate(listAssignmentsQuerySchema),
+  shiftAssignmentController.listRoster,
+);
 
 router.get(
   '/',

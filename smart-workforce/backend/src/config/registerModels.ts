@@ -16,4 +16,5 @@ import '../modules/qr/qrCode.model';
 import '../modules/geofence/geofence.model';
 import '../modules/face-recognition/faceEmbedding.model';
 import '../modules/audit/auditLog.model';
+import '../modules/settings/settings.model';
 import '../shared/counter/counter.model';

@@ -1,9 +1,7 @@
 name: ai_management_system
 description: "AI Management System — employee mobile app (GPS/QR/Face attendance, offline sync, leave, payroll)."
 publish_to: 'none'
-# 1.0.0+1 — the first production/Play Store submission. versionCode (the
-# +1) must increase on every future Play Store upload; versionName (1.0.0)
-# is the human-facing version shown in Settings/the Play listing.
+
 version: 1.0.0+1
 
 environment:
@@ -13,17 +11,16 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # State management (see docs/architecture/06-tech-stack-justification.md)
+  
   flutter_riverpod: ^2.5.1
 
-  # Networking
+
   dio: ^5.5.0
 
-  # Routing
+ 
   go_router: ^14.2.0
 
-  # Offline-first local storage — Hive for the attendance sync queue (Phase 13),
-  # flutter_secure_storage for JWT access/refresh tokens (Keychain/Keystore).
+  
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   flutter_secure_storage: ^9.2.2
@@ -32,70 +29,36 @@ dependencies:
   intl: ^0.19.0
   cupertino_icons: ^1.0.8
 
-  # Work Pulse AI redesign — Plus Jakarta Sans / DM Mono (see
-  # shared/theme/wp_theme.dart). Pure-Dart, no native code, no Gradle
-  # surprises: bundles/downloads font files through Flutter's own font
-  # loader, same class of dependency as intl.
+  
   google_fonts: ^6.2.1
 
-  # Phase 11 — saving a downloaded payslip PDF to the device (see
-  # features/payslips/data/repositories_impl/payslip_repository_impl.dart).
+  
   path_provider: ^2.1.5
 
-  # Phase 6 — GPS attendance/geofencing (see core/services/location_service.dart).
-  # Pinned below 14.0.0 deliberately: geolocator 14.x resolves
-  # geolocator_android 5.x, whose Dart code calls `Color.toARGB32()` — a
-  # dart:ui API that doesn't exist yet on this project's pinned Flutter
-  # 3.24.0 (ci-mobile.yml), only on newer SDKs. 13.x's geolocator_android
-  # 4.6.2 has no such call. Both 4.6.2 and 5.x separately need the Gradle
-  # compatibility shim in android/build.gradle for their
-  # `flutter.compileSdkVersion` reference — see that file's comment. Both
-  # issues found via real local `flutter build apk` failures, not guessed.
+  
   geolocator: ^13.0.1
 
-  # Phase 8 — face check-in: camera capture + on-device face detection for
-  # a real liveness check (see core/services/camera_service.dart,
-  # features/face/).
+ 
   camera: ^0.11.0+2
   google_mlkit_face_detection: ^0.12.0
 
-  # Real on-device face embedding — the same w600k_mbf.onnx (InsightFace
-  # buffalo_s, MIT license) MobileFaceNet model the backend runs, via ONNX
-  # Runtime's own Flutter binding (FFI over the native onnxruntime C API),
-  # not TFLite. Written with no Flutter/Dart SDK available, then confirmed
-  # by ci-mobile.yml (flutter analyze/test/build apk all passing — see
-  # features/face/domain/embedding/mobile_face_net_embedding_generator.dart's
-  # doc comment for the full story). `image` decodes the captured JPEG
-  # frame into pixel data for alignment/preprocessing
-  # (`features/face/domain/embedding/face_alignment.dart`); the geometric
-  # placeholder that used to be the only option is kept as
-  # `GeometricEmbeddingGenerator`, now a same-device fallback rather than
-  # the only path (see FaceEmbeddingGenerator).
+  
   onnxruntime: ^1.4.1
   image: ^4.9.1
 
-  # Phase 7 — QR check-in: scans the same token the backend encodes into
-  # the QR image it generates (see core/services/... — QrCheckInScreen
-  # owns the plugin's MobileScannerController/MobileScanner widget
-  # directly, the same "presentation layer touches the plugin type"
-  # exception FaceCheckInScreen already has for CameraController/CameraPreview).
+  
   mobile_scanner: ^6.0.2
 
-  # Opens the payslip PDF path_provider already saves, instead of just
-  # reporting it via SnackBar (see PayslipsScreen) — the one plugin this
-  # pass adds.
+  
   open_filex: ^4.5.0
 
-  # Added in its respective phase (kept here as a reference, not yet used):
-  # firebase_messaging, firebase_core — Phase 12, push notifications
+  
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  # Dev-only: generates the real per-platform launcher icon files (mipmap/
-  # Assets.xcassets) from assets/images/logo.png via `dart run
-  # flutter_launcher_icons` — not a runtime dependency of the app itself.
+  
   flutter_launcher_icons: ^0.14.1
 
 flutter_launcher_icons:
@@ -103,14 +66,7 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/images/logo.png"
   min_sdk_android: 23
-  # Adaptive icon (API 26+) — without this, flutter_launcher_icons only
-  # generates the legacy square mipmap PNGs, which every launcher then
-  # renders with hard corners instead of masking it into a circle/squircle/
-  # rounded-square like every other icon on the device. logo.png already
-  # has its own solid #14304F (WPColors.accent — Midnight Navy, the Office
-  # App mark) background baked in with generous padding around the glyph,
-  # so reusing it as the foreground layer over the same background color
-  # blends seamlessly rather than showing a visible seam.
+  
   adaptive_icon_background: "#14304F"
   adaptive_icon_foreground: "assets/images/logo.png"
 
@@ -118,10 +74,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    # w600k_mbf.onnx (13.6MB) — same file as backend/models/w600k_mbf.onnx,
-    # same provenance/checksum (see that directory and
-    # features/face/domain/embedding/mobile_face_net_embedding_generator.dart).
-    # Listed as a file, not a directory, deliberately: an asset directory
-    # entry bundles everything under it, and this is the only file in
-    # assets/models/.
+   
     - assets/models/w600k_mbf.onnx

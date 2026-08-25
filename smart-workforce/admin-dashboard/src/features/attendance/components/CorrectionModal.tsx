@@ -4,6 +4,7 @@ import { Field, Input, Select } from '@/shared/ui/Field';
 import { Modal } from '@/shared/ui/Modal';
 import { useCorrectAttendance } from '@/features/attendance/hooks/useAttendanceMutations';
 import { apiErrorMessage } from '@/shared/lib/apiError';
+import { pushToast } from '@/stores/toastStore';
 import type { Attendance, AttendanceStatus } from '@/types/api';
 
 const STATUS_OPTIONS: AttendanceStatus[] = ['present', 'late', 'half_day', 'absent', 'on_leave'];
@@ -37,7 +38,10 @@ export function CorrectionModal({
         },
       },
       {
-        onSuccess: onClose,
+        onSuccess: () => {
+          pushToast('Attendance corrected');
+          onClose();
+        },
         onError: (err) => setError(apiErrorMessage(err)),
       },
     );

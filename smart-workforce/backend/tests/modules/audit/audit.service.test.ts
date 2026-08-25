@@ -3,16 +3,24 @@ import { mockQuery } from '../../utils/mockQuery';
 jest.mock('../../../src/modules/audit/auditLog.model', () => ({
   AuditLog: { create: jest.fn(), find: jest.fn(), countDocuments: jest.fn() },
 }));
+jest.mock('../../../src/modules/users/user.model', () => ({
+  User: { find: jest.fn() },
+}));
 
 import { listAuditLogs, recordAudit } from '../../../src/modules/audit/audit.service';
 import { AuditLog } from '../../../src/modules/audit/auditLog.model';
+import { User } from '../../../src/modules/users/user.model';
 
 const mockedCreate = AuditLog.create as unknown as jest.Mock;
 const mockedFind = AuditLog.find as unknown as jest.Mock;
 const mockedCount = AuditLog.countDocuments as unknown as jest.Mock;
+const mockedUserFind = User.find as unknown as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Actor-email lookup — no console users by default; individual tests
+  // that care about the mapped email override this.
+  mockedUserFind.mockReturnValue(mockQuery([]));
 });
 
 describe('recordAudit', () => {

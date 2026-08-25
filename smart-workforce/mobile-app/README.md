@@ -8,7 +8,7 @@ Flutter · Clean Architecture (data/domain/presentation) · Riverpod · Dio · G
 ## Setup
 
 ```bash
-flutter --version                 # confirm the SDK is installed (3.24+)
+flutter --version               
 flutter pub get
 flutter analyze
 flutter test

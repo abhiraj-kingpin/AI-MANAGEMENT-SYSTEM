@@ -9,6 +9,7 @@ import { startOfUtcDay } from '../../shared/utils/dateTime';
 import { resolveEmployeeRefs } from '../../shared/utils/employeeRef';
 import { getManagedEmployeeIds } from '../../shared/utils/teamScope';
 import { Attendance } from '../attendance/attendance.model';
+import { recordAudit } from '../audit/audit.service';
 import { Employee } from '../employees/employee.model';
 import { notify } from '../notifications/notification.service';
 import { getHolidayDatesInRange } from './holiday.service';
@@ -312,6 +313,15 @@ export const leaveService = {
     }
 
     await leave.save();
+
+    await recordAudit({
+      actorId: actor.id,
+      action: `leave.${decision}`,
+      entityType: 'Leave',
+      entityId: leave.id as string,
+      before: null,
+      after: { status: leave.status, managerComment: leave.managerComment ?? null },
+    });
 
     logger.info(`Leave ${leaveId} ${decision} by user ${actor.id}`);
     await notify(

@@ -5,8 +5,15 @@ import { AppError } from '../../shared/errors/AppError';
 import { signQrToken, verifyQrToken } from '../../shared/utils/tokens';
 import { Geofence } from '../geofence/geofence.model';
 import { QRCode } from './qrCode.model';
-import { type QrCodeWithImageDTO, toQrCodeDTO } from './qr.types';
+import {
+  type QrCodeLifecycleRowDTO,
+  type QrCodeWithImageDTO,
+  toQrCodeDTO,
+  toQrLifecycleRow,
+} from './qr.types';
 import type { GenerateQrInput } from './qr.validators';
+
+const RECENT_CODES_LIMIT = 50;
 
 export const qrService = {
   async generate(input: GenerateQrInput, generatedBy: string): Promise<QrCodeWithImageDTO> {
@@ -49,8 +56,25 @@ export const qrService = {
     if (!qr) {
       throw AppError.notFound('QR code not found.');
     }
-    qr.validTo = new Date();
+    const now = new Date();
+    qr.validTo = now;
+    qr.revokedAt = now;
     await qr.save();
+  },
+
+  // Code-lifecycle table for the QR Attendance console — recent codes
+  // across every office, newest first.
+  async listRecent(): Promise<QrCodeLifecycleRowDTO[]> {
+    const codes = await QRCode.find().sort({ createdAt: -1 }).limit(RECENT_CODES_LIMIT);
+    if (codes.length === 0) return [];
+
+    const geofenceIds = [...new Set(codes.map((c) => String(c.geofenceId)))];
+    const geofences = await Geofence.find({ _id: { $in: geofenceIds } }).select('branchName');
+    const officeNameById = new Map(geofences.map((g) => [String(g._id), g.branchName]));
+
+    return codes.map((c) =>
+      toQrLifecycleRow(c, officeNameById.get(String(c.geofenceId)) ?? 'Unknown office', c.usedBy.length),
+    );
   },
 };
 

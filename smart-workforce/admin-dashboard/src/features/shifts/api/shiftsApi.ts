@@ -3,6 +3,8 @@ import type {
   ApiSuccess,
   AssignShiftInput,
   CreateShiftInput,
+  ListRosterQuery,
+  RosterEmployee,
   Shift,
   ShiftAssignment,
   UpdateShiftInput,
@@ -37,4 +39,11 @@ export async function fetchMyShift(): Promise<ShiftAssignment | null> {
 export async function assignShift(input: AssignShiftInput): Promise<ShiftAssignment> {
   const res = await api.post<ApiSuccess<{ assignment: ShiftAssignment }>>('/shifts/assign', input);
   return res.data.data.assignment;
+}
+
+export async function fetchRoster(query: ListRosterQuery): Promise<RosterEmployee[]> {
+  const res = await api.get<ApiSuccess<RosterEmployee[]>>('/shifts/assignments', {
+    params: query,
+  });
+  return res.data.data;
 }

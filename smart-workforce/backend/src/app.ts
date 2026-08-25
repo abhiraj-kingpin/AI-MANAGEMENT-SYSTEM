@@ -26,7 +26,9 @@ import { payrollRunRouter } from './modules/payroll/payrollRun.routes';
 import { payslipRouter } from './modules/payroll/payslip.routes';
 import { salaryRouter } from './modules/payroll/salary.routes';
 import { qrRouter } from './modules/qr/qr.routes';
+import { settingsRouter } from './modules/settings/settings.routes';
 import { shiftRouter } from './modules/shifts/shift.routes';
+import { userRouter } from './modules/users/user.routes';
 
 export function createApp(): Application {
   const app = express();
@@ -78,6 +80,8 @@ export function createApp(): Application {
   app.use(`${env.API_PREFIX}/notifications`, notificationRouter);
   app.use(`${env.API_PREFIX}/analytics`, analyticsRouter);
   app.use(`${env.API_PREFIX}/audit-logs`, auditRouter);
+  app.use(`${env.API_PREFIX}/users`, userRouter);
+  app.use(`${env.API_PREFIX}/settings`, settingsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

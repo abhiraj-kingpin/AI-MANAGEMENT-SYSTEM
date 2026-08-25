@@ -22,3 +22,8 @@ export const revokeQr = asyncHandler(async (req, res) => {
   await qrService.revoke(req.params.id);
   sendSuccess(res, { status: 'ok' });
 });
+
+export const listRecentQr = asyncHandler(async (_req, res) => {
+  const rows = await qrService.listRecent();
+  sendSuccess(res, rows);
+});

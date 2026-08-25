@@ -1,6 +1,13 @@
+import type { EmployeeRefDTO } from '../../shared/utils/employeeRef';
 import type { IShiftAssignment } from './shiftAssignment.model';
 import { type ShiftDTO, toShiftDTO } from './shift.types';
 import type { IShift } from './shift.model';
+
+export interface RosterEmployeeDTO {
+  employee: EmployeeRefDTO;
+  departmentId: string;
+  assignments: Array<{ shift: ShiftDTO; effectiveFrom: Date; effectiveTo: Date | null }>;
+}
 
 export interface ShiftAssignmentDTO {
   id: string;

@@ -11,6 +11,7 @@ router.use(authenticate, requireRole('super_admin', 'hr'));
 
 router.post('/generate', validate(generateQrSchema), qrController.generateQr);
 router.get('/active', validate(activeQrQuerySchema), qrController.activeQr);
+router.get('/recent', qrController.listRecentQr);
 router.post('/:id/revoke', qrController.revokeQr);
 
 export { router as qrRouter };

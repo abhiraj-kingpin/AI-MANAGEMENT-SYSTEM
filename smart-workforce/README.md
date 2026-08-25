@@ -66,7 +66,7 @@ Each successful check-in/out feeds working-hours, overtime, and late/half-day ca
 
 **Leave, shifts, payroll, notifications** — An employee applies for leave or views their shift/payslip from the mobile app; HR/managers review and act on it from the admin dashboard. Payroll runs as a batch job over a pay period's attendance records, producing downloadable PDF payslips. Any state change (leave approved, payslip released, broadcast message, etc.) creates an in-app notification, and can also fan out as a push notification.
 
-**AI-driven insights** — The backend continuously analyzes attendance data to power the admin dashboard's "AI Insights" screen: a late-arrival risk ranking, an absenteeism forecast, and an anomaly sweep (unusual check-in locations, duplicate faces across employees, overtime outliers) — surfaced as transparent statistics rather than opaque black-box scores.
+**AI-driven insights** — The backend continuously analyzes attendance data to power the admin dashboard's "AI Insights" screen: a late-arrival risk ranking, an absenteeism forecast (with a confidence interval, a month-over-month trend, an R² fit statistic, a held-out backtest error, and a real headcount-weighted per-department contribution breakdown — not a narrative "cause"), and an anomaly sweep (unusual check-in locations, duplicate faces across employees, overtime outliers) — surfaced as transparent statistics rather than opaque black-box scores. An Alerts Center aggregates these same signals, plus pending corrections, leave, and payroll exceptions, into one actionable feed with act/snooze.
 
 ## Features
 
@@ -74,19 +74,46 @@ Each successful check-in/out feeds working-hours, overtime, and late/half-day ca
 - GPS, QR, and Face check-in/check-out, all feeding the same attendance record
 - Geofenced offices, time-boxed signed QR codes, on-device liveness-checked face recognition
 - Offline queue with automatic sync once back online
-- HR/Manager reporting with filters, corrections, and an employee-initiated correction/approval workflow
+- HR/Manager reporting with filters, a corrections queue (old → new, approve/reject), and manual
+  backfill for a day with no punch at all
+- Live Attendance: real-time state cards (currently working, checked in, late, not checked in, on
+  leave, checked out) that filter a live table
+
+**Departments**
+- Head of department, headcount, attendance %, on-leave count, and a coverage bar per department
+- "View team" jumps straight into Employees pre-filtered to that department
 
 **Leave Management**
 - Self-service apply/cancel with real balance accounting (business days + holidays)
 - Approval/rejection queue for HR and managers
+- Company-wide Leave Calendar: a month grid with per-person initials chips (approved vs pending)
+  and holidays, filterable by department/leave type/status/month, plus an upcoming-holidays list
 
 **Shift Scheduling**
-- Shift definitions with single/bulk employee assignment
+- Shift definitions with single/bulk employee assignment and a per-shift coverage bar
+- A weekly roster grid — one row per employee, one column per day, click a cell to reassign
 - Employee-facing read-only shift view, driving attendance's late/overtime math
 
 **Payroll**
 - Salary structures (allowances/deductions)
 - Batch payslip generation per pay period, with downloadable PDFs
+- A dedicated Payslips console: generated/released counts for the month, release-all, and
+  per-row PDF download
+
+**Offices & Locations**
+- Buildings carry their own geofence (visualized as a square with a computed side length);
+  floors and rooms sit inside a building and inherit it
+- Assigned headcount and today's attendance rate per office, computed from real employee/attendance
+  data — an employee's primary office is set on their profile
+
+**Face Management**
+- Enrolment stats (enrolled, not registered, re-enrolment due, verifications today) and a
+  per-employee enrolment table — the console only ever shows enrolment *state*, never a raw
+  biometric template
+
+**QR Attendance**
+- Per-office signed, time-boxed QR generation, plus a code-lifecycle table across every office
+  (code, office, issued, scan count, and derived Active/Expired/Revoked state)
 
 **Notifications**
 - In-app inbox with read/unread state
@@ -94,14 +121,26 @@ Each successful check-in/out feeds working-hours, overtime, and late/half-day ca
 - Push notification delivery via Firebase
 
 **AI-Powered Analytics** *(admin dashboard)*
-- Dashboard KPIs, attendance trend chart, department comparison
-- Late-arrival risk ranking and absenteeism forecast
+- Dashboard KPIs, attendance trend chart, department comparison, punctuality by department, and
+  overtime concentration, with CSV/PDF/Excel export
+- Late-arrival risk ranking and an absenteeism forecast (confidence interval, trend, R², backtest
+  error, and a real per-department contribution breakdown)
 - Anomaly detection (rule-based checks plus an unsupervised ML model over attendance data)
+- An Alerts Center that turns those signals — plus pending corrections, leave, and payroll
+  exceptions — into one actionable, filterable, snoozable feed
+
+**Administration**
+- Users & Roles: who can sign into the console, an invite flow, and a role/permission matrix
+- Settings: attendance rules (grace period, auto-absent, geofence requirement), leave approval
+  policy, AI/analytics toggles, and payroll cut-off/retention — all persisted, not local-only
+- Audit Logs: an append-only trail of actor, action, target, source, and result, with before/after
+  values where something changed
 
 **Security & Access Control**
 - JWT access + rotating refresh tokens, role-based access control (RBAC)
 - Account lockout after repeated failed logins
-- Append-only audit trail
+- Append-only audit trail covering attendance corrections, employee changes, leave decisions,
+  payslip releases, office/geofence changes, and console-user invites
 
 ## Tech Stack
 

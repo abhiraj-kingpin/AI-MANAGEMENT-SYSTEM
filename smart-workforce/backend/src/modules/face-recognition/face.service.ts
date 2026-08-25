@@ -4,11 +4,16 @@ import { logger } from '../../config/logger';
 import { AppError } from '../../shared/errors/AppError';
 import { uploadBuffer } from '../../shared/services/fileUpload.service';
 import type { ActorContext } from '../../shared/types/actorContext';
+import { startOfUtcDay } from '../../shared/utils/dateTime';
 import { maxCosineSimilarity } from '../../shared/utils/vectorMath';
+import { Attendance } from '../attendance/attendance.model';
+import { Employee } from '../employees/employee.model';
 import { generateFaceEmbedding, NoFaceDetectedError } from './faceEmbedding.provider';
 import { FaceEmbedding } from './faceEmbedding.model';
 import { detectLiveness } from './livenessDetector';
 import type {
+  FaceEnrollmentRowDTO,
+  FaceEnrollmentStatsDTO,
   FaceRegisterResultDTO,
   FaceRegistrationStatusDTO,
   FaceVerifyResultDTO,
@@ -17,6 +22,11 @@ import type {
 const MIN_REGISTRATION_IMAGES = 3;
 const MAX_REGISTRATION_IMAGES = 5;
 const MIN_QUALITY_SCORE = 0.2;
+// A face registered longer ago than this is flagged "re-enrolment due" in
+// the admin console — templates drift from how someone actually looks
+// (haircuts, glasses, ageing) far enough back that a stale one starts
+// producing more false rejections at check-in.
+const RE_ENROLLMENT_DUE_DAYS = 180;
 
 function resolveTargetEmployeeId(requested: string | undefined, actor: ActorContext): string {
   const target = requested ?? actor.employeeId;
@@ -206,11 +216,91 @@ export const faceService = {
       embedding,
       embeddings.map((e) => e.vector),
     );
+    const matched = confidence >= env.FACE_MATCH_THRESHOLD;
 
-    return { matched: confidence >= env.FACE_MATCH_THRESHOLD, confidence };
+    if (matched) {
+      await FaceEmbedding.updateMany(
+        { employeeId: actor.employeeId, isActive: true },
+        { $set: { lastVerifiedAt: new Date() } },
+      );
+    }
+
+    return { matched, confidence };
   },
 
   async deleteFaceData(employeeId: string): Promise<void> {
     await FaceEmbedding.deleteMany({ employeeId });
+  },
+
+  // Face Management console — enrolment state per employee. Deliberately
+  // exposes nothing biometric: no vectors, no source images, just dates and
+  // a derived status.
+  async adminListEnrollments(): Promise<FaceEnrollmentRowDTO[]> {
+    const employees = await Employee.find({ isDeleted: false })
+      .select('employeeCode firstName lastName departmentId')
+      .populate({ path: 'departmentId', select: 'name' })
+      .sort({ firstName: 1 });
+
+    const embeddings = await FaceEmbedding.find({ isActive: true }).select(
+      'employeeId registeredAt lastVerifiedAt',
+    );
+    const byEmployee = new Map<string, { registeredAt: Date; lastVerifiedAt: Date | null }[]>();
+    for (const embedding of embeddings) {
+      const key = String(embedding.employeeId);
+      const list = byEmployee.get(key);
+      const entry = { registeredAt: embedding.registeredAt, lastVerifiedAt: embedding.lastVerifiedAt };
+      if (list) list.push(entry);
+      else byEmployee.set(key, [entry]);
+    }
+
+    const dueThreshold = Date.now() - RE_ENROLLMENT_DUE_DAYS * 24 * 60 * 60 * 1000;
+
+    return employees.map((employee) => {
+      const employeeId = String(employee._id);
+      const rows = byEmployee.get(employeeId);
+      const department = (employee.departmentId as unknown as { name?: string } | null)?.name ?? '—';
+
+      if (!rows || rows.length === 0) {
+        return {
+          employeeId,
+          employeeCode: employee.employeeCode,
+          name: `${employee.firstName} ${employee.lastName}`,
+          department,
+          status: 'not_registered',
+          enrolledAt: null,
+          lastVerifiedAt: null,
+        };
+      }
+
+      const enrolledAt = rows.reduce((latest, r) => (r.registeredAt > latest ? r.registeredAt : latest), rows[0].registeredAt);
+      const lastVerifiedAt = rows.reduce<Date | null>((latest, r) => {
+        if (!r.lastVerifiedAt) return latest;
+        if (!latest || r.lastVerifiedAt > latest) return r.lastVerifiedAt;
+        return latest;
+      }, null);
+
+      return {
+        employeeId,
+        employeeCode: employee.employeeCode,
+        name: `${employee.firstName} ${employee.lastName}`,
+        department,
+        status: enrolledAt.getTime() < dueThreshold ? 're_enrollment_due' : 'registered',
+        enrolledAt,
+        lastVerifiedAt,
+      };
+    });
+  },
+
+  async adminStats(): Promise<FaceEnrollmentStatsDTO> {
+    const rows = await faceService.adminListEnrollments();
+    const today = startOfUtcDay(new Date());
+    const verificationsToday = await Attendance.countDocuments({ method: 'face', date: today });
+
+    return {
+      enrolled: rows.filter((r) => r.status !== 'not_registered').length,
+      notRegistered: rows.filter((r) => r.status === 'not_registered').length,
+      reEnrollmentDue: rows.filter((r) => r.status === 're_enrollment_due').length,
+      verificationsToday,
+    };
   },
 };

@@ -1,10 +1,21 @@
 import { api } from '@/shared/lib/axios';
-import type { ApiSuccess, CreateGeofenceInput, Geofence, UpdateGeofenceInput } from '@/types/api';
+import type {
+  ApiSuccess,
+  CreateGeofenceInput,
+  Geofence,
+  OfficeSummary,
+  UpdateGeofenceInput,
+} from '@/types/api';
 
 export async function fetchGeofences(includeInactive = false): Promise<Geofence[]> {
   const res = await api.get<ApiSuccess<Geofence[]>>('/geofences', {
     params: includeInactive ? { includeInactive: 'true' } : undefined,
   });
+  return res.data.data;
+}
+
+export async function fetchOfficeSummary(): Promise<OfficeSummary[]> {
+  const res = await api.get<ApiSuccess<OfficeSummary[]>>('/geofences/summary');
   return res.data.data;
 }
 
