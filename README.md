@@ -1,164 +1,1056 @@
 # AI Management System
 
-An enterprise workforce management platform: GPS/QR/face attendance, leave, shift scheduling, payroll, and notifications — a Node.js/Express/TypeScript backend, a React admin dashboard, and a Flutter mobile app, all sharing one MongoDB database.
+## 1. What Is This System?
 
-## Overview
+AI Management System is an **employee/workforce management system**.
 
-Employees use the **mobile app** to check in/out, apply for leave, and view their shifts, payslips, and notifications. HR, managers, and admins use the **admin dashboard** to manage employees, review and correct attendance, approve leave, run payroll, and view AI-driven workforce insights. Both clients talk to the same **backend REST API**, which is the single source of truth for all workforce data.
+It helps a company manage:
 
-## Architecture
+* Employee attendance
+* GPS, QR and Face check-in
+* Leave
+* Shift schedules
+* Payroll
+* Notifications
+* Offices and locations
+* Employee face registration
+* Reports and analytics
+* AI-based workforce insights
+* Users, roles and permissions
 
-**Frontend** — React + Vite + TypeScript admin dashboard (Tailwind CSS, React Router, TanStack Query, Zustand) for HR/Manager/Admin use.
+The system has **three main parts**:
 
-**Backend** — Node.js + Express + TypeScript REST API. Role-based access control, JWT auth with rotating refresh tokens, and the face/GPS/QR attendance and analytics logic all live here.
+1. **Mobile App** — used by employees
+2. **Admin Dashboard** — used by HR, managers and admins
+3. **Backend API** — connects everything together
 
-**Database** — MongoDB (Mongoose), shared by the backend as the single data store for both clients.
+All important data is stored in **MongoDB**.
 
-**Mobile application** — Flutter employee app (Riverpod, Dio, GoRouter, Hive for the offline attendance queue), with on-device face detection/liveness/embedding via ML Kit and ONNX Runtime.
+---
 
-**External services** — Cloudinary (file storage), Firebase Cloud Messaging (push notifications), MongoDB Atlas and Render/Vercel for hosting.
+# 2. Simple System Flow
 
-## Project Structure
+The easiest way to understand the system is:
 
+```text
+              EMPLOYEE
+                 |
+                 v
+          ┌──────────────┐
+          │  Mobile App  │
+          └──────┬───────┘
+                 |
+                 | HTTPS + JWT
+                 v
+          ┌──────────────┐
+          │   Backend    │
+          │  REST API    │
+          └──────┬───────┘
+                 |
+        ┌────────┼────────┐
+        |        |        |
+        v        v        v
+    MongoDB  Cloudinary  Firebase
+      Data      Files      Push
+                 ^
+                 |
+          ┌──────┴───────┐
+          │Admin Dashboard│
+          └──────────────┘
+                 ^
+                 |
+          HR / Manager / Admin
 ```
+
+### In simple words
+
+**Mobile App**
+
+Employees use the app to:
+
+* Login
+* Check in
+* Check out
+* Apply for leave
+* See shifts
+* See payslips
+* See notifications
+
+**Admin Dashboard**
+
+HR, managers and admins use the dashboard to:
+
+* Manage employees
+* Check attendance
+* Correct attendance
+* Approve leave
+* Manage shifts
+* Run payroll
+* Manage offices
+* View reports
+* View AI insights
+* Manage users and permissions
+
+**Backend**
+
+The backend is the **main brain of the system**.
+
+It:
+
+* Receives requests from the mobile app and dashboard
+* Checks authentication
+* Checks user permissions
+* Validates data
+* Runs business logic
+* Saves and reads data from MongoDB
+* Sends notifications
+* Calculates attendance and payroll
+* Runs analytics
+
+---
+
+# 3. Project Structure
+
+```text
 smart-workforce/
-├── backend/            Express + TypeScript REST API + MongoDB
-├── admin-dashboard/    React + Vite + TypeScript — HR/Manager/Admin web console
-├── mobile-app/         Flutter — employee self-service app
-└── docs/architecture/  Original system design docs: schema, API contract, auth flow, deployment
+│
+├── backend/
+│   └── Node.js + Express + TypeScript API
+│
+├── admin-dashboard/
+│   └── React web application
+│
+├── mobile-app/
+│   └── Flutter employee application
+│
+└── docs/
+    └── Architecture and system documentation
 ```
 
-## How It Works
+---
 
+# 4. Who Uses the System?
+
+There are four main roles:
+
+| Role        | What They Can Do                               |
+| ----------- | ---------------------------------------------- |
+| Super Admin | Full system access                             |
+| HR          | Employees, attendance, leave, payroll, reports |
+| Manager     | Manage/review their own team                   |
+| Employee    | Attendance, leave, shifts, payslips            |
+
+The backend checks the user's role before allowing an operation.
+
+For example:
+
+```text
+Employee
+   ↓
+Can see own attendance
+
+Manager
+   ↓
+Can see/manage their team
+
+HR
+   ↓
+Can manage company workforce
+
+Super Admin
+   ↓
+Full access
 ```
- ┌───────────────┐        ┌──────────────────┐
- │  Mobile App    │        │  Admin Dashboard  │
- │  (employees)   │        │  (HR/Manager/Admin)│
- └───────┬────────┘        └─────────┬─────────┘
-         │        HTTPS + JWT        │
-         └─────────────┬─────────────┘
-                        ▼
-              ┌───────────────────┐
-              │   Backend REST API │
-              │  (Express, RBAC)   │
-              └─────────┬──────────┘
-                        │
-          ┌─────────────┼─────────────┐
-          ▼             ▼             ▼
-     ┌─────────┐  ┌───────────┐ ┌───────────┐
-     │ MongoDB  │  │ Cloudinary │ │  Firebase  │
-     │ (data)   │  │ (files)    │ │  (push)    │
-     └─────────┘  └───────────┘ └───────────┘
+
+---
+
+# 5. Login Flow
+
+When a user logs in:
+
+```text
+User enters email + password
+            ↓
+       Mobile/Dashboard
+            ↓
+         Backend
+            ↓
+   Check email/password
+            ↓
+      Check account status
+            ↓
+       Create tokens
+            ↓
+ Return access + refresh token
+            ↓
+ User is logged in
 ```
 
-**Auth** — A user logs in with email/password; the backend issues a short-lived JWT access token plus a rotating refresh token. The access token is sent on every request and is checked against the caller's role (`super_admin` / `hr` / `manager` / `employee`) at the route, and against *which record* they're allowed to touch inside the service layer (e.g. a manager only sees their own team).
+The system uses:
 
-**Attendance check-in** — From the mobile app, an employee checks in one of three ways:
-- **GPS**: the app sends its coordinates; the backend confirms they fall inside a registered office geofence.
-- **QR**: the app scans a time-boxed, signed QR code the admin dashboard generates per office location.
-- **Face**: the app captures a photo, detects the face, runs an on-device liveness check (to reject photos/video replays), generates a face embedding, and sends it to the backend, which compares it against the employee's stored embedding.
+* JWT access token
+* Rotating refresh token
+* Role-based access control
+* Account lockout after repeated failed logins
 
-Each successful check-in/out feeds working-hours, overtime, and late/half-day calculations, which in turn drive payroll and the admin dashboard's attendance reports.
+The access token is sent with API requests.
 
-**Face registration** — Before face check-in works, an employee registers their face (via the mobile app or an admin-side upload): several frames are captured, a face is detected and aligned, and an embedding vector is generated and stored. Check-in later compares a fresh embedding against that stored vector rather than the raw photo.
+The backend checks:
 
-**Offline mode** — If the mobile app has no connectivity when an employee checks in, the attempt is queued on-device; once the connection returns, the app syncs the queue with the backend automatically.
+1. Is the user logged in?
+2. What role does the user have?
+3. Is the user allowed to perform this action?
+4. Which records can the user access?
 
-**Leave, shifts, payroll, notifications** — An employee applies for leave or views their shift/payslip from the mobile app; HR/managers review and act on it from the admin dashboard. Payroll runs as a batch job over a pay period's attendance records, producing downloadable PDF payslips. Any state change (leave approved, payslip released, broadcast message, etc.) creates an in-app notification, and can also fan out as a push notification.
+---
 
-**AI-driven insights** — The backend continuously analyzes attendance data to power the admin dashboard's "AI Insights" screen: a late-arrival risk ranking, an absenteeism forecast (with a confidence interval, a month-over-month trend, an R² fit statistic, a held-out backtest error, and a real headcount-weighted per-department contribution breakdown — not a narrative "cause"), and an anomaly sweep (unusual check-in locations, duplicate faces across employees, overtime outliers) — surfaced as transparent statistics rather than opaque black-box scores. An Alerts Center aggregates these same signals, plus pending corrections, leave, and payroll exceptions, into one actionable feed with act/snooze.
+# 6. Attendance Flow
 
-## Features
+Attendance is one of the main parts of the system.
 
-**Attendance**
-- GPS, QR, and Face check-in/check-out, all feeding the same attendance record
-- Geofenced offices, time-boxed signed QR codes, on-device liveness-checked face recognition
-- Offline queue with automatic sync once back online
-- HR/Manager reporting with filters, a corrections queue (old → new, approve/reject), and manual
-  backfill for a day with no punch at all
-- Live Attendance: real-time state cards (currently working, checked in, late, not checked in, on
-  leave, checked out) that filter a live table
+Employees can check in/out using:
 
-**Departments**
-- Head of department, headcount, attendance %, on-leave count, and a coverage bar per department
-- "View team" jumps straight into Employees pre-filtered to that department
+* GPS
+* QR Code
+* Face Recognition
 
-**Leave Management**
-- Self-service apply/cancel with real balance accounting (business days + holidays)
-- Approval/rejection queue for HR and managers
-- Company-wide Leave Calendar: a month grid with per-person initials chips (approved vs pending)
-  and holidays, filterable by department/leave type/status/month, plus an upcoming-holidays list
+All three methods eventually create/update the **same attendance system**.
 
-**Shift Scheduling**
-- Shift definitions with single/bulk employee assignment and a per-shift coverage bar
-- A weekly roster grid — one row per employee, one column per day, click a cell to reassign
-- Employee-facing read-only shift view, driving attendance's late/overtime math
+---
 
-**Payroll**
-- Salary structures (allowances/deductions)
-- Batch payslip generation per pay period, with downloadable PDFs
-- A dedicated Payslips console: generated/released counts for the month, release-all, and
-  per-row PDF download
+## 6.1 GPS Attendance
 
-**Offices & Locations**
-- Buildings carry their own geofence (visualized as a square with a computed side length);
-  floors and rooms sit inside a building and inherit it
-- Assigned headcount and today's attendance rate per office, computed from real employee/attendance
-  data — an employee's primary office is set on their profile
+```text
+Employee opens app
+       ↓
+Selects Check In
+       ↓
+App gets GPS location
+       ↓
+Location sent to Backend
+       ↓
+Backend checks office geofence
+       ↓
+Inside allowed area?
+     /       \
+   YES        NO
+    ↓          ↓
+ Check In    Reject
+```
 
-**Face Management**
-- Enrolment stats (enrolled, not registered, re-enrolment due, verifications today) and a
-  per-employee enrolment table — the console only ever shows enrolment *state*, never a raw
-  biometric template
+The employee can check in only when their location satisfies the configured office geofence.
 
-**QR Attendance**
-- Per-office signed, time-boxed QR generation, plus a code-lifecycle table across every office
-  (code, office, issued, scan count, and derived Active/Expired/Revoked state)
+---
 
-**Notifications**
-- In-app inbox with read/unread state
-- Org-wide or department broadcasts from the admin dashboard
-- Push notification delivery via Firebase
+# 7. QR Attendance
 
-**AI-Powered Analytics** *(admin dashboard)*
-- Dashboard KPIs, attendance trend chart, department comparison, punctuality by department, and
-  overtime concentration, with CSV/PDF/Excel export
-- Late-arrival risk ranking and an absenteeism forecast (confidence interval, trend, R², backtest
-  error, and a real per-department contribution breakdown)
-- Anomaly detection (rule-based checks plus an unsupervised ML model over attendance data)
-- An Alerts Center that turns those signals — plus pending corrections, leave, and payroll
-  exceptions — into one actionable, filterable, snoozable feed
+The admin dashboard can generate a QR code for an office.
 
-**Administration**
-- Users & Roles: who can sign into the console, an invite flow, and a role/permission matrix
-- Settings: attendance rules (grace period, auto-absent, geofence requirement), leave approval
-  policy, AI/analytics toggles, and payroll cut-off/retention — all persisted, not local-only
-- Audit Logs: an append-only trail of actor, action, target, source, and result, with before/after
-  values where something changed
+The QR code is:
 
-**Security & Access Control**
-- JWT access + rotating refresh tokens, role-based access control (RBAC)
-- Account lockout after repeated failed logins
-- Append-only audit trail covering attendance corrections, employee changes, leave decisions,
-  payslip releases, office/geofence changes, and console-user invites
+* Signed
+* Time-limited
+* Associated with an office
 
-## Tech Stack
+Flow:
 
-| Layer            | Stack                                                                                  |
-| ----------------- | --------------------------------------------------------------------------------------- |
-| Backend           | Node.js, Express, TypeScript, MongoDB (Mongoose)                                        |
-| Admin Dashboard   | React, Vite, TypeScript, Tailwind CSS, React Router, Axios, TanStack Query, Zustand      |
-| Mobile            | Flutter, Riverpod, Dio, GoRouter, Hive, ML Kit + ONNX Runtime                            |
-| Infra             | MongoDB Atlas, Cloudinary, Firebase Cloud Messaging, Docker                              |
+```text
+Admin creates QR
+      ↓
+Backend generates signed QR
+      ↓
+Employee scans QR
+      ↓
+Mobile app sends QR information
+      ↓
+Backend validates QR
+      ↓
+QR valid?
+   /      \
+ YES       NO
+  ↓         ↓
+Check In  Reject
+```
 
-## Getting Started
+The system also tracks the QR lifecycle, such as:
 
-Each project is independently runnable — see its own README for exact steps:
+* Issued
+* Active
+* Expired
+* Revoked
+* Scan count
 
-- **Backend**: [backend/README.md](backend/README.md) — `npm install && npm run dev`, or `docker compose up --build` for API + MongoDB.
-- **Admin dashboard**: [admin-dashboard/README.md](admin-dashboard/README.md) — `npm install && npm run dev`.
-- **Mobile app**: [mobile-app/README.md](mobile-app/README.md) — `flutter pub get && flutter run`.
+---
 
-## License
+# 8. Face Attendance
 
-Proprietary — internal enterprise project.
+Face attendance uses the employee's registered face.
+
+Before using face attendance, the employee must register their face.
+
+### Face Registration
+
+```text
+Employee starts registration
+          ↓
+Capture several face frames
+          ↓
+Detect face
+          ↓
+Align face
+          ↓
+Generate face embedding
+          ↓
+Store embedding
+```
+
+The system stores the **face embedding**, not the raw face image as the attendance identity.
+
+### Face Check-In
+
+```text
+Employee selects Face Check-In
+          ↓
+Camera captures face
+          ↓
+Face detected
+          ↓
+Liveness check
+          ↓
+Generate face embedding
+          ↓
+Send embedding to Backend
+          ↓
+Compare with registered embedding
+          ↓
+Match?
+       /      \
+     YES       NO
+      ↓         ↓
+   Check In   Reject
+```
+
+The liveness check helps prevent someone from simply showing a photo or video replay.
+
+---
+
+# 9. Offline Attendance
+
+The mobile app can handle attendance when there is no internet connection.
+
+```text
+Employee checks in
+       ↓
+No internet
+       ↓
+Save attendance attempt
+on device
+       ↓
+Internet comes back
+       ↓
+App automatically syncs
+       ↓
+Backend processes request
+       ↓
+Attendance updated
+```
+
+The mobile app uses an offline queue for this.
+
+---
+
+# 10. Attendance Calculation
+
+After a successful check-in/check-out, the system can calculate:
+
+* Working hours
+* Late arrival
+* Overtime
+* Half-day
+* Attendance status
+
+Example:
+
+```text
+Check In: 09:30
+Check Out: 18:30
+       ↓
+Backend calculates
+       ↓
+Working hours
+Late status
+Overtime
+       ↓
+Attendance record
+       ↓
+Used by reports + payroll
+```
+
+Attendance data is also used by the analytics system.
+
+---
+
+# 11. Leave Management Flow
+
+Employees can apply for leave from the mobile app.
+
+```text
+Employee applies for leave
+          ↓
+Backend checks leave balance
+          ↓
+Leave request created
+          ↓
+HR/Manager sees request
+          ↓
+Approve or Reject
+       /       \
+   Approved   Rejected
+      ↓          ↓
+Balance       Request
+updated       closed
+```
+
+The system supports:
+
+* Leave balance
+* Business-day calculation
+* Holidays
+* Leave approval
+* Leave rejection
+* Leave cancellation
+* Leave calendar
+
+---
+
+# 12. Shift Management
+
+HR/Admin can create shifts.
+
+Example:
+
+```text
+Morning Shift
+09:00 AM → 06:00 PM
+```
+
+Employees can then be assigned to shifts.
+
+The system provides:
+
+* Individual assignment
+* Bulk assignment
+* Weekly roster
+* Employee shift view
+
+The assigned shift is important because attendance calculations use it to determine things like:
+
+* Late arrival
+* Expected working hours
+* Overtime
+
+---
+
+# 13. Payroll Flow
+
+Payroll uses employee salary information and attendance information.
+
+Simple flow:
+
+```text
+Employee Salary
+      +
+Attendance
+      +
+Working Hours
+      +
+Overtime
+      +
+Allowances
+      -
+Deductions
+      ↓
+Payroll Calculation
+      ↓
+Payslip Generated
+      ↓
+PDF Payslip
+      ↓
+Released to Employee
+```
+
+HR can generate payslips for a pay period.
+
+Employees can view/download their payslips from the mobile app.
+
+---
+
+# 14. Notifications
+
+Notifications are generated when important events happen.
+
+For example:
+
+```text
+Leave Approved
+      ↓
+Backend creates notification
+      ↓
+Notification appears
+in mobile app
+      ↓
+Firebase can also send
+push notification
+```
+
+Notifications can be used for:
+
+* Leave approval
+* Leave rejection
+* Payslip release
+* Company announcements
+* Department announcements
+* Other important system events
+
+---
+
+# 15. Admin Dashboard Flow
+
+The admin dashboard is the main control center for HR, managers and admins.
+
+The dashboard can be used to manage:
+
+```text
+Employees
+    ↓
+Attendance
+    ↓
+Departments
+    ↓
+Leave
+    ↓
+Shifts
+    ↓
+Payroll
+    ↓
+Offices
+    ↓
+Face Management
+    ↓
+QR Attendance
+    ↓
+Notifications
+    ↓
+AI Analytics
+    ↓
+Users & Roles
+    ↓
+Settings
+    ↓
+Audit Logs
+```
+
+---
+
+# 16. Departments
+
+Each department can show information such as:
+
+* Department head
+* Number of employees
+* Attendance percentage
+* Employees on leave
+* Coverage
+
+The admin can also open a department and directly view its employees.
+
+---
+
+# 17. Offices and Locations
+
+A company can have multiple offices.
+
+Each building has its own geofence.
+
+Example:
+
+```text
+Company
+  |
+  ├── Delhi Office
+  │      ├── Floor 1
+  │      ├── Floor 2
+  │      └── Rooms
+  │
+  └── Mumbai Office
+         ├── Floor 1
+         └── Rooms
+```
+
+An employee has a primary office.
+
+The office location is used for GPS attendance.
+
+---
+
+# 18. Face Management
+
+Admins can see face enrollment status.
+
+For example:
+
+* Enrolled
+* Not registered
+* Re-enrollment required
+* Verifications today
+
+The admin console shows the employee's **enrollment state** rather than displaying the raw biometric template.
+
+---
+
+# 19. AI Analytics
+
+The system also analyzes workforce attendance data.
+
+The dashboard can show:
+
+* Attendance trends
+* Department comparison
+* Punctuality
+* Overtime concentration
+* Late-arrival risk
+* Absenteeism forecast
+* Attendance anomalies
+
+The system also provides statistics such as:
+
+* Confidence interval
+* Month-over-month trend
+* R² fit statistic
+* Backtest error
+* Department contribution
+
+The goal is to help HR understand workforce patterns.
+
+---
+
+# 20. Anomaly Detection
+
+The system checks attendance data for unusual activity.
+
+Examples:
+
+```text
+Unusual check-in location
+        ↓
+Potential anomaly
+
+Duplicate face
+        ↓
+Potential anomaly
+
+Very high overtime
+        ↓
+Potential anomaly
+```
+
+The system uses rule-based checks and an unsupervised ML model for attendance anomalies.
+
+---
+
+# 21. Alerts Center
+
+The Alerts Center brings important issues into one place.
+
+It can contain:
+
+* Attendance anomalies
+* Pending attendance corrections
+* Leave exceptions
+* Payroll exceptions
+* AI-generated workforce signals
+
+HR/Admin can:
+
+* View
+* Act
+* Filter
+* Snooze alerts
+
+---
+
+# 22. Attendance Correction
+
+Sometimes an employee's attendance is wrong.
+
+For example:
+
+```text
+Old Check-In: 09:00
+New Check-In: 09:30
+```
+
+HR/Manager can review the correction.
+
+```text
+Correction Requested
+        ↓
+HR/Manager Reviews
+        ↓
+Approve / Reject
+      /       \
+ Approve     Reject
+    ↓           ↓
+Attendance   Original
+updated      remains
+```
+
+The system keeps the change in the audit log.
+
+---
+
+# 23. Audit Logs
+
+Important actions are recorded.
+
+For example:
+
+```text
+Who?
+ ↓
+HR User
+
+What?
+ ↓
+Changed attendance
+
+Which record?
+ ↓
+Employee attendance
+
+What changed?
+ ↓
+09:00 → 09:30
+
+Result?
+ ↓
+Approved
+```
+
+This creates an append-only history of important system actions.
+
+---
+
+# 24. Data Flow
+
+Almost everything follows the same basic pattern:
+
+```text
+User Action
+    ↓
+Mobile App / Admin Dashboard
+    ↓
+REST API
+    ↓
+Authentication
+    ↓
+Permission Check
+    ↓
+Business Logic
+    ↓
+MongoDB
+    ↓
+Response
+    ↓
+Mobile App / Dashboard
+```
+
+This is important:
+
+> **The frontend does not directly talk to MongoDB.**
+
+Both the mobile app and admin dashboard communicate with the backend.
+
+The backend is the **single source of truth**.
+
+---
+
+# 25. External Services
+
+The system also uses external services.
+
+### MongoDB Atlas
+
+Stores application data.
+
+```text
+Employees
+Attendance
+Leave
+Shifts
+Payroll
+Users
+Notifications
+etc.
+```
+
+### Cloudinary
+
+Used for file storage.
+
+### Firebase Cloud Messaging
+
+Used for push notifications.
+
+### Render / Vercel / Docker
+
+Used for deployment and hosting.
+
+---
+
+# 26. Technology Used
+
+### Backend
+
+* Node.js
+* Express
+* TypeScript
+* MongoDB
+* Mongoose
+
+### Admin Dashboard
+
+* React
+* Vite
+* TypeScript
+* Tailwind CSS
+* React Router
+* TanStack Query
+* Zustand
+* Axios
+
+### Mobile App
+
+* Flutter
+* Riverpod
+* Dio
+* GoRouter
+* Hive
+* ML Kit
+* ONNX Runtime
+
+---
+
+# 27. Complete Example: Employee Starts Their Day
+
+Here is a simple real-world example.
+
+### Step 1 — Employee opens the app
+
+```text
+Employee
+   ↓
+Mobile App
+   ↓
+Login
+```
+
+### Step 2 — Employee checks in
+
+They choose GPS, QR or Face.
+
+```text
+Mobile App
+   ↓
+Backend
+   ↓
+Validate attendance
+   ↓
+Create attendance record
+```
+
+### Step 3 — System calculates attendance
+
+The backend checks the employee's shift.
+
+```text
+Shift: 09:00
+Check-in: 09:15
+
+        ↓
+
+Employee is late by 15 minutes
+```
+
+### Step 4 — Employee works
+
+The employee can see their attendance status from the app.
+
+### Step 5 — Employee checks out
+
+```text
+Check Out
+   ↓
+Backend
+   ↓
+Calculate working hours
+   ↓
+Calculate overtime if applicable
+```
+
+### Step 6 — Payroll uses this information
+
+At the end of the pay period:
+
+```text
+Attendance
++
+Salary
++
+Overtime
++
+Allowances
+-
+Deductions
+       ↓
+Payroll
+       ↓
+Payslip
+```
+
+### Step 7 — Employee receives payslip
+
+HR releases the payslip.
+
+```text
+HR releases payslip
+       ↓
+Backend
+       ↓
+Notification
+       ↓
+Employee Mobile App
+       ↓
+Employee downloads PDF
+```
+
+---
+
+# 28. Complete System in One Picture
+
+```text
+                     COMPANY
+                        |
+          ┌─────────────┴─────────────┐
+          |                           |
+       EMPLOYEES                  HR / ADMIN
+          |                           |
+          v                           v
+   ┌──────────────┐          ┌────────────────┐
+   │ Mobile App   │          │ Admin Dashboard│
+   └──────┬───────┘          └───────┬────────┘
+          |                          |
+          └──────────┬───────────────┘
+                     |
+                     v
+             ┌───────────────┐
+             │ Backend API   │
+             │ Node/Express  │
+             └───────┬───────┘
+                     |
+        ┌────────────┼────────────┐
+        |            |            |
+        v            v            v
+   ┌─────────┐ ┌──────────┐ ┌──────────┐
+   │ MongoDB │ │Cloudinary│ │ Firebase │
+   │  Data   │ │  Files   │ │  Push    │
+   └─────────┘ └──────────┘ └──────────┘
+                     |
+                     v
+              Business Logic
+                     |
+       ┌─────────────┼─────────────┐
+       |             |             |
+       v             v             v
+  Attendance       Payroll       Analytics
+       |             |             |
+       └─────────────┼─────────────┘
+                     |
+                     v
+                Notifications
+```
+
+---
+
+# 29. Important Rule to Remember
+
+If you are new to this project, remember these **5 things**:
+
+### 1. Mobile App = Employee Side
+
+Employees use it for their daily work.
+
+### 2. Admin Dashboard = Management Side
+
+HR, managers and admins use it to manage employees and company operations.
+
+### 3. Backend = Brain
+
+The backend handles authentication, permissions, calculations and business rules.
+
+### 4. MongoDB = Main Database
+
+Important system data is stored here.
+
+### 5. Backend Controls Everything
+
+The frontend should not directly access the database.
+
+```text
+Mobile App ──────┐
+                 │
+                 ▼
+             Backend
+                 │
+                 ▼
+             MongoDB
+                 ▲
+                 │
+Admin Dashboard ─┘
+```
+
+---
+
+# 30. Running the Project
+
+Each part of the system can be run separately.
+
+### Backend
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Or use Docker:
+
+```bash
+docker compose up --build
+```
+
+### Admin Dashboard
+
+```bash
+cd admin-dashboard
+npm install
+npm run dev
+```
+
+### Mobile App
+
+```bash
+cd mobile-app
+flutter pub get
+flutter run
+
